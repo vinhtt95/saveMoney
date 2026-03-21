@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { AddTransactionForm } from '../components/AddTransactionModal';
 import {
   getExpenses,
   getTotalSpending,
@@ -43,6 +44,7 @@ function calcChange(current: number, previous: number): { pct: string; up: boole
 export function Dashboard() {
   const { state, dispatch } = useApp();
   const [showPeriodMenu, setShowPeriodMenu] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
 
   const allTxs = state.transactions;
   const period = state.selectedPeriod;
@@ -95,6 +97,14 @@ export function Dashboard() {
       .sort((a, b) => b.date.getTime() - a.date.getTime())
       .slice(0, 10);
   }, [periodTxs]);
+
+  const allCategories = state.categories;
+  const allAccounts = state.accounts;
+
+  function handleAddConfirm(tx: import('../types').Transaction) {
+    dispatch({ type: 'ADD_TRANSACTION', transaction: tx });
+    setShowAddForm(false);
+  }
 
   const hasData = allTxs.length > 0;
 
@@ -298,10 +308,33 @@ export function Dashboard() {
       <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
           <h3 className="font-bold text-slate-900 dark:text-white">Recent Transactions</h3>
-          <Link to="/transactions" className="text-sm font-semibold text-primary dark:text-slate-300 hover:underline">
-            View All
-          </Link>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowAddForm((v) => !v)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
+            >
+              <span className="material-symbols-outlined text-sm">add</span>
+              Thêm
+            </button>
+            <Link to="/transactions" className="text-sm font-semibold text-primary dark:text-slate-300 hover:underline">
+              View All
+            </Link>
+          </div>
         </div>
+        {showAddForm && (
+          <div className="p-4 border-b border-slate-100 dark:border-slate-800">
+            <AddTransactionForm
+              open={showAddForm}
+              onClose={() => setShowAddForm(false)}
+              onConfirm={handleAddConfirm}
+              allCategories={allCategories}
+              allAccounts={allAccounts}
+              defaultCategoryExpense={state.defaultCategoryExpense}
+              defaultCategoryIncome={state.defaultCategoryIncome}
+              defaultAccount={state.defaultAccount}
+            />
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 text-xs font-bold uppercase tracking-wider">
