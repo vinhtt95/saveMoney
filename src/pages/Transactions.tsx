@@ -82,14 +82,16 @@ const fieldCls = 'w-full px-2 py-1.5 bg-white dark:bg-slate-800 border border-sl
 function InlineFields({
   draft,
   onChange,
-  allCategories,
+  expenseCategories,
+  incomeCategories,
   allAccounts,
   defaultCategoryExpense = '',
   defaultCategoryIncome = '',
 }: {
   draft: Draft;
   onChange: (patch: Partial<Draft>) => void;
-  allCategories: string[];
+  expenseCategories: string[];
+  incomeCategories: string[];
   allAccounts: string[];
   defaultCategoryExpense?: string;
   defaultCategoryIncome?: string;
@@ -137,7 +139,7 @@ function InlineFields({
         <Combobox
           value={draft.category}
           onChange={(v) => onChange({ category: v })}
-          options={allCategories}
+          options={draft.type === 'Expense' ? expenseCategories : draft.type === 'Income' ? incomeCategories : []}
           placeholder="Coffee, Transport..."
           allowCustom
         />
@@ -221,7 +223,10 @@ export function Transactions() {
     () => [...new Set(periodTxs.map((t) => t.account))].sort(),
     [periodTxs]
   );
-  const allTransactionCategories = state.categories;
+  const allTransactionCategories = useMemo(
+    () => [...state.expenseCategories, ...state.incomeCategories].sort(),
+    [state.expenseCategories, state.incomeCategories]
+  );
   const allTransactionAccounts = state.accounts;
 
   const filtered = useMemo(() => {
@@ -345,7 +350,8 @@ export function Transactions() {
               open={isAdding}
               onClose={() => setIsAdding(false)}
               onConfirm={handleAddConfirm}
-              allCategories={allTransactionCategories}
+              expenseCategories={state.expenseCategories}
+              incomeCategories={state.incomeCategories}
               allAccounts={allTransactionAccounts}
               defaultCategoryExpense={state.defaultCategoryExpense}
               defaultCategoryIncome={state.defaultCategoryIncome}
@@ -569,7 +575,8 @@ export function Transactions() {
                     open={isAdding}
                     onClose={() => setIsAdding(false)}
                     onConfirm={handleAddConfirm}
-                    allCategories={allTransactionCategories}
+                    expenseCategories={state.expenseCategories}
+              incomeCategories={state.incomeCategories}
                     allAccounts={allTransactionAccounts}
                     defaultCategoryExpense={state.defaultCategoryExpense}
                     defaultCategoryIncome={state.defaultCategoryIncome}
@@ -651,7 +658,8 @@ export function Transactions() {
                                   <InlineFields
                                     draft={draft}
                                     onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
-                                    allCategories={allTransactionCategories}
+                                    expenseCategories={state.expenseCategories}
+              incomeCategories={state.incomeCategories}
                                     allAccounts={allTransactionAccounts}
                                   />
                                   {editError && <p className="text-xs text-rose-500 mt-2">{editError}</p>}

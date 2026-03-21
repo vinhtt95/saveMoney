@@ -98,7 +98,10 @@ export function Dashboard() {
       .slice(0, 10);
   }, [periodTxs]);
 
-  const allCategories = state.categories;
+  const allCategories = useMemo(
+    () => [...state.expenseCategories, ...state.incomeCategories].sort(),
+    [state.expenseCategories, state.incomeCategories]
+  );
   const allAccounts = state.accounts;
 
   function handleAddConfirm(tx: import('../types').Transaction) {
@@ -327,7 +330,8 @@ export function Dashboard() {
               open={showAddForm}
               onClose={() => setShowAddForm(false)}
               onConfirm={handleAddConfirm}
-              allCategories={allCategories}
+              expenseCategories={state.expenseCategories}
+              incomeCategories={state.incomeCategories}
               allAccounts={allAccounts}
               defaultCategoryExpense={state.defaultCategoryExpense}
               defaultCategoryIncome={state.defaultCategoryIncome}

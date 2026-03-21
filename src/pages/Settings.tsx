@@ -79,15 +79,17 @@ export function Settings() {
     }
   }
 
+  const [newCategoryType, setNewCategoryType] = useState<'Expense' | 'Income'>('Expense');
+
   function addCategory() {
     const val = newCategory.trim();
-    if (!val || state.categories.includes(val)) return;
-    dispatch({ type: 'SET_CATEGORIES', categories: [...state.categories, val].sort() });
+    if (!val) return;
+    dispatch({ type: 'ADD_CATEGORY', name: val, categoryType: newCategoryType });
     setNewCategory('');
   }
 
-  function removeCategory(cat: string) {
-    dispatch({ type: 'SET_CATEGORIES', categories: state.categories.filter((c) => c !== cat) });
+  function removeCategory(cat: string, categoryType: 'Expense' | 'Income') {
+    dispatch({ type: 'DELETE_CATEGORY', name: cat, categoryType });
   }
 
   function addAccount() {
@@ -287,7 +289,7 @@ export function Settings() {
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
                 >
                   <option value="">— Không có mặc định —</option>
-                  {state.categories.map((cat) => (
+                  {state.expenseCategories.map((cat) => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
                 </select>
@@ -303,7 +305,7 @@ export function Settings() {
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
                 >
                   <option value="">— Không có mặc định —</option>
-                  {state.categories.map((cat) => (
+                  {state.incomeCategories.map((cat) => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
                 </select>
@@ -333,11 +335,19 @@ export function Settings() {
                 <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Danh mục</h3>
                 <p className="text-sm text-slate-500">Quản lý danh sách danh mục dùng trong form nhập giao dịch.</p>
               </div>
-              <span className="text-sm font-semibold text-primary">{state.categories.length} danh mục</span>
+              <span className="text-sm font-semibold text-primary">{state.expenseCategories.length + state.incomeCategories.length} danh mục</span>
             </div>
             <div className="p-6 space-y-4">
               {/* Add new */}
               <div className="flex gap-2">
+                <select
+                  value={newCategoryType}
+                  onChange={(e) => setNewCategoryType(e.target.value as 'Expense' | 'Income')}
+                  className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                >
+                  <option value="Expense">Chi tiêu</option>
+                  <option value="Income">Thu nhập</option>
+                </select>
                 <input
                   type="text"
                   value={newCategory}
@@ -348,7 +358,7 @@ export function Settings() {
                 />
                 <button
                   onClick={addCategory}
-                  disabled={!newCategory.trim() || state.categories.includes(newCategory.trim())}
+                  disabled={!newCategory.trim()}
                   className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <span className="material-symbols-outlined text-sm">add</span>
@@ -356,24 +366,40 @@ export function Settings() {
                 </button>
               </div>
               {/* List */}
-              {state.categories.length === 0 ? (
+              {state.expenseCategories.length === 0 && state.incomeCategories.length === 0 ? (
                 <p className="text-sm text-slate-400 text-center py-4">Chưa có danh mục nào. Import CSV hoặc thêm thủ công.</p>
               ) : (
-                <div className="flex flex-wrap gap-2">
-                  {state.categories.map((cat) => (
-                    <span
-                      key={cat}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-full text-sm font-medium text-slate-700 dark:text-slate-300"
-                    >
-                      {cat}
-                      <button
-                        onClick={() => removeCategory(cat)}
-                        className="size-4 flex items-center justify-center rounded-full hover:bg-rose-100 hover:text-rose-600 transition-colors text-slate-400"
-                      >
-                        <span className="material-symbols-outlined text-xs">close</span>
-                      </button>
-                    </span>
-                  ))}
+                <div className="space-y-3">
+                  {state.expenseCategories.length > 0 && (
+                    <div>
+                      <p className="text-xs font-bold uppercase text-rose-500 mb-1.5">Chi tiêu</p>
+                      <div className="flex flex-wrap gap-2">
+                        {state.expenseCategories.map((cat) => (
+                          <span key={cat} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 dark:bg-rose-900/20 rounded-full text-sm font-medium text-slate-700 dark:text-slate-300">
+                            {cat}
+                            <button onClick={() => removeCategory(cat, 'Expense')} className="size-4 flex items-center justify-center rounded-full hover:bg-rose-100 hover:text-rose-600 transition-colors text-slate-400">
+                              <span className="material-symbols-outlined text-xs">close</span>
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {state.incomeCategories.length > 0 && (
+                    <div>
+                      <p className="text-xs font-bold uppercase text-emerald-500 mb-1.5">Thu nhập</p>
+                      <div className="flex flex-wrap gap-2">
+                        {state.incomeCategories.map((cat) => (
+                          <span key={cat} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-full text-sm font-medium text-slate-700 dark:text-slate-300">
+                            {cat}
+                            <button onClick={() => removeCategory(cat, 'Income')} className="size-4 flex items-center justify-center rounded-full hover:bg-emerald-100 hover:text-emerald-600 transition-colors text-slate-400">
+                              <span className="material-symbols-outlined text-xs">close</span>
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

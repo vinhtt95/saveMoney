@@ -13,6 +13,7 @@ const navItems = [
   { name: 'Transactions', icon: 'receipt_long', path: '/transactions' },
   { name: 'Analytics', icon: 'insights', path: '/analytics' },
   { name: 'Accounts', icon: 'account_balance', path: '/accounts' },
+  { name: 'Categories', icon: 'category', path: '/categories' },
   { name: 'Settings', icon: 'settings', path: '/settings' },
 ];
 

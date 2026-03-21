@@ -74,7 +74,8 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onConfirm: (tx: Transaction) => void;
-  allCategories: string[];
+  expenseCategories: string[];
+  incomeCategories: string[];
   allAccounts: string[];
   defaultCategoryExpense?: string;
   defaultCategoryIncome?: string;
@@ -85,7 +86,8 @@ export function AddTransactionForm({
   open,
   onClose,
   onConfirm,
-  allCategories,
+  expenseCategories,
+  incomeCategories,
   allAccounts,
   defaultCategoryExpense = '',
   defaultCategoryIncome = '',
@@ -205,7 +207,7 @@ export function AddTransactionForm({
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 <div>
                   <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Danh mục <span className="text-rose-400">*</span></p>
-                  <Combobox value={draft.category} onChange={(v) => patch({ category: v })} options={allCategories} placeholder="Coffee, Transport..." allowCustom />
+                  <Combobox value={draft.category} onChange={(v) => patch({ category: v })} options={mode === 'Expense' ? expenseCategories : mode === 'Income' ? incomeCategories : []} placeholder="Coffee, Transport..." allowCustom />
                 </div>
                 <div>
                   <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Tài khoản</p>

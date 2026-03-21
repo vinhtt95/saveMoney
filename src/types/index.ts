@@ -23,7 +23,8 @@ export interface AppState {
   transactions: Transaction[];
   filters: FilterState;
   selectedPeriod: string; // 'all' | 'YYYY-MM'
-  categories: string[];
+  expenseCategories: string[];
+  incomeCategories: string[];
   accounts: string[];
   accountBalances: Record<string, number>;
   defaultCategoryExpense: string;
