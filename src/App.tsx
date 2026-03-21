@@ -11,6 +11,7 @@ import { Analytics } from './pages/Analytics';
 import { Settings } from './pages/Settings';
 import { Accounts } from './pages/Accounts';
 import { Categories } from './pages/Categories';
+import { Budget } from './pages/Budget';
 import { AppProvider } from './context/AppContext';
 
 export default function App() {
@@ -24,6 +25,7 @@ export default function App() {
             <Route path="analytics" element={<Analytics />} />
             <Route path="accounts" element={<Accounts />} />
             <Route path="categories" element={<Categories />} />
+            <Route path="budget" element={<Budget />} />
             <Route path="settings" element={<Settings />} />
           </Route>
         </Routes>

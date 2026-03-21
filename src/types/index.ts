@@ -19,6 +19,15 @@ export interface FilterState {
   dateEnd: string | null;
 }
 
+export interface Budget {
+  id: string;
+  name: string;
+  limit: number;       // VND
+  dateStart: string;   // 'YYYY-MM-DD'
+  dateEnd: string;     // 'YYYY-MM-DD'
+  categories: string[];
+}
+
 export interface AppState {
   transactions: Transaction[];
   filters: FilterState;
