@@ -23,4 +23,6 @@ export interface AppState {
   transactions: Transaction[];
   filters: FilterState;
   selectedPeriod: string; // 'all' | 'YYYY-MM'
+  categories: string[];
+  accounts: string[];
 }

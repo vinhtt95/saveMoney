@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { parseCSV, exportCSV } from '../utils/csvParser';
 import { formatVND, formatDate } from '../utils/formatters';
 
-type Tab = 'data' | 'display' | 'about';
+type Tab = 'data' | 'lists' | 'display' | 'about';
 
 export function Settings() {
   const { state, dispatch } = useApp();
@@ -13,6 +13,8 @@ export function Settings() {
   const [importMsg, setImportMsg] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [newCategory, setNewCategory] = useState('');
+  const [newAccount, setNewAccount] = useState('');
 
   function handleFile(file: File) {
     if (!file.name.endsWith('.csv')) {
@@ -70,8 +72,31 @@ export function Settings() {
     }
   }
 
+  function addCategory() {
+    const val = newCategory.trim();
+    if (!val || state.categories.includes(val)) return;
+    dispatch({ type: 'SET_CATEGORIES', categories: [...state.categories, val].sort() });
+    setNewCategory('');
+  }
+
+  function removeCategory(cat: string) {
+    dispatch({ type: 'SET_CATEGORIES', categories: state.categories.filter((c) => c !== cat) });
+  }
+
+  function addAccount() {
+    const val = newAccount.trim();
+    if (!val || state.accounts.includes(val)) return;
+    dispatch({ type: 'SET_ACCOUNTS', accounts: [...state.accounts, val].sort() });
+    setNewAccount('');
+  }
+
+  function removeAccount(acc: string) {
+    dispatch({ type: 'SET_ACCOUNTS', accounts: state.accounts.filter((a) => a !== acc) });
+  }
+
   const tabs: { id: Tab; label: string }[] = [
     { id: 'data', label: 'Data Management' },
+    { id: 'lists', label: 'Danh mục & Tài khoản' },
     { id: 'display', label: 'Display & Theme' },
     { id: 'about', label: 'About App' },
   ];
@@ -230,6 +255,116 @@ export function Settings() {
                   Clear Database
                 </button>
               </div>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {activeTab === 'lists' && (
+        <div className="max-w-5xl space-y-8">
+          {/* Categories */}
+          <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Danh mục</h3>
+                <p className="text-sm text-slate-500">Quản lý danh sách danh mục dùng trong form nhập giao dịch.</p>
+              </div>
+              <span className="text-sm font-semibold text-primary">{state.categories.length} danh mục</span>
+            </div>
+            <div className="p-6 space-y-4">
+              {/* Add new */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newCategory}
+                  onChange={(e) => setNewCategory(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addCategory()}
+                  placeholder="Nhập tên danh mục mới..."
+                  className="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                />
+                <button
+                  onClick={addCategory}
+                  disabled={!newCategory.trim() || state.categories.includes(newCategory.trim())}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <span className="material-symbols-outlined text-sm">add</span>
+                  Thêm
+                </button>
+              </div>
+              {/* List */}
+              {state.categories.length === 0 ? (
+                <p className="text-sm text-slate-400 text-center py-4">Chưa có danh mục nào. Import CSV hoặc thêm thủ công.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {state.categories.map((cat) => (
+                    <span
+                      key={cat}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-full text-sm font-medium text-slate-700 dark:text-slate-300"
+                    >
+                      {cat}
+                      <button
+                        onClick={() => removeCategory(cat)}
+                        className="size-4 flex items-center justify-center rounded-full hover:bg-rose-100 hover:text-rose-600 transition-colors text-slate-400"
+                      >
+                        <span className="material-symbols-outlined text-xs">close</span>
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Accounts */}
+          <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Tài khoản</h3>
+                <p className="text-sm text-slate-500">Quản lý danh sách tài khoản dùng trong form nhập giao dịch.</p>
+              </div>
+              <span className="text-sm font-semibold text-primary">{state.accounts.length} tài khoản</span>
+            </div>
+            <div className="p-6 space-y-4">
+              {/* Add new */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newAccount}
+                  onChange={(e) => setNewAccount(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addAccount()}
+                  placeholder="Nhập tên tài khoản mới..."
+                  className="flex-1 px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                />
+                <button
+                  onClick={addAccount}
+                  disabled={!newAccount.trim() || state.accounts.includes(newAccount.trim())}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <span className="material-symbols-outlined text-sm">add</span>
+                  Thêm
+                </button>
+              </div>
+              {/* List */}
+              {state.accounts.length === 0 ? (
+                <p className="text-sm text-slate-400 text-center py-4">Chưa có tài khoản nào. Import CSV hoặc thêm thủ công.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {state.accounts.map((acc) => (
+                    <span
+                      key={acc}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-full text-sm font-medium text-slate-700 dark:text-slate-300"
+                    >
+                      {acc}
+                      <button
+                        onClick={() => removeAccount(acc)}
+                        className="size-4 flex items-center justify-center rounded-full hover:bg-rose-100 hover:text-rose-600 transition-colors text-slate-400"
+                      >
+                        <span className="material-symbols-outlined text-xs">close</span>
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
         </div>

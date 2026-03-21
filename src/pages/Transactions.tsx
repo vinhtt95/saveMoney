@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { getExpenses, getTotalSpending, getTotalIncome, getAvgDaily, filterByPeriod, getAvailablePeriods } from '../utils/analytics';
 import { formatVND, formatVNDShort, formatDate } from '../utils/formatters';
+import { Transaction, TransactionType } from '../types';
+import { Combobox } from '../components/Combobox';
 
 const CATEGORY_ICONS: Record<string, { icon: string; color: string; bg: string }> = {
   Transport: { icon: 'directions_car', color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/30' },
@@ -22,9 +24,169 @@ function getIcon(category: string) {
   return CATEGORY_ICONS[category] || { icon: 'receipt_long', color: 'text-slate-600', bg: 'bg-slate-100 dark:bg-slate-800' };
 }
 
+const TRANSACTION_TYPES: TransactionType[] = ['Expense', 'Income', 'Transfer', 'Account'];
+
+interface Draft {
+  date: string;
+  type: TransactionType;
+  category: string;
+  account: string;
+  transferTo: string;
+  amountStr: string;
+}
+
+function emptyDraft(): Draft {
+  return {
+    date: new Date().toISOString().slice(0, 10),
+    type: 'Expense',
+    category: '',
+    account: '',
+    transferTo: '',
+    amountStr: '',
+  };
+}
+
+function draftFromTx(tx: Transaction): Draft {
+  return {
+    date: tx.date.toISOString().slice(0, 10),
+    type: tx.type,
+    category: tx.category,
+    account: tx.account,
+    transferTo: tx.transferTo,
+    amountStr: String(Math.abs(tx.amount)),
+  };
+}
+
+function draftToTx(draft: Draft, id: string): Transaction | null {
+  const amt = parseFloat(draft.amountStr);
+  if (!draft.date || !draft.category.trim() || !draft.account.trim() || !draft.amountStr || isNaN(amt) || amt <= 0) {
+    return null;
+  }
+  if (draft.type === 'Transfer' && !draft.transferTo.trim()) return null;
+  return {
+    id,
+    date: new Date(draft.date),
+    type: draft.type,
+    category: draft.category.trim(),
+    account: draft.account.trim(),
+    transferTo: draft.transferTo.trim(),
+    amount: draft.type === 'Expense' ? -Math.abs(amt) : Math.abs(amt),
+  };
+}
+
+// Shared inline field styling
+const fieldCls = 'w-full px-2 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition';
+
+function InlineFields({
+  draft,
+  onChange,
+  allCategories,
+  allAccounts,
+}: {
+  draft: Draft;
+  onChange: (patch: Partial<Draft>) => void;
+  allCategories: string[];
+  allAccounts: string[];
+}) {
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+      {/* Type */}
+      <div className="col-span-2 md:col-span-3">
+        <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Loại</p>
+        <div className="flex gap-1.5 flex-wrap">
+          {TRANSACTION_TYPES.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => onChange({ type: t, transferTo: '' })}
+              className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                draft.type === t
+                  ? 'bg-primary text-white border-primary'
+                  : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50'
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Date */}
+      <div>
+        <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Ngày</p>
+        <input
+          type="date"
+          value={draft.date}
+          onChange={(e) => onChange({ date: e.target.value })}
+          className={fieldCls}
+        />
+      </div>
+
+      {/* Category */}
+      <div>
+        <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Danh mục</p>
+        <Combobox
+          value={draft.category}
+          onChange={(v) => onChange({ category: v })}
+          options={allCategories}
+          placeholder="Coffee, Transport..."
+          allowCustom
+        />
+      </div>
+
+      {/* Account */}
+      <div>
+        <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Tài khoản</p>
+        <Combobox
+          value={draft.account}
+          onChange={(v) => onChange({ account: v })}
+          options={allAccounts}
+          placeholder="Tiền mặt..."
+          allowCustom
+        />
+      </div>
+
+      {/* Transfer To (only Transfer type) */}
+      {draft.type === 'Transfer' && (
+        <div>
+          <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Chuyển đến</p>
+          <Combobox
+            value={draft.transferTo}
+            onChange={(v) => onChange({ transferTo: v })}
+            options={allAccounts}
+            placeholder="Tài khoản đích..."
+            allowCustom
+          />
+        </div>
+      )}
+
+      {/* Amount */}
+      <div>
+        <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">
+          Số tiền (VND){draft.type === 'Expense' && <span className="ml-1 text-rose-400 normal-case font-normal">— tự ghi âm</span>}
+        </p>
+        <input
+          type="number"
+          min="1"
+          step="any"
+          value={draft.amountStr}
+          onChange={(e) => onChange({ amountStr: e.target.value })}
+          placeholder="50000"
+          className={fieldCls}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function Transactions() {
   const { state, dispatch } = useApp();
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [isAdding, setIsAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Draft>(emptyDraft);
+  const [addError, setAddError] = useState('');
+  const [editError, setEditError] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [showCategoryMenu, setShowCategoryMenu] = useState(false);
@@ -43,7 +205,6 @@ export function Transactions() {
     [transactions, selectedPeriod]
   );
 
-  // Unique categories and accounts from period
   const allCategories = useMemo(
     () => [...new Set(periodTxs.filter((t) => t.type === 'Expense' || t.type === 'Income').map((t) => t.category))].sort(),
     [periodTxs]
@@ -52,8 +213,9 @@ export function Transactions() {
     () => [...new Set(periodTxs.map((t) => t.account))].sort(),
     [periodTxs]
   );
+  const allTransactionCategories = state.categories;
+  const allTransactionAccounts = state.accounts;
 
-  // Filtered transactions
   const filtered = useMemo(() => {
     let txs = periodTxs.filter((t) => t.type === 'Expense' || t.type === 'Income');
     if (filters.search) {
@@ -74,7 +236,6 @@ export function Transactions() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
 
-  // Group paginated transactions by date
   const groupedByDay = useMemo(() => {
     const groups: { dateKey: string; date: Date; txs: typeof paginated; dayIncome: number; dayExpense: number }[] = [];
     const map = new Map<string, typeof groups[0]>();
@@ -93,7 +254,6 @@ export function Transactions() {
     return groups;
   }, [paginated]);
 
-  // Reset page when filters or pageSize change
   useMemo(() => setPage(1), [filters, selectedPeriod, pageSize]);
 
   const expenses = useMemo(() => getExpenses(filtered), [filtered]);
@@ -102,18 +262,11 @@ export function Transactions() {
   const avgDaily = useMemo(() => getAvgDaily(filtered), [filtered]);
   const netFlow = totalIncome - totalSpending;
 
-  // Close dropdowns on outside click
   useEffect(() => {
     function handler(e: MouseEvent) {
-      if (categoryMenuRef.current && !categoryMenuRef.current.contains(e.target as Node)) {
-        setShowCategoryMenu(false);
-      }
-      if (accountMenuRef.current && !accountMenuRef.current.contains(e.target as Node)) {
-        setShowAccountMenu(false);
-      }
-      if (periodMenuRef.current && !periodMenuRef.current.contains(e.target as Node)) {
-        setShowPeriodMenu(false);
-      }
+      if (categoryMenuRef.current && !categoryMenuRef.current.contains(e.target as Node)) setShowCategoryMenu(false);
+      if (accountMenuRef.current && !accountMenuRef.current.contains(e.target as Node)) setShowAccountMenu(false);
+      if (periodMenuRef.current && !periodMenuRef.current.contains(e.target as Node)) setShowPeriodMenu(false);
     }
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -133,6 +286,45 @@ export function Transactions() {
     dispatch({ type: 'SET_FILTER', filter: { accounts: accs } });
   }
 
+  function startAdd() {
+    setDraft(emptyDraft());
+    setAddError('');
+    setIsAdding(true);
+    setEditingId(null);
+  }
+
+  function cancelAdd() {
+    setIsAdding(false);
+    setAddError('');
+  }
+
+  function confirmAdd() {
+    const tx = draftToTx(draft, crypto.randomUUID());
+    if (!tx) { setAddError('Vui lòng điền đầy đủ thông tin hợp lệ.'); return; }
+    dispatch({ type: 'ADD_TRANSACTION', transaction: tx });
+    setIsAdding(false);
+    setAddError('');
+  }
+
+  function startEdit(tx: Transaction) {
+    setDraft(draftFromTx(tx));
+    setEditError('');
+    setEditingId(tx.id);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditError('');
+  }
+
+  function confirmEdit(originalId: string) {
+    const tx = draftToTx(draft, originalId);
+    if (!tx) { setEditError('Vui lòng điền đầy đủ thông tin hợp lệ.'); return; }
+    dispatch({ type: 'EDIT_TRANSACTION', transaction: tx });
+    setEditingId(null);
+    setEditError('');
+  }
+
   if (transactions.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-4">
@@ -140,19 +332,50 @@ export function Transactions() {
           <span className="material-symbols-outlined text-3xl text-slate-400">receipt_long</span>
         </div>
         <h2 className="text-xl font-bold text-slate-900 dark:text-white">No transactions</h2>
-        <p className="text-slate-500 text-sm">Import your Savey CSV to see transactions.</p>
-        <Link to="/settings" className="px-6 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:opacity-90 transition-opacity">
-          Import Data
-        </Link>
+        <p className="text-slate-500 text-sm">Import your Savey CSV or add manually.</p>
+        <div className="flex gap-3">
+          <button onClick={startAdd} className="px-6 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:opacity-90 transition-opacity flex items-center gap-2">
+            <span className="material-symbols-outlined text-sm">add</span> Thêm giao dịch
+          </button>
+          <Link to="/settings" className="px-6 py-2 border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+            Import CSV
+          </Link>
+        </div>
+        {/* Inline add form for empty state */}
+        {isAdding && (
+          <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-xl border-2 border-primary/30 shadow-sm p-6 mt-2">
+            <p className="text-xs font-bold uppercase text-primary mb-4 tracking-wide">Giao dịch mới</p>
+            <InlineFields
+              draft={draft}
+              onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
+              allCategories={allTransactionCategories}
+              allAccounts={allTransactionAccounts}
+            />
+            {addError && <p className="text-xs text-rose-500 mt-3">{addError}</p>}
+            <div className="flex gap-2 mt-4">
+              <button onClick={confirmAdd} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity">Lưu</button>
+              <button onClick={cancelAdd} className="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Hủy</button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Transactions History</h2>
-        <p className="text-slate-500 dark:text-slate-400 text-sm">Review and manage your financial records across all accounts.</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Transactions History</h2>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">Review and manage your financial records across all accounts.</p>
+        </div>
+        <button
+          onClick={startAdd}
+          className="shrink-0 flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity shadow-sm"
+        >
+          <span className="material-symbols-outlined text-sm">add</span>
+          Thêm giao dịch
+        </button>
       </div>
 
       {/* Summary Cards */}
@@ -247,12 +470,7 @@ export function Transactions() {
             <div className="absolute top-full mt-1 left-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg z-10 min-w-[180px] overflow-hidden">
               {allCategories.map((cat) => (
                 <label key={cat} className="flex items-center gap-2 px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer text-sm">
-                  <input
-                    type="checkbox"
-                    checked={filters.categories.includes(cat)}
-                    onChange={() => toggleCategory(cat)}
-                    className="rounded"
-                  />
+                  <input type="checkbox" checked={filters.categories.includes(cat)} onChange={() => toggleCategory(cat)} className="rounded" />
                   {cat}
                 </label>
               ))}
@@ -284,12 +502,7 @@ export function Transactions() {
             <div className="absolute top-full mt-1 left-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg z-10 min-w-[180px] overflow-hidden">
               {allAccounts.map((acc) => (
                 <label key={acc} className="flex items-center gap-2 px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer text-sm">
-                  <input
-                    type="checkbox"
-                    checked={filters.accounts.includes(acc)}
-                    onChange={() => toggleAccount(acc)}
-                    className="rounded"
-                  />
+                  <input type="checkbox" checked={filters.accounts.includes(acc)} onChange={() => toggleAccount(acc)} className="rounded" />
                   {acc}
                 </label>
               ))}
@@ -352,7 +565,38 @@ export function Transactions() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {paginated.length === 0 ? (
+
+            {/* Inline Add Row */}
+            {isAdding && (
+              <tr className="bg-primary/5 dark:bg-primary/10 border-l-4 border-primary">
+                <td colSpan={5} className="px-6 py-5">
+                  <p className="text-[10px] uppercase font-bold text-primary mb-3 tracking-wide">Giao dịch mới</p>
+                  <InlineFields
+                    draft={draft}
+                    onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
+                    allCategories={allTransactionCategories}
+                    allAccounts={allTransactionAccounts}
+                  />
+                  {addError && <p className="text-xs text-rose-500 mt-2">{addError}</p>}
+                  <div className="flex gap-2 mt-4">
+                    <button
+                      onClick={confirmAdd}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
+                    >
+                      <span className="material-symbols-outlined text-sm">check</span> Lưu
+                    </button>
+                    <button
+                      onClick={cancelAdd}
+                      className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-sm">close</span> Hủy
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            )}
+
+            {paginated.length === 0 && !isAdding ? (
               <tr>
                 <td colSpan={5} className="px-6 py-12 text-center text-slate-400 text-sm">No transactions match your filters.</td>
               </tr>
@@ -371,110 +615,149 @@ export function Transactions() {
                     </td>
                     <td className="px-6 py-2 text-right">
                       <div className="flex items-center justify-end gap-3 text-xs font-semibold">
-                        {group.dayIncome > 0 && (
-                          <span className="text-emerald-600">+{formatVNDShort(group.dayIncome)}</span>
-                        )}
-                        {group.dayExpense > 0 && (
-                          <span className="text-rose-600">-{formatVNDShort(group.dayExpense)}</span>
-                        )}
+                        {group.dayIncome > 0 && <span className="text-emerald-600">+{formatVNDShort(group.dayIncome)}</span>}
+                        {group.dayExpense > 0 && <span className="text-rose-600">-{formatVNDShort(group.dayExpense)}</span>}
                       </div>
                     </td>
                     <td />
                   </tr>
+
                   {group.txs.map((tx) => {
-                const icon = getIcon(tx.category);
-                const isExpense = tx.type === 'Expense';
-                const isExpanded = expandedRow === tx.id;
-                return (
-                  <React.Fragment key={tx.id}>
-                    <tr
-                      className={`hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer ${isExpanded ? 'bg-primary/5 dark:bg-primary/10 border-l-4 border-primary' : ''}`}
-                      onClick={() => setExpandedRow(isExpanded ? null : tx.id)}
-                    >
-                      <td className="px-6 py-4 text-sm whitespace-nowrap font-medium text-slate-400 dark:text-slate-500 pl-10">—</td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <div className={`size-6 rounded ${icon.bg} flex items-center justify-center`}>
-                            <span className={`material-symbols-outlined ${icon.color} text-sm`}>{icon.icon}</span>
-                          </div>
-                          <span className="text-sm font-medium">{tx.category}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">{tx.account}</td>
-                      <td className={`px-6 py-4 text-sm font-bold text-right ${isExpense ? 'text-rose-600' : 'text-emerald-600'}`}>
-                        {isExpense ? '-' : '+'}{formatVND(tx.amount)}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`material-symbols-outlined ${isExpanded ? 'text-primary' : 'text-slate-300'}`}>
-                          {isExpanded ? 'expand_less' : 'chevron_right'}
-                        </span>
-                      </td>
-                    </tr>
-                    {isExpanded && (
-                      <tr className="bg-primary/5 dark:bg-primary/10">
-                        <td colSpan={5} className="px-12 py-6 border-t border-primary/10">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <div className="space-y-2">
-                              <p className="text-[10px] uppercase font-bold text-slate-400 mb-3">Details</p>
-                              <ul className="text-sm space-y-2">
-                                <li className="flex justify-between border-b border-slate-200/50 dark:border-slate-700/50 pb-1">
-                                  <span className="text-slate-500">Transaction ID</span>
-                                  <span className="font-mono text-xs">{tx.id}</span>
-                                </li>
-                                <li className="flex justify-between border-b border-slate-200/50 dark:border-slate-700/50 pb-1">
-                                  <span className="text-slate-500">Date</span>
-                                  <span className="font-medium">{formatDate(tx.date)}</span>
-                                </li>
-                                <li className="flex justify-between border-b border-slate-200/50 dark:border-slate-700/50 pb-1">
-                                  <span className="text-slate-500">Type</span>
-                                  <span className={`font-medium ${isExpense ? 'text-rose-600' : 'text-emerald-600'}`}>{tx.type}</span>
-                                </li>
-                                <li className="flex justify-between border-b border-slate-200/50 dark:border-slate-700/50 pb-1">
-                                  <span className="text-slate-500">Category</span>
-                                  <span>{tx.category}</span>
-                                </li>
-                                <li className="flex justify-between border-b border-slate-200/50 dark:border-slate-700/50 pb-1">
-                                  <span className="text-slate-500">Account</span>
-                                  <span>{tx.account}</span>
-                                </li>
-                                {tx.transferTo && (
-                                  <li className="flex justify-between border-b border-slate-200/50 dark:border-slate-700/50 pb-1">
-                                    <span className="text-slate-500">Transfer To</span>
-                                    <span>{tx.transferTo}</span>
-                                  </li>
-                                )}
-                                <li className="flex justify-between pb-1">
-                                  <span className="text-slate-500">Amount</span>
-                                  <span className={`font-bold ${isExpense ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                    {isExpense ? '-' : '+'}{formatVND(tx.amount)}
-                                  </span>
-                                </li>
-                              </ul>
-                            </div>
-                            <div className="space-y-2">
-                              <p className="text-[10px] uppercase font-bold text-slate-400 mb-3">Actions</p>
-                              <div className="flex flex-col gap-2">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (confirm('Delete this transaction?')) {
-                                      dispatch({ type: 'DELETE_TRANSACTION', id: tx.id });
-                                      setExpandedRow(null);
-                                    }
-                                  }}
-                                  className="flex items-center gap-2 text-sm font-medium px-4 py-2 text-red-600 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-lg hover:bg-red-100 transition-colors"
-                                >
-                                  <span className="material-symbols-outlined text-sm">delete</span> Delete Transaction
-                                </button>
+                    const icon = getIcon(tx.category);
+                    const isExpense = tx.type === 'Expense';
+                    const isExpanded = expandedRow === tx.id;
+                    const isEditingThis = editingId === tx.id;
+
+                    return (
+                      <React.Fragment key={tx.id}>
+                        <tr
+                          className={`hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer ${isExpanded ? 'bg-primary/5 dark:bg-primary/10 border-l-4 border-primary' : ''}`}
+                          onClick={() => {
+                            if (isEditingThis) return; // don't collapse while editing
+                            setExpandedRow(isExpanded ? null : tx.id);
+                            if (isExpanded) cancelEdit();
+                          }}
+                        >
+                          <td className="px-6 py-4 text-sm whitespace-nowrap font-medium text-slate-400 dark:text-slate-500 pl-10">—</td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-2">
+                              <div className={`size-6 rounded ${icon.bg} flex items-center justify-center`}>
+                                <span className={`material-symbols-outlined ${icon.color} text-sm`}>{icon.icon}</span>
                               </div>
+                              <span className="text-sm font-medium">{tx.category}</span>
                             </div>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                );
-              })}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">{tx.account}</td>
+                          <td className={`px-6 py-4 text-sm font-bold text-right ${isExpense ? 'text-rose-600' : 'text-emerald-600'}`}>
+                            {isExpense ? '-' : '+'}{formatVND(tx.amount)}
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`material-symbols-outlined ${isExpanded ? 'text-primary' : 'text-slate-300'}`}>
+                              {isExpanded ? 'expand_less' : 'chevron_right'}
+                            </span>
+                          </td>
+                        </tr>
+
+                        {isExpanded && (
+                          <tr className="bg-primary/5 dark:bg-primary/10">
+                            <td colSpan={5} className="px-12 py-6 border-t border-primary/10">
+                              {isEditingThis ? (
+                                /* ── Edit Mode ── */
+                                <div>
+                                  <p className="text-[10px] uppercase font-bold text-primary mb-3 tracking-wide">Chỉnh sửa giao dịch</p>
+                                  <InlineFields
+                                    draft={draft}
+                                    onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
+                                    allCategories={allTransactionCategories}
+                                    allAccounts={allTransactionAccounts}
+                                  />
+                                  {editError && <p className="text-xs text-rose-500 mt-2">{editError}</p>}
+                                  <div className="flex gap-2 mt-4">
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); confirmEdit(tx.id); }}
+                                      className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
+                                    >
+                                      <span className="material-symbols-outlined text-sm">check</span> Lưu thay đổi
+                                    </button>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); cancelEdit(); }}
+                                      className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                    >
+                                      <span className="material-symbols-outlined text-sm">close</span> Hủy
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                /* ── View Mode ── */
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                  <div className="space-y-2">
+                                    <p className="text-[10px] uppercase font-bold text-slate-400 mb-3">Details</p>
+                                    <ul className="text-sm space-y-2">
+                                      <li className="flex justify-between border-b border-slate-200/50 dark:border-slate-700/50 pb-1">
+                                        <span className="text-slate-500">Transaction ID</span>
+                                        <span className="font-mono text-xs">{tx.id}</span>
+                                      </li>
+                                      <li className="flex justify-between border-b border-slate-200/50 dark:border-slate-700/50 pb-1">
+                                        <span className="text-slate-500">Date</span>
+                                        <span className="font-medium">{formatDate(tx.date)}</span>
+                                      </li>
+                                      <li className="flex justify-between border-b border-slate-200/50 dark:border-slate-700/50 pb-1">
+                                        <span className="text-slate-500">Type</span>
+                                        <span className={`font-medium ${isExpense ? 'text-rose-600' : 'text-emerald-600'}`}>{tx.type}</span>
+                                      </li>
+                                      <li className="flex justify-between border-b border-slate-200/50 dark:border-slate-700/50 pb-1">
+                                        <span className="text-slate-500">Category</span>
+                                        <span>{tx.category}</span>
+                                      </li>
+                                      <li className="flex justify-between border-b border-slate-200/50 dark:border-slate-700/50 pb-1">
+                                        <span className="text-slate-500">Account</span>
+                                        <span>{tx.account}</span>
+                                      </li>
+                                      {tx.transferTo && (
+                                        <li className="flex justify-between border-b border-slate-200/50 dark:border-slate-700/50 pb-1">
+                                          <span className="text-slate-500">Transfer To</span>
+                                          <span>{tx.transferTo}</span>
+                                        </li>
+                                      )}
+                                      <li className="flex justify-between pb-1">
+                                        <span className="text-slate-500">Amount</span>
+                                        <span className={`font-bold ${isExpense ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                          {isExpense ? '-' : '+'}{formatVND(tx.amount)}
+                                        </span>
+                                      </li>
+                                    </ul>
+                                  </div>
+                                  <div className="space-y-2">
+                                    <p className="text-[10px] uppercase font-bold text-slate-400 mb-3">Actions</p>
+                                    <div className="flex flex-col gap-2">
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); startEdit(tx); }}
+                                        className="flex items-center gap-2 text-sm font-medium px-4 py-2 text-primary bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-lg hover:bg-primary/10 transition-colors"
+                                      >
+                                        <span className="material-symbols-outlined text-sm">edit</span> Chỉnh sửa
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          if (confirm('Xóa giao dịch này?')) {
+                                            dispatch({ type: 'DELETE_TRANSACTION', id: tx.id });
+                                            setExpandedRow(null);
+                                          }
+                                        }}
+                                        className="flex items-center gap-2 text-sm font-medium px-4 py-2 text-red-600 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-lg hover:bg-red-100 transition-colors"
+                                      >
+                                        <span className="material-symbols-outlined text-sm">delete</span> Xóa giao dịch
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
                 </React.Fragment>
               ))
             )}
