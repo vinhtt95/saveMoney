@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import { AppState, FilterState, Transaction } from '../types';
+import { AppState, DatabaseBackup, FilterState, Transaction } from '../types';
 import { getAvailablePeriods } from '../utils/analytics';
 import { toYYYYMM } from '../utils/formatters';
 
@@ -27,7 +27,8 @@ type Action =
   | { type: 'SET_ACCOUNTS'; accounts: string[] }
   | { type: 'SET_ACCOUNT_BALANCES'; accountBalances: Record<string, number> }
   | { type: 'RENAME_ACCOUNT'; oldName: string; newName: string }
-  | { type: 'SET_DEFAULTS'; defaultCategoryExpense: string; defaultCategoryIncome: string; defaultAccount: string };
+  | { type: 'SET_DEFAULTS'; defaultCategoryExpense: string; defaultCategoryIncome: string; defaultAccount: string }
+  | { type: 'RESTORE_BACKUP'; backup: Omit<DatabaseBackup, 'budgets'> };
 
 const defaultFilters: FilterState = {
   search: '',
@@ -281,6 +282,25 @@ function reducer(state: AppState, action: Action): AppState {
         transferTo: t.transferTo === oldName ? newName : t.transferTo,
       }));
       return { ...state, accounts: newAccounts, accountBalances: newBalances, transactions: newTransactions };
+    }
+    case 'RESTORE_BACKUP': {
+      const { backup } = action;
+      const transactions = backup.transactions.map((t) => ({ ...t, date: new Date(t.date) }));
+      const periods = getAvailablePeriods(transactions);
+      const latestPeriod = periods[0] || toYYYYMM(new Date());
+      return {
+        ...state,
+        transactions,
+        expenseCategories: backup.expenseCategories,
+        incomeCategories: backup.incomeCategories,
+        accounts: backup.accounts,
+        accountBalances: backup.accountBalances,
+        defaultCategoryExpense: backup.defaults.defaultCategoryExpense,
+        defaultCategoryIncome: backup.defaults.defaultCategoryIncome,
+        defaultAccount: backup.defaults.defaultAccount,
+        selectedPeriod: latestPeriod,
+        filters: defaultFilters,
+      };
     }
     default:
       return state;

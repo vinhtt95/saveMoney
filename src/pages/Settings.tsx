@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { parseCSV, exportCSV } from '../utils/csvParser';
+import { exportDatabase, readBackupFile } from '../utils/backup';
+import { DatabaseBackup } from '../types';
 import { formatVND, formatDate } from '../utils/formatters';
 
 type Tab = 'data' | 'lists' | 'display' | 'about';
@@ -77,6 +79,31 @@ export function Settings() {
       setPendingTxs([]);
       setPreview([]);
     }
+  }
+
+  const [pendingBackup, setPendingBackup] = useState<DatabaseBackup | null>(null);
+  const [backupMsg, setBackupMsg] = useState('');
+  const [isBackupDragging, setIsBackupDragging] = useState(false);
+  const backupInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleBackupFile(file: File) {
+    try {
+      const backup = await readBackupFile(file);
+      setPendingBackup(backup);
+      setBackupMsg(`Đọc thành công: ${backup.transactions.length} giao dịch, ${backup.budgets.length} ngân sách, ${backup.expenseCategories.length + backup.incomeCategories.length} danh mục, ${backup.accounts.length} tài khoản.`);
+    } catch (err) {
+      setBackupMsg((err as Error).message);
+    }
+  }
+
+  function handleRestoreBackup() {
+    if (!pendingBackup) return;
+    if (!confirm('Thao tác này sẽ GHI ĐÈ toàn bộ dữ liệu hiện tại (giao dịch, danh mục, tài khoản, ngân sách). Tiếp tục?')) return;
+    const { budgets, ...rest } = pendingBackup;
+    dispatch({ type: 'RESTORE_BACKUP', backup: rest });
+    localStorage.setItem('savemoney_budgets', JSON.stringify(budgets));
+    setPendingBackup(null);
+    setBackupMsg(`Khôi phục thành công! ${rest.transactions.length} giao dịch, ${budgets.length} ngân sách đã được nạp.`);
   }
 
   const [newCategoryType, setNewCategoryType] = useState<'Expense' | 'Income'>('Expense');
@@ -246,6 +273,83 @@ export function Settings() {
                 <span className="material-symbols-outlined text-lg">download</span>
                 CSV
               </button>
+            </div>
+          </section>
+
+          <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="p-6 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Sao lưu & Khôi phục</h3>
+              <p className="text-sm text-slate-500">Export toàn bộ database (giao dịch, danh mục, tài khoản, ngân sách) ra file JSON để backup hoặc chuyển thiết bị.</p>
+            </div>
+            <div className="p-6 space-y-6">
+              {/* Export */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-bold text-slate-900 dark:text-slate-100">Export Database</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {state.transactions.length} giao dịch · {state.expenseCategories.length + state.incomeCategories.length} danh mục · {state.accounts.length} tài khoản
+                  </p>
+                </div>
+                <button
+                  onClick={() => exportDatabase(state)}
+                  className="flex items-center gap-2 px-5 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:opacity-90 transition-opacity"
+                >
+                  <span className="material-symbols-outlined text-lg">backup</span>
+                  Export .json
+                </button>
+              </div>
+
+              {/* Import */}
+              <div className="border-t border-slate-100 dark:border-slate-800 pt-6">
+                <p className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-3">Khôi phục từ backup</p>
+                <div
+                  className={`flex flex-col items-center gap-3 rounded-xl border-2 border-dashed px-6 py-8 transition-colors cursor-pointer ${
+                    isBackupDragging
+                      ? 'border-primary bg-primary/5'
+                      : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50'
+                  }`}
+                  onDragOver={(e) => { e.preventDefault(); setIsBackupDragging(true); }}
+                  onDragLeave={() => setIsBackupDragging(false)}
+                  onDrop={(e) => { e.preventDefault(); setIsBackupDragging(false); const f = e.dataTransfer.files[0]; if (f) handleBackupFile(f); }}
+                  onClick={() => backupInputRef.current?.click()}
+                >
+                  <span className="material-symbols-outlined text-3xl text-slate-400">settings_backup_restore</span>
+                  <p className="text-sm text-slate-500 text-center">
+                    {isBackupDragging ? 'Thả file .json vào đây' : 'Click hoặc kéo thả file .json backup vào đây'}
+                  </p>
+                  <input
+                    ref={backupInputRef}
+                    type="file"
+                    accept=".json"
+                    className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleBackupFile(f); e.target.value = ''; }}
+                  />
+                </div>
+
+                {backupMsg && (
+                  <p className={`mt-3 text-sm font-medium ${backupMsg.includes('thành công') ? 'text-emerald-600' : 'text-slate-600 dark:text-slate-400'}`}>
+                    {backupMsg}
+                  </p>
+                )}
+
+                {pendingBackup && (
+                  <div className="mt-4 flex items-center gap-3">
+                    <button
+                      onClick={handleRestoreBackup}
+                      className="flex items-center gap-2 px-5 py-2 bg-primary text-white rounded-lg text-sm font-bold hover:opacity-90 transition-opacity"
+                    >
+                      <span className="material-symbols-outlined text-sm">restore</span>
+                      Khôi phục
+                    </button>
+                    <button
+                      onClick={() => { setPendingBackup(null); setBackupMsg(''); }}
+                      className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-700 transition-colors"
+                    >
+                      Hủy
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </section>
 

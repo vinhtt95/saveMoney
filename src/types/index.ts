@@ -28,6 +28,22 @@ export interface Budget {
   categories: string[];
 }
 
+export interface DatabaseBackup {
+  version: number;
+  exportedAt: string;
+  transactions: Array<Omit<Transaction, 'date'> & { date: string }>;
+  expenseCategories: string[];
+  incomeCategories: string[];
+  accounts: string[];
+  accountBalances: Record<string, number>;
+  defaults: {
+    defaultCategoryExpense: string;
+    defaultCategoryIncome: string;
+    defaultAccount: string;
+  };
+  budgets: Budget[];
+}
+
 export interface AppState {
   transactions: Transaction[];
   filters: FilterState;
