@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
@@ -90,12 +90,27 @@ export function Dashboard() {
   const topCategories = useMemo(() => getCategoryBreakdown(getExpenses(periodTxs)).slice(0, 4), [periodTxs]);
   const maxCatTotal = topCategories[0]?.total || 1;
 
-  // Recent transactions (expenses + income, last 10)
-  const recentTxs = useMemo(() => {
-    return [...periodTxs]
+  // Recent transactions (expenses + income, last 10) grouped by date
+  const groupedRecentTxs = useMemo(() => {
+    const txs = [...periodTxs]
       .filter((t) => t.type === 'Expense' || t.type === 'Income')
       .sort((a, b) => b.date.getTime() - a.date.getTime())
       .slice(0, 10);
+    const groups: { dateKey: string; date: Date; txs: typeof txs; dayIncome: number; dayExpense: number }[] = [];
+    const map = new Map<string, typeof groups[0]>();
+    for (const tx of txs) {
+      const key = tx.date.toISOString().slice(0, 10);
+      if (!map.has(key)) {
+        const group = { dateKey: key, date: tx.date, txs: [] as typeof txs, dayIncome: 0, dayExpense: 0 };
+        map.set(key, group);
+        groups.push(group);
+      }
+      const g = map.get(key)!;
+      g.txs.push(tx);
+      if (tx.type === 'Income') g.dayIncome += tx.amount;
+      if (tx.type === 'Expense') g.dayExpense += Math.abs(tx.amount);
+    }
+    return groups;
   }, [periodTxs]);
 
   const allCategories = useMemo(
@@ -345,32 +360,50 @@ export function Dashboard() {
               <tr>
                 <th className="px-6 py-3">Category</th>
                 <th className="px-6 py-3">Account</th>
-                <th className="px-6 py-3">Date</th>
                 <th className="px-6 py-3 text-right">Amount</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {recentTxs.map((tx) => {
-                const icon = getCategoryIcon(tx.category);
-                const isExpense = tx.type === 'Expense';
-                return (
-                  <tr key={tx.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className={`size-8 rounded ${icon.bg} ${icon.color} flex items-center justify-center`}>
-                          <span className="material-symbols-outlined text-lg">{icon.icon}</span>
-                        </div>
-                        <span className="text-sm font-medium">{tx.category}</span>
+            <tbody>
+              {groupedRecentTxs.map((group) => (
+                <React.Fragment key={group.dateKey}>
+                  <tr className="bg-slate-50 dark:bg-slate-800/70 border-t-2 border-slate-200 dark:border-slate-700">
+                    <td className="px-6 py-2">
+                      <span className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                        {formatDate(group.date)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-2 text-xs text-slate-400">
+                      {group.txs.length} transaction{group.txs.length !== 1 ? 's' : ''}
+                    </td>
+                    <td className="px-6 py-2 text-right">
+                      <div className="flex items-center justify-end gap-3 text-xs font-semibold">
+                        {group.dayIncome > 0 && <span className="text-emerald-600">+{formatVNDShort(group.dayIncome)}</span>}
+                        {group.dayExpense > 0 && <span className="text-rose-600">-{formatVNDShort(group.dayExpense)}</span>}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">{tx.account}</td>
-                    <td className="px-6 py-4 text-sm text-slate-500">{formatDate(tx.date)}</td>
-                    <td className={`px-6 py-4 text-right text-sm font-bold ${isExpense ? 'text-rose-600' : 'text-emerald-600'}`}>
-                      {isExpense ? '-' : '+'}{formatVND(tx.amount)}
-                    </td>
                   </tr>
-                );
-              })}
+                  {group.txs.map((tx) => {
+                    const icon = getCategoryIcon(tx.category);
+                    const isExpense = tx.type === 'Expense';
+                    return (
+                      <tr key={tx.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors border-t border-slate-100 dark:border-slate-800">
+                        <td className="px-6 py-3">
+                          <div className="flex items-center gap-2 pl-4">
+                            <div className={`size-7 rounded ${icon.bg} ${icon.color} flex items-center justify-center`}>
+                              <span className="material-symbols-outlined text-base">{icon.icon}</span>
+                            </div>
+                            <span className="text-sm font-medium">{tx.category}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-3 text-sm text-slate-500 dark:text-slate-400">{tx.account}</td>
+                        <td className={`px-6 py-3 text-right text-sm font-bold ${isExpense ? 'text-rose-600' : 'text-emerald-600'}`}>
+                          {isExpense ? '-' : '+'}{formatVND(tx.amount)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </React.Fragment>
+              ))}
             </tbody>
           </table>
         </div>
