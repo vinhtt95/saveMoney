@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Data Import - Personal Finance App</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#144bb8",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#111621",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display">
+<div class="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
+<div class="layout-container flex h-full grow flex-col">
+<!-- Header -->
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 md:px-10 py-3 sticky top-0 z-50">
+<div class="flex items-center gap-4 text-slate-900 dark:text-slate-100">
+<div class="flex items-center justify-center size-8 rounded-lg bg-primary text-white">
+<span class="material-symbols-outlined text-xl">account_balance_wallet</span>
+</div>
+<h2 class="text-lg font-bold leading-tight tracking-tight">FinanceFlow</h2>
+</div>
+<div class="flex items-center gap-3">
+<button class="flex items-center justify-center rounded-lg h-10 w-10 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="flex items-center justify-center rounded-lg h-10 w-10 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+<span class="material-symbols-outlined">help</span>
+</button>
+<div class="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
+                    JD
+                </div>
+</div>
+</header>
+<main class="flex flex-1 justify-center py-8">
+<div class="layout-content-container flex flex-col max-w-[1024px] flex-1 px-4 md:px-0">
+<!-- Breadcrumbs -->
+<nav class="flex items-center gap-2 mb-6">
+<a class="text-slate-500 dark:text-slate-400 text-sm font-medium hover:text-primary transition-colors" href="#">Dashboard</a>
+<span class="material-symbols-outlined text-slate-400 text-sm">chevron_right</span>
+<a class="text-slate-500 dark:text-slate-400 text-sm font-medium hover:text-primary transition-colors" href="#">Settings</a>
+<span class="material-symbols-outlined text-slate-400 text-sm">chevron_right</span>
+<span class="text-primary text-sm font-semibold">Data Import</span>
+</nav>
+<!-- Page Title -->
+<div class="flex flex-col gap-2 mb-8">
+<h1 class="text-slate-900 dark:text-slate-100 text-3xl font-bold leading-tight">Import Financial Data</h1>
+<p class="text-slate-600 dark:text-slate-400 text-base">Upload your bank statements to sync and categorize your transactions automatically.</p>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<!-- Left Column: Upload & Settings -->
+<div class="lg:col-span-1 flex flex-col gap-6">
+<!-- Upload Section -->
+<div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+<h3 class="text-slate-900 dark:text-slate-100 font-bold mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">upload_file</span>
+                                Upload File
+                            </h3>
+<div class="flex flex-col items-center gap-4 rounded-xl border-2 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 px-4 py-10 transition-colors hover:border-primary/50">
+<div class="bg-primary/10 p-3 rounded-full">
+<span class="material-symbols-outlined text-3xl text-primary">cloud_upload</span>
+</div>
+<div class="text-center">
+<p class="text-slate-900 dark:text-slate-100 text-sm font-bold">Drag and drop CSV or Excel</p>
+<p class="text-slate-500 dark:text-slate-400 text-xs mt-1">Max file size 10MB</p>
+</div>
+<button class="flex w-full items-center justify-center rounded-lg h-10 px-4 bg-primary text-white text-sm font-bold transition-all hover:bg-primary/90">
+                                    Browse Files
+                                </button>
+</div>
+</div>
+<!-- Import Settings -->
+<div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+<h3 class="text-slate-900 dark:text-slate-100 font-bold mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">settings</span>
+                                Import Settings
+                            </h3>
+<div class="space-y-4">
+<div class="flex items-start gap-3">
+<input checked="" class="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary" type="checkbox"/>
+<div class="flex flex-col">
+<label class="text-sm font-semibold text-slate-900 dark:text-slate-100">Duplicate Detection</label>
+<p class="text-xs text-slate-500 dark:text-slate-400">Skip transactions that already exist in your history.</p>
+</div>
+</div>
+<div class="flex items-start gap-3">
+<input class="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary" type="checkbox"/>
+<div class="flex flex-col">
+<label class="text-sm font-semibold text-slate-900 dark:text-slate-100">Auto-Categorization</label>
+<p class="text-xs text-slate-500 dark:text-slate-400">Let AI suggest categories based on transaction names.</p>
+</div>
+</div>
+<div class="pt-2">
+<label class="text-xs font-bold uppercase text-slate-500 dark:text-slate-400 mb-2 block">Date Format</label>
+<select class="w-full rounded-lg border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm py-2">
+<option>MM/DD/YYYY</option>
+<option>DD/MM/YYYY</option>
+<option>YYYY-MM-DD</option>
+</select>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Preview & Validation -->
+<div class="lg:col-span-2 flex flex-col gap-6">
+<div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col shadow-sm">
+<div class="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+<h3 class="text-slate-900 dark:text-slate-100 font-bold flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">preview</span>
+                                    Data Preview &amp; Validation
+                                </h3>
+<span class="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 text-xs font-bold rounded">
+                                    124 Rows Ready
+                                </span>
+</div>
+<!-- Preview Table -->
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-slate-50 dark:bg-slate-800/50">
+<th class="px-6 py-3 text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Date</th>
+<th class="px-6 py-3 text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Description</th>
+<th class="px-6 py-3 text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Category</th>
+<th class="px-6 py-3 text-xs font-bold uppercase text-slate-500 dark:text-slate-400 text-right">Amount</th>
+<th class="px-6 py-3 text-xs font-bold uppercase text-slate-500 dark:text-slate-400 text-center">Status</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+<tr>
+<td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">Oct 24, 2023</td>
+<td class="px-6 py-4 text-sm font-medium text-slate-900 dark:text-slate-100">Starbucks Coffee</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs rounded">Dining</span>
+</td>
+<td class="px-6 py-4 text-sm text-right font-medium text-slate-900 dark:text-slate-100">-$4.75</td>
+<td class="px-6 py-4 text-center">
+<span class="material-symbols-outlined text-green-500 text-lg">check_circle</span>
+</td>
+</tr>
+<tr>
+<td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">Oct 23, 2023</td>
+<td class="px-6 py-4 text-sm font-medium text-slate-900 dark:text-slate-100">Apartment Rent</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs rounded">Housing</span>
+</td>
+<td class="px-6 py-4 text-sm text-right font-medium text-slate-900 dark:text-slate-100">-$1,800.00</td>
+<td class="px-6 py-4 text-center">
+<span class="material-symbols-outlined text-green-500 text-lg">check_circle</span>
+</td>
+</tr>
+<tr>
+<td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">Oct 22, 2023</td>
+<td class="px-6 py-4 text-sm font-medium text-slate-900 dark:text-slate-100">Amazon.com</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs rounded">Uncategorized</span>
+</td>
+<td class="px-6 py-4 text-sm text-right font-medium text-slate-900 dark:text-slate-100">-$64.20</td>
+<td class="px-6 py-4 text-center">
+<span class="material-symbols-outlined text-amber-500 text-lg" title="Requires category">warning</span>
+</td>
+</tr>
+<tr>
+<td class="px-6 py-4 text-sm text-slate-700 dark:text-slate-300">Oct 20, 2023</td>
+<td class="px-6 py-4 text-sm font-medium text-slate-900 dark:text-slate-100">Payroll Deposit</td>
+<td class="px-6 py-4">
+<span class="px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs rounded">Income</span>
+</td>
+<td class="px-6 py-4 text-sm text-right font-medium text-green-600">+$4,250.00</td>
+<td class="px-6 py-4 text-center">
+<span class="material-symbols-outlined text-green-500 text-lg">check_circle</span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Footer Actions -->
+<div class="p-6 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/30">
+<div class="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+<span class="material-symbols-outlined text-sm">info</span>
+<span>Reviewing 4 of 124 transactions</span>
+</div>
+<div class="flex gap-3">
+<button class="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                                        Cancel
+                                    </button>
+<button class="px-6 py-2 rounded-lg bg-primary text-white text-sm font-bold shadow-sm hover:shadow-md transition-all">
+                                        Confirm &amp; Import
+                                    </button>
+</div>
+</div>
+</div>
+<!-- Info Card -->
+<div class="bg-primary/5 rounded-xl border border-primary/20 p-6 flex gap-4">
+<div class="text-primary">
+<span class="material-symbols-outlined">lightbulb</span>
+</div>
+<div>
+<h4 class="text-primary text-sm font-bold mb-1">Pro Tip</h4>
+<p class="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                                    You can map custom columns if your CSV header doesn't match our standard format. Simply click on a header in the preview table to re-map it.
+                                </p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</div>
+</body></html>

@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Personal Finance - Transactions</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#144bb8",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#111621",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100">
+<div class="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
+<div class="layout-container flex h-full grow flex-col">
+<!-- Navigation Header -->
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-10 py-3">
+<div class="flex items-center gap-4">
+<div class="size-8 text-primary">
+<span class="material-symbols-outlined text-3xl">account_balance_wallet</span>
+</div>
+<h2 class="text-slate-900 dark:text-slate-100 text-xl font-bold leading-tight tracking-tight">FinTrack</h2>
+</div>
+<div class="flex flex-1 justify-end gap-4 items-center">
+<button class="flex items-center justify-center rounded-lg h-10 bg-primary text-white gap-2 text-sm font-bold px-4 hover:bg-primary/90 transition-colors">
+<span class="material-symbols-outlined">add</span>
+<span>Add Transaction</span>
+</button>
+<div class="flex gap-2">
+<button class="flex items-center justify-center rounded-lg h-10 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2.5">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="flex items-center justify-center rounded-lg h-10 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-2.5">
+<span class="material-symbols-outlined">settings</span>
+</button>
+</div>
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 border-2 border-primary" data-alt="User profile avatar placeholder" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuArGR6EHF2HOw05whga7LMtDDqK57q_9axYT2l2fk2-jc5oxMHInlGUN6wF-jcVAPvx-5Ufsk0VELAg-wExnusIAJFtQcfTN9kazS4qcXEWcCjjK5JbJGnvC4njiEwSBwGi2tLq11pVLHGQdO7qfWL_Q30MvTTGeju3t6G5Hid9lNA8g7VOmlqcFb2qvDfxZBHdTAuV7uS3RTpdRzCyCuCqp0lmfL2TRxtXwt01OmvCFLxhKX-HDz6SQV6P4vZdqF4V6e6Z0QwQwFv6");'></div>
+</div>
+</header>
+<main class="flex-1 flex flex-col max-w-[1200px] mx-auto w-full py-8 px-6 gap-6">
+<!-- Search and Filters Section -->
+<div class="flex flex-col gap-4 bg-white dark:bg-slate-900 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+<div class="flex flex-wrap gap-4 items-end">
+<div class="flex-1 min-w-[300px]">
+<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Search Transactions</label>
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+<input class="w-full h-11 pl-10 pr-4 rounded-lg bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus:ring-primary focus:border-primary text-slate-900 dark:text-slate-100" placeholder="Search by note, payee, or amount..." type="text"/>
+</div>
+</div>
+<div class="w-64">
+<label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Date Range</label>
+<button class="flex w-full h-11 items-center justify-between px-4 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">calendar_today</span>
+<span class="text-sm">Oct 1 - Oct 31, 2023</span>
+</div>
+<span class="material-symbols-outlined">expand_more</span>
+</button>
+</div>
+<button class="h-11 px-4 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center gap-2 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
+<span class="material-symbols-outlined">filter_list</span>
+<span class="text-sm font-medium">More Filters</span>
+</button>
+</div>
+<!-- Multi-select chips -->
+<div class="flex flex-wrap gap-2 items-center pt-2">
+<span class="text-xs font-bold text-slate-500 uppercase tracking-wider mr-2">Quick Filters:</span>
+<button class="flex h-8 items-center gap-1.5 rounded-full bg-primary text-white px-3 text-xs font-semibold">
+                            All Categories
+                        </button>
+<button class="flex h-8 items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-3 text-xs font-medium hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+<span class="material-symbols-outlined text-sm">restaurant</span> Food &amp; Drink
+                        </button>
+<button class="flex h-8 items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-3 text-xs font-medium hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+<span class="material-symbols-outlined text-sm">shopping_bag</span> Shopping
+                        </button>
+<button class="flex h-8 items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-3 text-xs font-medium hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+<span class="material-symbols-outlined text-sm">home</span> Housing
+                        </button>
+<button class="flex h-8 items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-3 text-xs font-medium hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+<span class="material-symbols-outlined text-sm">directions_car</span> Transport
+                        </button>
+<button class="flex h-8 items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-3 text-xs font-medium hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+<span class="material-symbols-outlined text-sm">payments</span> Income
+                        </button>
+</div>
+</div>
+<!-- Transactions Table Card -->
+<div class="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
+<div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50">
+<h3 class="font-bold text-slate-800 dark:text-slate-200">Recent Transactions</h3>
+<div class="flex gap-2">
+<button class="p-1.5 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500">
+<span class="material-symbols-outlined">file_download</span>
+</button>
+<button class="p-1.5 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500">
+<span class="material-symbols-outlined">print</span>
+</button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider border-b border-slate-100 dark:border-slate-800">
+<th class="px-6 py-4">
+<div class="flex items-center gap-1 cursor-pointer hover:text-primary">
+                                            Date <span class="material-symbols-outlined text-sm">arrow_downward</span>
+</div>
+</th>
+<th class="px-6 py-4">Payee</th>
+<th class="px-6 py-4">Category</th>
+<th class="px-6 py-4">Note</th>
+<th class="px-6 py-4 text-right">Amount</th>
+<th class="px-6 py-4 w-10"></th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">Oct 24, 2023</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-lg">coffee</span>
+</div>
+<span class="font-semibold text-slate-900 dark:text-slate-100">Starbucks</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">
+                                            Food
+                                        </span>
+</td>
+<td class="px-6 py-4 text-sm text-slate-500 italic">Morning latte</td>
+<td class="px-6 py-4 text-right font-bold text-red-600 dark:text-red-400">-$6.50</td>
+<td class="px-6 py-4 text-right">
+<button class="text-slate-400 hover:text-slate-600">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">Oct 23, 2023</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-lg">laptop_mac</span>
+</div>
+<span class="font-semibold text-slate-900 dark:text-slate-100">Apple Store</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                                            Shopping
+                                        </span>
+</td>
+<td class="px-6 py-4 text-sm text-slate-500 italic">iPhone Case</td>
+<td class="px-6 py-4 text-right font-bold text-red-600 dark:text-red-400">-$149.00</td>
+<td class="px-6 py-4 text-right">
+<button class="text-slate-400 hover:text-slate-600">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">Oct 22, 2023</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-lg">house</span>
+</div>
+<span class="font-semibold text-slate-900 dark:text-slate-100">Rent Payment</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">
+                                            Housing
+                                        </span>
+</td>
+<td class="px-6 py-4 text-sm text-slate-500 italic">October Rent</td>
+<td class="px-6 py-4 text-right font-bold text-red-600 dark:text-red-400">-$1,200.00</td>
+<td class="px-6 py-4 text-right">
+<button class="text-slate-400 hover:text-slate-600">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">Oct 21, 2023</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-lg">commute</span>
+</div>
+<span class="font-semibold text-slate-900 dark:text-slate-100">Uber</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                                            Transport
+                                        </span>
+</td>
+<td class="px-6 py-4 text-sm text-slate-500 italic">Office trip</td>
+<td class="px-6 py-4 text-right font-bold text-red-600 dark:text-red-400">-$15.20</td>
+<td class="px-6 py-4 text-right">
+<button class="text-slate-400 hover:text-slate-600">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">Oct 20, 2023</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded-full bg-primary/10 dark:bg-primary/20 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-lg">work</span>
+</div>
+<span class="font-semibold text-slate-900 dark:text-slate-100">Salary Deposit</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                            Income
+                                        </span>
+</td>
+<td class="px-6 py-4 text-sm text-slate-500 italic">Monthly Paycheck</td>
+<td class="px-6 py-4 text-right font-bold text-emerald-600 dark:text-emerald-400">+$4,500.00</td>
+<td class="px-6 py-4 text-right">
+<button class="text-slate-400 hover:text-slate-600">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+<td class="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">Oct 19, 2023</td>
+<td class="px-6 py-4">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-lg">shopping_cart</span>
+</div>
+<span class="font-semibold text-slate-900 dark:text-slate-100">Whole Foods</span>
+</div>
+</td>
+<td class="px-6 py-4">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">
+                                            Food
+                                        </span>
+</td>
+<td class="px-6 py-4 text-sm text-slate-500 italic">Weekly Groceries</td>
+<td class="px-6 py-4 text-right font-bold text-red-600 dark:text-red-400">-$82.35</td>
+<td class="px-6 py-4 text-right">
+<button class="text-slate-400 hover:text-slate-600">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination -->
+<div class="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+<span class="text-sm text-slate-500">Showing 1 to 6 of 42 transactions</span>
+<div class="flex gap-2">
+<button class="px-3 py-1 text-sm border border-slate-200 dark:border-slate-700 rounded hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50" disabled="">Previous</button>
+<button class="px-3 py-1 text-sm bg-primary text-white rounded">1</button>
+<button class="px-3 py-1 text-sm border border-slate-200 dark:border-slate-700 rounded hover:bg-slate-50 dark:hover:bg-slate-800">2</button>
+<button class="px-3 py-1 text-sm border border-slate-200 dark:border-slate-700 rounded hover:bg-slate-50 dark:hover:bg-slate-800">3</button>
+<button class="px-3 py-1 text-sm border border-slate-200 dark:border-slate-700 rounded hover:bg-slate-50 dark:hover:bg-slate-800">Next</button>
+</div>
+</div>
+</div>
+<!-- Summary Cards Footer -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800">
+<p class="text-sm font-medium text-slate-500 mb-1">Total Income</p>
+<h4 class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">$4,500.00</h4>
+</div>
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800">
+<p class="text-sm font-medium text-slate-500 mb-1">Total Expenses</p>
+<h4 class="text-2xl font-bold text-red-600 dark:text-red-400">-$1,453.05</h4>
+</div>
+<div class="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800">
+<p class="text-sm font-medium text-slate-500 mb-1">Net Flow</p>
+<h4 class="text-2xl font-bold text-primary">+$3,046.95</h4>
+</div>
+</div>
+</main>
+</div>
+</div>
+</body></html>

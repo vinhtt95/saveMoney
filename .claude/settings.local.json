@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx vite build:*)",
+      "Bash(git fetch origin master)",
+      "Bash(git checkout master)",
+      "Bash(git pull origin master)",
+      "Bash(npm run lint)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(npm install)",
+      "Bash(wc -l /Users/vinhtt/Projects/IPShield/visual-patent-workbench/services/*.ts /Users/vinhtt/Projects/IPShield/visual-patent-workbench/*.ts /Users/vinhtt/Projects/IPShield/visual-patent-workbench/*.tsx)",
+      "Bash(ls -la /Users/vinhtt/Projects/IPShield/visual-patent-workbench/*.ts)",
+      "Bash(grep -n \"classificationCsvService\\\\|ClassificationTestPanel\" /Users/vinhtt/Projects/IPShield/visual-patent-workbench/services/*.ts /Users/vinhtt/Projects/IPShield/visual-patent-workbench/components/panels/*.tsx)",
+      "Bash(grep -r 'type AnalysisMode' /Users/vinhtt/Projects/IPShield/visual-patent-workbench/src --include=*.ts --include=*.tsx)",
+      "Bash(grep -r AnalysisMode /Users/vinhtt/Projects/IPShield/visual-patent-workbench --include=*.ts --include=*.tsx)",
+      "Bash(git init:*)",
+      "Bash(git remote:*)"
+    ]
+  }
+}
