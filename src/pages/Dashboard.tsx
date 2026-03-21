@@ -443,7 +443,7 @@ export function Dashboard() {
                     return (
                       <React.Fragment key={tx.id}>
                         <tr
-                          className={`hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors border-t border-slate-100 dark:border-slate-800 cursor-pointer ${isExpanded ? 'bg-primary/5 dark:bg-primary/10 border-l-4 border-primary' : ''}`}
+                          className={`hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors border-t border-slate-100 dark:border-slate-800 cursor-pointer ${isExpanded ? (tx.type === 'Expense' ? 'bg-rose-50 dark:bg-rose-900/20' : tx.type === 'Income' ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-blue-50 dark:bg-blue-900/20') : ''}`}
                           onClick={() => {
                             if (isExpanded) {
                               setExpandedRow(null);
@@ -469,7 +469,7 @@ export function Dashboard() {
                         </tr>
 
                         {isExpanded && (
-                          <tr className="bg-primary/5 dark:bg-primary/10">
+                          <tr className={tx.type === 'Expense' ? 'bg-rose-50 dark:bg-rose-900/20' : tx.type === 'Income' ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-blue-50 dark:bg-blue-900/20'}>
                             <td colSpan={3} className="px-6 py-5 border-t border-primary/10">
                               <InlineEditForm
                                 draft={draft}
