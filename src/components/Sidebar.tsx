@@ -6,7 +6,7 @@ const navItems = [
   { name: 'Dashboard', icon: 'dashboard', path: '/' },
   { name: 'Transactions', icon: 'receipt_long', path: '/transactions' },
   { name: 'Analytics', icon: 'insights', path: '/analytics' },
-  { name: 'Budget', icon: 'account_balance_wallet', path: '/budget' },
+  { name: 'Accounts', icon: 'account_balance', path: '/accounts' },
   { name: 'Settings', icon: 'settings', path: '/settings' },
 ];
 

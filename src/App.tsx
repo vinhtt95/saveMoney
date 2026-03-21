@@ -9,7 +9,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Transactions } from './pages/Transactions';
 import { Analytics } from './pages/Analytics';
 import { Settings } from './pages/Settings';
-import { Budget } from './pages/Budget';
+import { Accounts } from './pages/Accounts';
 import { AppProvider } from './context/AppContext';
 
 export default function App() {
@@ -21,7 +21,7 @@ export default function App() {
             <Route index element={<Dashboard />} />
             <Route path="transactions" element={<Transactions />} />
             <Route path="analytics" element={<Analytics />} />
-            <Route path="budget" element={<Budget />} />
+            <Route path="accounts" element={<Accounts />} />
             <Route path="settings" element={<Settings />} />
           </Route>
         </Routes>

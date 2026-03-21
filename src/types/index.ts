@@ -25,4 +25,5 @@ export interface AppState {
   selectedPeriod: string; // 'all' | 'YYYY-MM'
   categories: string[];
   accounts: string[];
+  accountBalances: Record<string, number>;
 }

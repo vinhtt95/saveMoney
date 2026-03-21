@@ -289,3 +289,26 @@ export function getAccountByWeek(
 
   return weeks;
 }
+
+/**
+ * Compute the net transaction total for each account across all transaction types.
+ * - Expense/Income/Account types: amount is already signed, add directly to account
+ * - Transfer: debit source account, credit transferTo account
+ * Returns a map of account name → net total (does NOT include initial balance offsets).
+ */
+export function getAccountNetTotals(txs: Transaction[]): Record<string, number> {
+  const map: Record<string, number> = {};
+  txs.forEach((t) => {
+    if (!map[t.account]) map[t.account] = 0;
+    if (t.type === 'Transfer') {
+      map[t.account] -= Math.abs(t.amount);
+      if (t.transferTo) {
+        if (!map[t.transferTo]) map[t.transferTo] = 0;
+        map[t.transferTo] += Math.abs(t.amount);
+      }
+    } else {
+      map[t.account] += t.amount;
+    }
+  });
+  return map;
+}

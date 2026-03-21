@@ -6,6 +6,7 @@ import { toYYYYMM } from '../utils/formatters';
 const STORAGE_KEY = 'savemoney_transactions';
 const CATEGORIES_KEY = 'savemoney_categories';
 const ACCOUNTS_KEY = 'savemoney_accounts';
+const ACCOUNT_BALANCES_KEY = 'savemoney_account_balances';
 
 type Action =
   | { type: 'IMPORT'; transactions: Transaction[] }
@@ -16,7 +17,9 @@ type Action =
   | { type: 'ADD_TRANSACTION'; transaction: Transaction }
   | { type: 'EDIT_TRANSACTION'; transaction: Transaction }
   | { type: 'SET_CATEGORIES'; categories: string[] }
-  | { type: 'SET_ACCOUNTS'; accounts: string[] };
+  | { type: 'SET_ACCOUNTS'; accounts: string[] }
+  | { type: 'SET_ACCOUNT_BALANCES'; accountBalances: Record<string, number> }
+  | { type: 'RENAME_ACCOUNT'; oldName: string; newName: string };
 
 const defaultFilters: FilterState = {
   search: '',
@@ -33,6 +36,7 @@ const initialState: AppState = {
   selectedPeriod: 'all',
   categories: [],
   accounts: [],
+  accountBalances: {},
 };
 
 function serializeTransactions(txs: Transaction[]): string {
@@ -58,16 +62,25 @@ function loadStringList(key: string): string[] {
   return [];
 }
 
-function loadFromStorage(): Pick<AppState, 'transactions' | 'categories' | 'accounts'> {
+function loadAccountBalances(): Record<string, number> {
+  try {
+    const raw = localStorage.getItem(ACCOUNT_BALANCES_KEY);
+    if (raw) return JSON.parse(raw) as Record<string, number>;
+  } catch { /* ignore */ }
+  return {};
+}
+
+function loadFromStorage(): Pick<AppState, 'transactions' | 'categories' | 'accounts' | 'accountBalances'> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return {
       transactions: raw ? deserializeTransactions(raw) : [],
       categories: loadStringList(CATEGORIES_KEY),
       accounts: loadStringList(ACCOUNTS_KEY),
+      accountBalances: loadAccountBalances(),
     };
   } catch {
-    return { transactions: [], categories: [], accounts: [] };
+    return { transactions: [], categories: [], accounts: [], accountBalances: {} };
   }
 }
 
@@ -105,7 +118,7 @@ function reducer(state: AppState, action: Action): AppState {
       };
     }
     case 'CLEAR':
-      return { ...initialState };
+      return { ...initialState, accountBalances: {} };
     case 'SET_FILTER':
       return { ...state, filters: { ...state.filters, ...action.filter } };
     case 'SET_PERIOD':
@@ -131,6 +144,23 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, categories: action.categories };
     case 'SET_ACCOUNTS':
       return { ...state, accounts: action.accounts };
+    case 'SET_ACCOUNT_BALANCES':
+      return { ...state, accountBalances: action.accountBalances };
+    case 'RENAME_ACCOUNT': {
+      const { oldName, newName } = action;
+      const newAccounts = state.accounts.map((a) => (a === oldName ? newName : a));
+      const newBalances = { ...state.accountBalances };
+      if (oldName in newBalances) {
+        newBalances[newName] = newBalances[oldName];
+        delete newBalances[oldName];
+      }
+      const newTransactions = state.transactions.map((t) => ({
+        ...t,
+        account: t.account === oldName ? newName : t.account,
+        transferTo: t.transferTo === oldName ? newName : t.transferTo,
+      }));
+      return { ...state, accounts: newAccounts, accountBalances: newBalances, transactions: newTransactions };
+    }
     default:
       return state;
   }
@@ -169,6 +199,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(state.accounts));
     } catch { /* ignore */ }
   }, [state.accounts]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(ACCOUNT_BALANCES_KEY, JSON.stringify(state.accountBalances));
+    } catch { /* ignore */ }
+  }, [state.accountBalances]);
 
   return <AppContext.Provider value={{ state, dispatch }}>{children}</AppContext.Provider>;
 }
