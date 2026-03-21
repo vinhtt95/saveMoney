@@ -7,6 +7,7 @@ const STORAGE_KEY = 'savemoney_transactions';
 const CATEGORIES_KEY = 'savemoney_categories';
 const ACCOUNTS_KEY = 'savemoney_accounts';
 const ACCOUNT_BALANCES_KEY = 'savemoney_account_balances';
+const DEFAULTS_KEY = 'savemoney_defaults';
 
 type Action =
   | { type: 'IMPORT'; transactions: Transaction[] }
@@ -19,7 +20,8 @@ type Action =
   | { type: 'SET_CATEGORIES'; categories: string[] }
   | { type: 'SET_ACCOUNTS'; accounts: string[] }
   | { type: 'SET_ACCOUNT_BALANCES'; accountBalances: Record<string, number> }
-  | { type: 'RENAME_ACCOUNT'; oldName: string; newName: string };
+  | { type: 'RENAME_ACCOUNT'; oldName: string; newName: string }
+  | { type: 'SET_DEFAULTS'; defaultCategoryExpense: string; defaultCategoryIncome: string; defaultAccount: string };
 
 const defaultFilters: FilterState = {
   search: '',
@@ -37,6 +39,9 @@ const initialState: AppState = {
   categories: [],
   accounts: [],
   accountBalances: {},
+  defaultCategoryExpense: '',
+  defaultCategoryIncome: '',
+  defaultAccount: '',
 };
 
 function serializeTransactions(txs: Transaction[]): string {
@@ -62,6 +67,22 @@ function loadStringList(key: string): string[] {
   return [];
 }
 
+function loadDefaults(): { defaultCategoryExpense: string; defaultCategoryIncome: string; defaultAccount: string } {
+  try {
+    const raw = localStorage.getItem(DEFAULTS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Record<string, string>;
+      return {
+        // migrate from old key name "defaultCategory"
+        defaultCategoryExpense: parsed.defaultCategoryExpense ?? parsed.defaultCategory ?? '',
+        defaultCategoryIncome: parsed.defaultCategoryIncome ?? '',
+        defaultAccount: parsed.defaultAccount ?? '',
+      };
+    }
+  } catch { /* ignore */ }
+  return { defaultCategoryExpense: '', defaultCategoryIncome: '', defaultAccount: '' };
+}
+
 function loadAccountBalances(): Record<string, number> {
   try {
     const raw = localStorage.getItem(ACCOUNT_BALANCES_KEY);
@@ -70,17 +91,19 @@ function loadAccountBalances(): Record<string, number> {
   return {};
 }
 
-function loadFromStorage(): Pick<AppState, 'transactions' | 'categories' | 'accounts' | 'accountBalances'> {
+function loadFromStorage(): Pick<AppState, 'transactions' | 'categories' | 'accounts' | 'accountBalances' | 'defaultCategoryExpense' | 'defaultCategoryIncome' | 'defaultAccount'> {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
+    const defaults = loadDefaults();
     return {
       transactions: raw ? deserializeTransactions(raw) : [],
       categories: loadStringList(CATEGORIES_KEY),
       accounts: loadStringList(ACCOUNTS_KEY),
       accountBalances: loadAccountBalances(),
+      ...defaults,
     };
   } catch {
-    return { transactions: [], categories: [], accounts: [], accountBalances: {} };
+    return { transactions: [], categories: [], accounts: [], accountBalances: {}, defaultCategoryExpense: '', defaultCategoryIncome: '', defaultAccount: '' };
   }
 }
 
@@ -146,6 +169,8 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, accounts: action.accounts };
     case 'SET_ACCOUNT_BALANCES':
       return { ...state, accountBalances: action.accountBalances };
+    case 'SET_DEFAULTS':
+      return { ...state, defaultCategoryExpense: action.defaultCategoryExpense, defaultCategoryIncome: action.defaultCategoryIncome, defaultAccount: action.defaultAccount };
     case 'RENAME_ACCOUNT': {
       const { oldName, newName } = action;
       const newAccounts = state.accounts.map((a) => (a === oldName ? newName : a));
@@ -205,6 +230,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem(ACCOUNT_BALANCES_KEY, JSON.stringify(state.accountBalances));
     } catch { /* ignore */ }
   }, [state.accountBalances]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(DEFAULTS_KEY, JSON.stringify({ defaultCategoryExpense: state.defaultCategoryExpense, defaultCategoryIncome: state.defaultCategoryIncome, defaultAccount: state.defaultAccount }));
+    } catch { /* ignore */ }
+  }, [state.defaultCategoryExpense, state.defaultCategoryIncome, state.defaultAccount]);
 
   return <AppContext.Provider value={{ state, dispatch }}>{children}</AppContext.Provider>;
 }

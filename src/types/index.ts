@@ -26,4 +26,7 @@ export interface AppState {
   categories: string[];
   accounts: string[];
   accountBalances: Record<string, number>;
+  defaultCategoryExpense: string;
+  defaultCategoryIncome: string;
+  defaultAccount: string;
 }

@@ -35,12 +35,12 @@ interface Draft {
   amountStr: string;
 }
 
-function emptyDraft(): Draft {
+function emptyDraft(defaultCategoryExpense = '', defaultCategoryIncome = '', defaultAccount = ''): Draft {
   return {
     date: new Date().toISOString().slice(0, 10),
     type: 'Expense',
-    category: '',
-    account: '',
+    category: defaultCategoryExpense,
+    account: defaultAccount,
     transferTo: '',
     amountStr: '',
   };
@@ -82,11 +82,15 @@ function InlineFields({
   onChange,
   allCategories,
   allAccounts,
+  defaultCategoryExpense = '',
+  defaultCategoryIncome = '',
 }: {
   draft: Draft;
   onChange: (patch: Partial<Draft>) => void;
   allCategories: string[];
   allAccounts: string[];
+  defaultCategoryExpense?: string;
+  defaultCategoryIncome?: string;
 }) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -98,7 +102,10 @@ function InlineFields({
             <button
               key={t}
               type="button"
-              onClick={() => onChange({ type: t, transferTo: '' })}
+              onClick={() => {
+                const newCategory = t === 'Expense' ? defaultCategoryExpense : t === 'Income' ? defaultCategoryIncome : '';
+                onChange({ type: t, transferTo: '', category: newCategory });
+              }}
               className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-colors ${
                 draft.type === t
                   ? 'bg-primary text-white border-primary'
@@ -184,7 +191,7 @@ export function Transactions() {
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Draft>(emptyDraft);
+  const [draft, setDraft] = useState<Draft>(() => emptyDraft(state.defaultCategoryExpense, state.defaultCategoryIncome, state.defaultAccount));
   const [addError, setAddError] = useState('');
   const [editError, setEditError] = useState('');
   const [page, setPage] = useState(1);
@@ -287,7 +294,7 @@ export function Transactions() {
   }
 
   function startAdd() {
-    setDraft(emptyDraft());
+    setDraft(emptyDraft(state.defaultCategoryExpense, state.defaultCategoryIncome, state.defaultAccount));
     setAddError('');
     setIsAdding(true);
     setEditingId(null);
@@ -350,6 +357,8 @@ export function Transactions() {
               onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
               allCategories={allTransactionCategories}
               allAccounts={allTransactionAccounts}
+              defaultCategoryExpense={state.defaultCategoryExpense}
+              defaultCategoryIncome={state.defaultCategoryIncome}
             />
             {addError && <p className="text-xs text-rose-500 mt-3">{addError}</p>}
             <div className="flex gap-2 mt-4">
@@ -576,6 +585,8 @@ export function Transactions() {
                     onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
                     allCategories={allTransactionCategories}
                     allAccounts={allTransactionAccounts}
+                    defaultCategoryExpense={state.defaultCategoryExpense}
+                    defaultCategoryIncome={state.defaultCategoryIncome}
                   />
                   {addError && <p className="text-xs text-rose-500 mt-2">{addError}</p>}
                   <div className="flex gap-2 mt-4">

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { parseCSV, exportCSV } from '../utils/csvParser';
 import { formatVND, formatDate } from '../utils/formatters';
@@ -15,6 +15,13 @@ export function Settings() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [newCategory, setNewCategory] = useState('');
   const [newAccount, setNewAccount] = useState('');
+  const [defaultCategoryExpense, setDefaultCategoryExpense] = useState(state.defaultCategoryExpense);
+  const [defaultCategoryIncome, setDefaultCategoryIncome] = useState(state.defaultCategoryIncome);
+  const [defaultAccount, setDefaultAccount] = useState(state.defaultAccount);
+
+  useEffect(() => { setDefaultCategoryExpense(state.defaultCategoryExpense); }, [state.defaultCategoryExpense]);
+  useEffect(() => { setDefaultCategoryIncome(state.defaultCategoryIncome); }, [state.defaultCategoryIncome]);
+  useEffect(() => { setDefaultAccount(state.defaultAccount); }, [state.defaultAccount]);
 
   function handleFile(file: File) {
     if (!file.name.endsWith('.csv')) {
@@ -262,6 +269,63 @@ export function Settings() {
 
       {activeTab === 'lists' && (
         <div className="max-w-5xl space-y-8">
+          {/* Defaults */}
+          <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+            <div className="p-6 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Mặc định khi thêm giao dịch</h3>
+              <p className="text-sm text-slate-500">Danh mục và tài khoản sẽ được điền sẵn khi mở form thêm giao dịch mới.</p>
+            </div>
+            <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-400 mb-2">Danh mục mặc định — Chi tiêu</label>
+                <select
+                  value={defaultCategoryExpense}
+                  onChange={(e) => {
+                    setDefaultCategoryExpense(e.target.value);
+                    dispatch({ type: 'SET_DEFAULTS', defaultCategoryExpense: e.target.value, defaultCategoryIncome: defaultCategoryIncome, defaultAccount });
+                  }}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                >
+                  <option value="">— Không có mặc định —</option>
+                  {state.categories.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-400 mb-2">Danh mục mặc định — Thu nhập</label>
+                <select
+                  value={defaultCategoryIncome}
+                  onChange={(e) => {
+                    setDefaultCategoryIncome(e.target.value);
+                    dispatch({ type: 'SET_DEFAULTS', defaultCategoryExpense, defaultCategoryIncome: e.target.value, defaultAccount });
+                  }}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                >
+                  <option value="">— Không có mặc định —</option>
+                  {state.categories.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-400 mb-2">Tài khoản mặc định</label>
+                <select
+                  value={defaultAccount}
+                  onChange={(e) => {
+                    setDefaultAccount(e.target.value);
+                    dispatch({ type: 'SET_DEFAULTS', defaultCategoryExpense, defaultCategoryIncome, defaultAccount: e.target.value });
+                  }}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+                >
+                  <option value="">— Không có mặc định —</option>
+                  {state.accounts.map((acc) => (
+                    <option key={acc} value={acc}>{acc}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </section>
           {/* Categories */}
           <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
             <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
