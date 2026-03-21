@@ -39,16 +39,6 @@ export function Sidebar() {
           </NavLink>
         ))}
       </nav>
-      <div className="p-4 mt-auto">
-        <div className="p-4 rounded-xl bg-primary/5 dark:bg-primary/20 border border-primary/10">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="material-symbols-outlined text-primary text-sm">verified</span>
-            <p className="text-xs font-bold text-primary dark:text-slate-200 uppercase tracking-wider">Pro Plan</p>
-          </div>
-          <p className="text-[10px] text-slate-500 dark:text-slate-400 mb-3">Unlock advanced AI spending insights.</p>
-          <button className="w-full py-2 bg-primary text-white text-xs font-bold rounded-lg">Upgrade Now</button>
-        </div>
-      </div>
     </aside>
   );
 }

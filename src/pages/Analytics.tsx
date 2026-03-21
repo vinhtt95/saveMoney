@@ -20,7 +20,7 @@ import {
 } from '../utils/analytics';
 import { formatVND, formatVNDShort, formatMonth, toYYYYMM } from '../utils/formatters';
 
-type AnalyticsTab = 'overview' | 'categories' | 'comparison' | 'matrix';
+type AnalyticsTab = 'categories' | 'comparison' | 'matrix';
 
 const CATEGORY_COLORS = ['#144bb8', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
@@ -40,7 +40,7 @@ function formatDayLabel(dateStr: string): string {
 export function Analytics() {
   const { state } = useApp();
   const { transactions, selectedPeriod } = state;
-  const [activeTab, setActiveTab] = useState<AnalyticsTab>('overview');
+  const [activeTab, setActiveTab] = useState<AnalyticsTab>('categories');
 
   const allTxs = transactions;
   const period = selectedPeriod === 'all'
@@ -134,7 +134,6 @@ export function Analytics() {
   }, [matrixData, showTopN]);
 
   const tabs: { id: AnalyticsTab; label: string; icon: string }[] = [
-    { id: 'overview', label: 'Overview', icon: 'insights' },
     { id: 'categories', label: 'Categories', icon: 'category' },
     { id: 'comparison', label: 'Comparison', icon: 'compare_arrows' },
     { id: 'matrix', label: 'Theo danh mục', icon: 'grid_on' },
@@ -321,139 +320,6 @@ export function Analytics() {
         </div>
       )}
 
-      {activeTab === 'overview' && (<>
-      {/* Row 1: Day of Week + Monthly Heatmap */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Day of Week */}
-        <div className="lg:col-span-1 bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="font-bold text-slate-800 dark:text-slate-100">By Day of Week</h3>
-            <span className="text-xs text-slate-400">all time</span>
-          </div>
-          <div className="space-y-4">
-            {dayOfWeek.map((item) => {
-              const isBusiest = item.amount === Math.max(...dayOfWeek.map((d) => d.amount));
-              return (
-                <div key={item.day} className="space-y-1">
-                  <div className={`flex justify-between text-xs font-medium mb-1 ${isBusiest ? 'text-primary font-bold' : ''}`}>
-                    <span>{item.day}</span>
-                    <span>{formatVNDShort(item.amount)}</span>
-                  </div>
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden">
-                    <div
-                      className={`${isBusiest ? 'bg-primary' : 'bg-primary/60'} h-full rounded-full`}
-                      style={{ width: `${(item.amount / maxDow) * 100}%` }}
-                    ></div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Heatmap */}
-        <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="font-bold text-slate-800 dark:text-slate-100">Monthly Density — {formatMonth(period)}</h3>
-            <div className="flex gap-2 items-center text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
-              <span>Less</span>
-              <div className="flex gap-1">
-                {HEATMAP_LEVELS.map((cls, i) => (
-                  <div key={i} className={`size-3 rounded-sm ${cls}`}></div>
-                ))}
-              </div>
-              <span>More</span>
-            </div>
-          </div>
-          <div className="grid grid-cols-7 gap-1.5">
-            {['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'].map((d) => (
-              <div key={d} className="text-center text-[10px] font-bold text-slate-400">{d}</div>
-            ))}
-            {/* Empty offset cells */}
-            {Array.from({ length: startOffset }).map((_, i) => (
-              <div key={`empty-${i}`} className="aspect-square" />
-            ))}
-            {heatmap.map((cell) => (
-              <div
-                key={cell.date}
-                className={`aspect-square ${HEATMAP_LEVELS[cell.level]} rounded-md hover:ring-2 ring-primary transition-all cursor-pointer`}
-                title={`${formatDayLabel(cell.date)}: ${cell.amount > 0 ? formatVND(cell.amount) : 'No spending'}`}
-              >
-                <span className="sr-only">{cell.day}</span>
-              </div>
-            ))}
-          </div>
-          {expenses.length > 0 && (
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-6 italic">
-              {(() => {
-                const busiest = dayOfWeek.reduce((a, b) => (a.amount > b.amount ? a : b));
-                return `Spending peaks on ${busiest.day} (${formatVNDShort(busiest.amount)} total).`;
-              })()}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* Row 2: Account Breakdown + Top Spending Days */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="font-bold text-slate-800 dark:text-slate-100">Spending by Account</h3>
-            <div className="flex gap-3">
-              {accountBreakdown.slice(0, 3).map((a, i) => (
-                <div key={a.account} className="flex items-center gap-1.5">
-                  <div className={`size-2 rounded-full ${i === 0 ? 'bg-primary' : i === 1 ? 'bg-primary/40' : 'bg-slate-300'}`}></div>
-                  <span className="text-[10px] font-bold text-slate-500">{a.account.toUpperCase()}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          {accountBreakdown.length > 0 ? (
-            <div className="space-y-4">
-              {accountBreakdown.map((acc, i) => (
-                <div key={acc.account} className="space-y-1.5">
-                  <div className="flex justify-between text-sm">
-                    <span className="font-medium text-slate-700 dark:text-slate-300">{acc.account}</span>
-                    <span className="text-slate-900 dark:text-white font-bold">
-                      {formatVNDShort(acc.total)} <span className="text-slate-400 font-normal text-xs">({acc.percent.toFixed(0)}%)</span>
-                    </span>
-                  </div>
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 h-3 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${i === 0 ? 'bg-primary' : i === 1 ? 'bg-primary/40' : 'bg-slate-300'}`}
-                      style={{ width: `${acc.percent}%` }}
-                    ></div>
-                  </div>
-                  <p className="text-xs text-slate-400">{acc.count} transactions</p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="h-32 flex items-center justify-center text-slate-400 text-sm">No expense data for this period</div>
-          )}
-        </div>
-
-        <div className="lg:col-span-1 bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-6">Top Spending Days</h3>
-          <div className="space-y-4">
-            {topDays.length > 0 ? topDays.map((item, i) => (
-              <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
-                <div>
-                  <p className="text-sm font-bold">{formatDayLabel(item.date)}</p>
-                  <p className="text-[10px] text-slate-500 truncate max-w-[120px]">{item.categories}</p>
-                </div>
-                <span className="text-sm font-black text-primary dark:text-slate-100 whitespace-nowrap ml-2">
-                  {formatVNDShort(item.total)}
-                </span>
-              </div>
-            )) : (
-              <p className="text-sm text-slate-400">No data available.</p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      </>)}
 
       {activeTab === 'matrix' && (
         <div className="flex flex-col gap-6">
