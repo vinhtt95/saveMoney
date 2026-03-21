@@ -16,6 +16,7 @@ import {
   getCategoryBreakdown,
   getAvailablePeriods,
   getCategoryMonthMatrix,
+  getCategoryMonthlyTrend,
 } from '../utils/analytics';
 import { formatVND, formatVNDShort, formatMonth, toYYYYMM } from '../utils/formatters';
 
@@ -102,6 +103,18 @@ export function Analytics() {
   const defaultTo = allPeriods[0];
   const [matrixFrom, setMatrixFrom] = useState(defaultFrom || '');
   const [matrixTo, setMatrixTo] = useState(defaultTo || '');
+
+  // Category trend line chart — synced with matrix date range
+  const allCategories = useMemo(() => getCategoryBreakdown(getExpenses(allTxs)).map((c) => c.category), [allTxs]);
+  const [trendCategory, setTrendCategory] = useState(() => allCategories[0] || '');
+  const trendPeriods = useMemo(
+    () => allPeriods.filter((p) => p >= matrixFrom && p <= matrixTo).slice().reverse(),
+    [allPeriods, matrixFrom, matrixTo]
+  );
+  const trendData = useMemo(
+    () => trendCategory ? getCategoryMonthlyTrend(allTxs, trendCategory, trendPeriods) : [],
+    [allTxs, trendCategory, trendPeriods]
+  );
   const [showTopN, setShowTopN] = useState(5);
 
   const matrixData = useMemo(() => {
@@ -444,7 +457,7 @@ export function Analytics() {
 
       {activeTab === 'matrix' && (
         <div className="flex flex-col gap-6">
-          {/* Controls */}
+          {/* Shared controls */}
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Từ</label>
@@ -512,11 +525,43 @@ export function Analytics() {
                 </div>
               </div>
 
+              {/* Category trend line chart */}
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="font-bold text-slate-800 dark:text-slate-100">Chi tiêu theo danh mục</h3>
+                    <p className="text-xs text-slate-500 mt-1">Click vào dòng trong bảng để xem xu hướng của danh mục đó</p>
+                  </div>
+                  {trendCategory && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-lg">
+                      <div className="size-2.5 rounded-full bg-primary"></div>
+                      <span className="text-sm font-bold text-primary">{trendCategory}</span>
+                    </div>
+                  )}
+                </div>
+                {trendData.length > 0 ? (
+                  <div className="h-56">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={trendData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                        <XAxis dataKey="month" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                        <YAxis tickFormatter={(v) => formatVNDShort(v)} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={72} />
+                        <Tooltip formatter={(value: number) => [formatVND(value), trendCategory]} labelFormatter={(label) => `Tháng ${label}`} />
+                        <Line type="monotone" dataKey="amount" stroke="#144bb8" strokeWidth={2} dot={{ r: 4, fill: '#144bb8' }} activeDot={{ r: 6 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="h-56 flex items-center justify-center text-slate-400 text-sm">
+                    Không có dữ liệu trong khoảng thời gian này.
+                  </div>
+                )}
+              </div>
+
               {/* Trend table */}
               <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
                 <div className="p-6 border-b border-slate-100 dark:border-slate-800">
                   <h3 className="font-bold text-slate-800 dark:text-slate-100">Bảng chi tiết</h3>
-                  <p className="text-xs text-slate-500 mt-1">Màu đỏ = tăng so với tháng trước, xanh = giảm</p>
+                  <p className="text-xs text-slate-500 mt-1">Click vào dòng để xem biểu đồ đường · Màu đỏ = tăng, xanh = giảm so với tháng trước</p>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
@@ -531,16 +576,22 @@ export function Analytics() {
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                       {matrixCats.map((cat, ci) => {
+                        const isSelected = trendCategory === cat;
                         const values = matrixData.map((row) => (row[cat] as number) || 0);
                         const first = values.find((v) => v > 0) || 0;
                         const last = values[values.length - 1];
                         const overallChange = first > 0 ? ((last - first) / first) * 100 : null;
                         return (
-                          <tr key={cat} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                            <td className="px-4 py-3 sticky left-0 bg-white dark:bg-slate-900 font-medium">
+                          <tr
+                            key={cat}
+                            onClick={() => setTrendCategory(cat)}
+                            className={`cursor-pointer transition-colors ${isSelected ? 'bg-primary/5 dark:bg-primary/10' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
+                          >
+                            <td className={`px-4 py-3 sticky left-0 font-medium ${isSelected ? 'bg-primary/5 dark:bg-primary/10' : 'bg-white dark:bg-slate-900'}`}>
                               <div className="flex items-center gap-2">
                                 <div className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: CATEGORY_COLORS[ci % CATEGORY_COLORS.length] }}></div>
-                                <span className="truncate max-w-[110px]">{cat}</span>
+                                <span className={`truncate max-w-[110px] ${isSelected ? 'text-primary font-bold' : ''}`}>{cat}</span>
+                                {isSelected && <span className="material-symbols-outlined text-xs text-primary">show_chart</span>}
                               </div>
                             </td>
                             {values.map((val, vi) => {

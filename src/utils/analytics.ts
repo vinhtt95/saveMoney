@@ -243,6 +243,21 @@ export function getAvailablePeriods(txs: Transaction[]): string[] {
   return Array.from(set).sort().reverse();
 }
 
+/** Monthly spending trend for a single category over a range of periods */
+export function getCategoryMonthlyTrend(
+  txs: Transaction[],
+  category: string,
+  periods: string[]
+): { month: string; amount: number }[] {
+  const expenses = getExpenses(txs);
+  return periods.map((p) => {
+    const total = expenses
+      .filter((t) => toYYYYMM(t.date) === p && t.category === category)
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+    return { month: p, amount: total };
+  });
+}
+
 /** Account spending by week within a period */
 export function getAccountByWeek(
   txs: Transaction[],
