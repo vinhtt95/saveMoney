@@ -5,6 +5,7 @@ import { getExpenses, getTotalSpending, getTotalIncome, getAvgDaily, filterByPer
 import { formatVND, formatVNDShort, formatDate } from '../utils/formatters';
 import { Transaction, TransactionType } from '../types';
 import { Combobox } from '../components/Combobox';
+import { AddTransactionForm } from '../components/AddTransactionModal';
 
 const CATEGORY_ICONS: Record<string, { icon: string; color: string; bg: string }> = {
   Transport: { icon: 'directions_car', color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/30' },
@@ -59,7 +60,8 @@ function draftFromTx(tx: Transaction): Draft {
 
 function draftToTx(draft: Draft, id: string): Transaction | null {
   const amt = parseFloat(draft.amountStr);
-  if (!draft.date || !draft.category.trim() || !draft.account.trim() || !draft.amountStr || isNaN(amt) || amt <= 0) {
+  const needsCategory = draft.type !== 'Transfer';
+  if (!draft.date || (needsCategory && !draft.category.trim()) || !draft.account.trim() || !draft.amountStr || isNaN(amt) || amt <= 0) {
     return null;
   }
   if (draft.type === 'Transfer' && !draft.transferTo.trim()) return null;
@@ -192,7 +194,6 @@ export function Transactions() {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(() => emptyDraft(state.defaultCategoryExpense, state.defaultCategoryIncome, state.defaultAccount));
-  const [addError, setAddError] = useState('');
   const [editError, setEditError] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -294,23 +295,13 @@ export function Transactions() {
   }
 
   function startAdd() {
-    setDraft(emptyDraft(state.defaultCategoryExpense, state.defaultCategoryIncome, state.defaultAccount));
-    setAddError('');
     setIsAdding(true);
     setEditingId(null);
   }
 
-  function cancelAdd() {
-    setIsAdding(false);
-    setAddError('');
-  }
-
-  function confirmAdd() {
-    const tx = draftToTx(draft, crypto.randomUUID());
-    if (!tx) { setAddError('Vui lòng điền đầy đủ thông tin hợp lệ.'); return; }
+  function handleAddConfirm(tx: Transaction) {
     dispatch({ type: 'ADD_TRANSACTION', transaction: tx });
     setIsAdding(false);
-    setAddError('');
   }
 
   function startEdit(tx: Transaction) {
@@ -334,7 +325,7 @@ export function Transactions() {
 
   if (transactions.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 gap-4">
+      <div className="flex flex-col items-center justify-center py-16 gap-4">
         <div className="size-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center">
           <span className="material-symbols-outlined text-3xl text-slate-400">receipt_long</span>
         </div>
@@ -348,23 +339,18 @@ export function Transactions() {
             Import CSV
           </Link>
         </div>
-        {/* Inline add form for empty state */}
         {isAdding && (
-          <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-xl border-2 border-primary/30 shadow-sm p-6 mt-2">
-            <p className="text-xs font-bold uppercase text-primary mb-4 tracking-wide">Giao dịch mới</p>
-            <InlineFields
-              draft={draft}
-              onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
+          <div className="w-full max-w-2xl mt-2">
+            <AddTransactionForm
+              open={isAdding}
+              onClose={() => setIsAdding(false)}
+              onConfirm={handleAddConfirm}
               allCategories={allTransactionCategories}
               allAccounts={allTransactionAccounts}
               defaultCategoryExpense={state.defaultCategoryExpense}
               defaultCategoryIncome={state.defaultCategoryIncome}
+              defaultAccount={state.defaultAccount}
             />
-            {addError && <p className="text-xs text-rose-500 mt-3">{addError}</p>}
-            <div className="flex gap-2 mt-4">
-              <button onClick={confirmAdd} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity">Lưu</button>
-              <button onClick={cancelAdd} className="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Hủy</button>
-            </div>
           </div>
         )}
       </div>
@@ -562,7 +548,7 @@ export function Transactions() {
       )}
 
       {/* Table */}
-      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
@@ -577,37 +563,23 @@ export function Transactions() {
 
             {/* Inline Add Row */}
             {isAdding && (
-              <tr className="bg-primary/5 dark:bg-primary/10 border-l-4 border-primary">
-                <td colSpan={5} className="px-6 py-5">
-                  <p className="text-[10px] uppercase font-bold text-primary mb-3 tracking-wide">Giao dịch mới</p>
-                  <InlineFields
-                    draft={draft}
-                    onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
+              <tr>
+                <td colSpan={5} className="p-4">
+                  <AddTransactionForm
+                    open={isAdding}
+                    onClose={() => setIsAdding(false)}
+                    onConfirm={handleAddConfirm}
                     allCategories={allTransactionCategories}
                     allAccounts={allTransactionAccounts}
                     defaultCategoryExpense={state.defaultCategoryExpense}
                     defaultCategoryIncome={state.defaultCategoryIncome}
+                    defaultAccount={state.defaultAccount}
                   />
-                  {addError && <p className="text-xs text-rose-500 mt-2">{addError}</p>}
-                  <div className="flex gap-2 mt-4">
-                    <button
-                      onClick={confirmAdd}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
-                    >
-                      <span className="material-symbols-outlined text-sm">check</span> Lưu
-                    </button>
-                    <button
-                      onClick={cancelAdd}
-                      className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-sm">close</span> Hủy
-                    </button>
-                  </div>
                 </td>
               </tr>
             )}
 
-            {paginated.length === 0 && !isAdding ? (
+            {paginated.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-6 py-12 text-center text-slate-400 text-sm">No transactions match your filters.</td>
               </tr>
@@ -813,6 +785,7 @@ export function Transactions() {
           </div>
         </div>
       </div>
+
     </div>
   );
 }
