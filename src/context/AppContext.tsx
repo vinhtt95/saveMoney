@@ -33,7 +33,7 @@ const defaultFilters: FilterState = {
 const initialState: AppState = {
   transactions: [],
   filters: defaultFilters,
-  selectedPeriod: 'all',
+  selectedPeriod: toYYYYMM(new Date()),
   categories: [],
   accounts: [],
   accountBalances: {},
