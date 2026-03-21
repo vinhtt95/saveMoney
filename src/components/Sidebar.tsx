@@ -1,6 +1,12 @@
+import { useMemo } from 'react';
 import { NavLink } from 'react-router-dom';
-import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { useApp } from '../context/AppContext';
+import { getAccountNetTotals } from '../utils/analytics';
+
+function formatNum(amount: number): string {
+  return Math.abs(Math.round(amount)).toLocaleString('vi-VN');
+}
 
 const navItems = [
   { name: 'Dashboard', icon: 'dashboard', path: '/' },
@@ -9,6 +15,62 @@ const navItems = [
   { name: 'Accounts', icon: 'account_balance', path: '/accounts' },
   { name: 'Settings', icon: 'settings', path: '/settings' },
 ];
+
+function SidebarAccountCards() {
+  const { state } = useApp();
+  const netTotals = useMemo(() => getAccountNetTotals(state.transactions), [state.transactions]);
+
+  const accountCards = useMemo(() => {
+    return state.accounts.map((acc) => {
+      const initial = state.accountBalances[acc] ?? 0;
+      const net = netTotals[acc] ?? 0;
+      const balance = initial + net;
+      let spending = 0;
+      let income = 0;
+      state.transactions.forEach((t) => {
+        if (t.account === acc) {
+          if (t.type === 'Expense') spending += Math.abs(t.amount);
+          else if (t.type === 'Income') income += t.amount;
+        }
+      });
+      return { account: acc, balance, spending, income };
+    }).filter((a) => a.balance !== 0 || a.spending !== 0 || a.income !== 0);
+  }, [state.accounts, state.accountBalances, netTotals, state.transactions]);
+
+  if (accountCards.length === 0) return null;
+
+  return (
+    <div className="px-4 pb-4">
+      <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Accounts</p>
+      <div className="space-y-2">
+        {accountCards.map((acc) => (
+          <div key={acc.account} className="bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div className={`px-3 py-3 ${acc.balance >= 0 ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-rose-50 dark:bg-rose-900/20'}`}>
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="material-symbols-outlined text-slate-400 text-base">account_balance_wallet</span>
+                <span className="text-sm font-semibold text-slate-500 dark:text-slate-400 truncate flex-1">{acc.account}</span>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 shrink-0">VND</span>
+              </div>
+              <p className={`text-lg font-bold text-right ${acc.balance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                {acc.balance >= 0 ? '+' : ''}{formatNum(acc.balance)}
+              </p>
+            </div>
+            <div className="px-3 py-2 flex justify-between text-xs text-slate-400">
+              <span className="flex items-center gap-1">
+                <span className="size-1.5 rounded-full bg-rose-400 inline-block"></span>
+                {acc.spending > 0 ? `-${formatNum(acc.spending)}` : '—'}
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="size-1.5 rounded-full bg-emerald-400 inline-block"></span>
+                {acc.income > 0 ? `+${formatNum(acc.income)}` : '—'}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function Sidebar() {
   return (
@@ -39,6 +101,7 @@ export function Sidebar() {
           </NavLink>
         ))}
       </nav>
+      <SidebarAccountCards />
     </aside>
   );
 }

@@ -96,25 +96,6 @@ export function Dashboard() {
       .slice(0, 10);
   }, [periodTxs]);
 
-  const accountStats = useMemo(() => {
-    const expenseMap: Record<string, number> = {};
-    const incomeMap: Record<string, number> = {};
-    periodTxs.forEach((t) => {
-      if (t.type === 'Expense') {
-        expenseMap[t.account] = (expenseMap[t.account] || 0) + Math.abs(t.amount);
-      } else if (t.type === 'Income') {
-        incomeMap[t.account] = (incomeMap[t.account] || 0) + t.amount;
-      }
-    });
-    const accounts = new Set([...Object.keys(expenseMap), ...Object.keys(incomeMap)]);
-    return [...accounts].map((acc) => ({
-      account: acc,
-      spending: expenseMap[acc] || 0,
-      income: incomeMap[acc] || 0,
-      net: (incomeMap[acc] || 0) - (expenseMap[acc] || 0),
-    })).sort((a, b) => b.spending - a.spending);
-  }, [periodTxs]);
-
   const hasData = allTxs.length > 0;
 
   if (!hasData) {
@@ -236,49 +217,6 @@ export function Dashboard() {
           {largestTx && <p className="text-slate-400 text-xs mt-1">Largest: {formatVNDShort(Math.abs(largestTx.amount))}</p>}
         </div>
       </div>
-
-      {/* Account Cards */}
-      {accountStats.length > 0 && (
-        <div>
-          <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Accounts</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            {accountStats.map((acc) => (
-              <div key={acc.account} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                {/* Net highlight bar */}
-                <div className={`px-5 py-4 ${acc.net >= 0 ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-rose-50 dark:bg-rose-900/20'}`}>
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-slate-500 dark:text-slate-400 text-base">account_balance_wallet</span>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 truncate max-w-[100px]">{acc.account}</span>
-                    </div>
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${acc.net >= 0 ? 'text-emerald-700 bg-emerald-100 dark:bg-emerald-900/40 dark:text-emerald-400' : 'text-rose-700 bg-rose-100 dark:bg-rose-900/40 dark:text-rose-400'}`}>
-                      Net
-                    </span>
-                  </div>
-                  <p className={`text-xl font-bold text-right ${acc.net >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                    {acc.net >= 0 ? '+' : ''}{formatVND(acc.net)}
-                  </p>
-                </div>
-                {/* Spending / Income rows */}
-                <div className="px-5 py-3 space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-400 flex items-center gap-1.5">
-                      <span className="size-1.5 rounded-full bg-rose-400 inline-block"></span>Chi tiêu
-                    </span>
-                    <span className="font-semibold text-slate-700 dark:text-slate-300 text-right">{acc.spending > 0 ? `-${formatVND(acc.spending)}` : '—'}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-400 flex items-center gap-1.5">
-                      <span className="size-1.5 rounded-full bg-emerald-400 inline-block"></span>Thu nhập
-                    </span>
-                    <span className="font-semibold text-slate-700 dark:text-slate-300 text-right">{acc.income > 0 ? `+${formatVND(acc.income)}` : '—'}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
