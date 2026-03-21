@@ -15,10 +15,11 @@ import {
   getAccountBreakdown,
   getCategoryBreakdown,
   getAvailablePeriods,
+  getCategoryMonthMatrix,
 } from '../utils/analytics';
 import { formatVND, formatVNDShort, formatMonth, toYYYYMM } from '../utils/formatters';
 
-type AnalyticsTab = 'overview' | 'categories' | 'comparison';
+type AnalyticsTab = 'overview' | 'categories' | 'comparison' | 'matrix';
 
 const CATEGORY_COLORS = ['#144bb8', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
@@ -95,10 +96,35 @@ export function Analytics() {
 
   const maxDow = Math.max(...dayOfWeek.map((d) => d.amount), 1);
 
+  // Matrix tab state
+  const allPeriods = useMemo(() => getAvailablePeriods(allTxs), [allTxs]);
+  const defaultFrom = allPeriods[Math.min(allPeriods.length - 1, 5)]; // up to 6 months back
+  const defaultTo = allPeriods[0];
+  const [matrixFrom, setMatrixFrom] = useState(defaultFrom || '');
+  const [matrixTo, setMatrixTo] = useState(defaultTo || '');
+  const [showTopN, setShowTopN] = useState(5);
+
+  const matrixData = useMemo(() => {
+    if (!matrixFrom || !matrixTo || matrixFrom > matrixTo) return [];
+    return getCategoryMonthMatrix(allTxs, matrixFrom, matrixTo);
+  }, [allTxs, matrixFrom, matrixTo]);
+
+  const matrixCats = useMemo(() => {
+    if (matrixData.length === 0) return [];
+    const cats = Object.keys(matrixData[0]).filter((k) => k !== 'month');
+    // Sort by total descending
+    const totals: Record<string, number> = {};
+    cats.forEach((cat) => {
+      totals[cat] = matrixData.reduce((s, row) => s + ((row[cat] as number) || 0), 0);
+    });
+    return cats.sort((a, b) => totals[b] - totals[a]).slice(0, showTopN);
+  }, [matrixData, showTopN]);
+
   const tabs: { id: AnalyticsTab; label: string; icon: string }[] = [
     { id: 'overview', label: 'Overview', icon: 'insights' },
     { id: 'categories', label: 'Categories', icon: 'category' },
     { id: 'comparison', label: 'Comparison', icon: 'compare_arrows' },
+    { id: 'matrix', label: 'Theo danh mục', icon: 'grid_on' },
   ];
 
   return (
@@ -415,6 +441,146 @@ export function Analytics() {
       </div>
 
       </>)}
+
+      {activeTab === 'matrix' && (
+        <div className="flex flex-col gap-6">
+          {/* Controls */}
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Từ</label>
+              <select
+                value={matrixFrom}
+                onChange={(e) => setMatrixFrom(e.target.value)}
+                className="text-sm border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200"
+              >
+                {allPeriods.slice().reverse().map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Đến</label>
+              <select
+                value={matrixTo}
+                onChange={(e) => setMatrixTo(e.target.value)}
+                className="text-sm border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200"
+              >
+                {allPeriods.slice().reverse().map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2 ml-auto">
+              <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Top</label>
+              {[3, 5, 8, 10].map((n) => (
+                <button
+                  key={n}
+                  onClick={() => setShowTopN(n)}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-colors ${showTopN === n ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+                >
+                  {n}
+                </button>
+              ))}
+              <span className="text-sm text-slate-400">danh mục</span>
+            </div>
+          </div>
+
+          {matrixData.length === 0 || matrixCats.length === 0 ? (
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-12 text-center text-slate-400 text-sm">
+              Không có dữ liệu trong khoảng thời gian này.
+            </div>
+          ) : (
+            <>
+              {/* Stacked bar chart */}
+              <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-6">Chi tiêu theo tháng và danh mục</h3>
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={matrixData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                      <XAxis dataKey="month" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                      <YAxis tickFormatter={(v) => formatVNDShort(v)} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={72} />
+                      <Tooltip
+                        formatter={(value: number, name: string) => [formatVND(value), name]}
+                        labelFormatter={(label) => `Tháng ${label}`}
+                      />
+                      <Legend />
+                      {matrixCats.map((cat, i) => (
+                        <Bar key={cat} dataKey={cat} stackId="a" fill={CATEGORY_COLORS[i % CATEGORY_COLORS.length]} radius={i === matrixCats.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
+                      ))}
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Trend table */}
+              <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-slate-100 dark:border-slate-800">
+                  <h3 className="font-bold text-slate-800 dark:text-slate-100">Bảng chi tiết</h3>
+                  <p className="text-xs text-slate-500 mt-1">Màu đỏ = tăng so với tháng trước, xanh = giảm</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 text-xs font-bold uppercase tracking-wider">
+                      <tr>
+                        <th className="px-4 py-3 sticky left-0 bg-slate-50 dark:bg-slate-800/50 min-w-[140px]">Danh mục</th>
+                        {matrixData.map((row) => (
+                          <th key={row.month as string} className="px-4 py-3 text-right whitespace-nowrap">{row.month as string}</th>
+                        ))}
+                        <th className="px-4 py-3 text-right whitespace-nowrap">Thay đổi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                      {matrixCats.map((cat, ci) => {
+                        const values = matrixData.map((row) => (row[cat] as number) || 0);
+                        const first = values.find((v) => v > 0) || 0;
+                        const last = values[values.length - 1];
+                        const overallChange = first > 0 ? ((last - first) / first) * 100 : null;
+                        return (
+                          <tr key={cat} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                            <td className="px-4 py-3 sticky left-0 bg-white dark:bg-slate-900 font-medium">
+                              <div className="flex items-center gap-2">
+                                <div className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: CATEGORY_COLORS[ci % CATEGORY_COLORS.length] }}></div>
+                                <span className="truncate max-w-[110px]">{cat}</span>
+                              </div>
+                            </td>
+                            {values.map((val, vi) => {
+                              const prev = vi > 0 ? values[vi - 1] : null;
+                              const isUp = prev !== null && prev > 0 && val > prev;
+                              const isDown = prev !== null && prev > 0 && val < prev;
+                              return (
+                                <td
+                                  key={vi}
+                                  className={`px-4 py-3 text-right font-medium whitespace-nowrap ${
+                                    val === 0 ? 'text-slate-300 dark:text-slate-700' :
+                                    isUp ? 'text-rose-600 bg-rose-50 dark:bg-rose-900/10' :
+                                    isDown ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/10' :
+                                    'text-slate-700 dark:text-slate-300'
+                                  }`}
+                                >
+                                  {val === 0 ? '—' : formatVNDShort(val)}
+                                </td>
+                              );
+                            })}
+                            <td className="px-4 py-3 text-right font-bold whitespace-nowrap">
+                              {overallChange === null ? (
+                                <span className="text-slate-400">—</span>
+                              ) : (
+                                <span className={overallChange > 0 ? 'text-rose-600' : overallChange < 0 ? 'text-emerald-600' : 'text-slate-500'}>
+                                  {overallChange > 0 ? '+' : ''}{overallChange.toFixed(0)}%
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

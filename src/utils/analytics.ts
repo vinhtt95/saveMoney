@@ -205,6 +205,38 @@ export function getMonthlyComparison(
   });
 }
 
+/** Category × month spending matrix for a date range */
+export function getCategoryMonthMatrix(
+  txs: Transaction[],
+  fromPeriod: string,
+  toPeriod: string
+): { month: string; [category: string]: number | string }[] {
+  // Build sorted list of all YYYY-MM in range
+  const allPeriods = getAvailablePeriods(txs).filter(
+    (p) => p >= fromPeriod && p <= toPeriod
+  ).reverse(); // chronological order
+
+  // Collect all categories in range
+  const rangeTxs = txs.filter((t) => {
+    const p = toYYYYMM(t.date);
+    return p >= fromPeriod && p <= toPeriod;
+  });
+  const allCats = getCategoryBreakdown(getExpenses(rangeTxs)).map((c) => c.category);
+
+  return allPeriods.map((p) => {
+    const periodTxs = filterByPeriod(txs, p);
+    const bd = getCategoryBreakdown(getExpenses(periodTxs));
+    const bdMap: Record<string, number> = {};
+    bd.forEach((c) => (bdMap[c.category] = c.total));
+
+    const row: { month: string; [key: string]: number | string } = { month: p };
+    allCats.forEach((cat) => {
+      row[cat] = bdMap[cat] || 0;
+    });
+    return row;
+  });
+}
+
 /** Get sorted list of available periods (YYYY-MM) from transactions */
 export function getAvailablePeriods(txs: Transaction[]): string[] {
   const set = new Set(txs.map((t) => toYYYYMM(t.date)));
