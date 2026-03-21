@@ -420,8 +420,8 @@ export function Budget() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-end justify-between mb-1.5">
                         <div>
-                          <span className="text-lg font-bold text-slate-900 dark:text-white">{formatVNDShort(spent)}</span>
-                          <span className="text-sm text-slate-400 ml-1.5">/ {formatVNDShort(budget.limit)}</span>
+                          <span className="text-lg font-bold text-slate-900 dark:text-white">{formatVND(spent)}</span>
+                          <span className="text-sm text-slate-400 ml-1.5">/ {formatVND(budget.limit)}</span>
                         </div>
                         <span className={`text-sm font-bold ${pct >= 100 ? 'text-rose-600' : pct >= 85 ? 'text-amber-600' : 'text-emerald-600'}`}>
                           {pct.toFixed(0)}%
@@ -447,7 +447,7 @@ export function Budget() {
                       <div className="flex justify-between mt-1.5 text-xs text-slate-400">
                         <span>{matchingTxs.length} giao dịch</span>
                         <span className={remaining < 0 ? 'text-rose-600 dark:text-rose-400 font-medium' : ''}>
-                          {remaining >= 0 ? `Còn lại ${formatVNDShort(remaining)}` : `Vượt ${formatVNDShort(Math.abs(remaining))}`}
+                          {remaining >= 0 ? `Còn lại ${formatVND(remaining)}` : `Vượt ${formatVND(Math.abs(remaining))}`}
                         </span>
                       </div>
 

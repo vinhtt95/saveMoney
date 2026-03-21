@@ -3,9 +3,22 @@ import { NavLink } from 'react-router-dom';
 import { twMerge } from 'tailwind-merge';
 import { useApp } from '../context/AppContext';
 import { getAccountNetTotals } from '../utils/analytics';
+import { toYYYYMMDD, formatVNDShort } from '../utils/formatters';
+import type { Budget } from '../types';
 
 function formatNum(amount: number): string {
   return Math.abs(Math.round(amount)).toLocaleString('vi-VN');
+}
+
+function loadBudgets(): Budget[] {
+  try {
+    const raw = localStorage.getItem('savemoney_budgets');
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 const navItems = [
@@ -74,6 +87,66 @@ function SidebarAccountCards() {
   );
 }
 
+function SidebarBudgetCards() {
+  const { state } = useApp();
+  const budgets = useMemo(() => loadBudgets(), []);
+
+  const budgetStats = useMemo(() => {
+    return budgets.map((budget) => {
+      const spent = state.transactions
+        .filter(
+          (t) =>
+            t.type === 'Expense' &&
+            budget.categories.includes(t.category) &&
+            toYYYYMMDD(t.date) >= budget.dateStart &&
+            toYYYYMMDD(t.date) <= budget.dateEnd
+        )
+        .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+      const pct = budget.limit > 0 ? Math.min((spent / budget.limit) * 100, 100) : 0;
+      return { budget, spent, pct };
+    });
+  }, [budgets, state.transactions]);
+
+  if (budgetStats.length === 0) return null;
+
+  return (
+    <div className="px-4 pb-4">
+      <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Budgets</p>
+      <div className="space-y-2">
+        {budgetStats.map(({ budget, spent, pct }) => {
+          const isOver = pct >= 100;
+          const isCritical = pct >= 85;
+          const barColor = isOver ? 'bg-rose-500' : isCritical ? 'bg-amber-500' : 'bg-emerald-500';
+          const textColor = isOver ? 'text-rose-600 dark:text-rose-400' : isCritical ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400';
+
+          return (
+            <NavLink
+              key={budget.id}
+              to="/budget"
+              className="block bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden hover:border-primary/40 transition-colors"
+            >
+              <div className="px-3 py-2.5">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-300 truncate flex-1">{budget.name}</span>
+                </div>
+                <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden mb-1.5">
+                  <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+                </div>
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="text-slate-400">Còn lại</span>
+                  <span className={`text-lg font-bold ${textColor}`}>
+                    {(budget.limit - spent).toLocaleString('vi-VN')}
+                  </span>
+                </div>
+              </div>
+            </NavLink>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function Sidebar() {
   return (
     <aside className="w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hidden md:flex flex-col shrink-0">
@@ -103,6 +176,7 @@ export function Sidebar() {
           </NavLink>
         ))}
       </nav>
+      <SidebarBudgetCards />
       <SidebarAccountCards />
     </aside>
   );
