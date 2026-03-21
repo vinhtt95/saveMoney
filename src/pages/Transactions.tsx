@@ -1,10 +1,8 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
-import { getExpenses, getTotalSpending, getTotalIncome, getAvgDaily, filterByPeriod } from '../utils/analytics';
+import { getExpenses, getTotalSpending, getTotalIncome, getAvgDaily, filterByPeriod, getAvailablePeriods } from '../utils/analytics';
 import { formatVND, formatVNDShort, formatDate } from '../utils/formatters';
-
-const PAGE_SIZE = 10;
 
 const CATEGORY_ICONS: Record<string, { icon: string; color: string; bg: string }> = {
   Transport: { icon: 'directions_car', color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/30' },
@@ -28,12 +26,17 @@ export function Transactions() {
   const { state, dispatch } = useApp();
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [showCategoryMenu, setShowCategoryMenu] = useState(false);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
+  const [showPeriodMenu, setShowPeriodMenu] = useState(false);
   const categoryMenuRef = useRef<HTMLDivElement>(null);
   const accountMenuRef = useRef<HTMLDivElement>(null);
+  const periodMenuRef = useRef<HTMLDivElement>(null);
 
   const { filters, selectedPeriod, transactions } = state;
+
+  const availablePeriods = useMemo(() => getAvailablePeriods(transactions), [transactions]);
 
   const periodTxs = useMemo(
     () => filterByPeriod(transactions, selectedPeriod),
@@ -68,11 +71,30 @@ export function Transactions() {
     return txs.sort((a, b) => b.date.getTime() - a.date.getTime());
   }, [periodTxs, filters]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
 
-  // Reset page when filters change
-  useMemo(() => setPage(1), [filters, selectedPeriod]);
+  // Group paginated transactions by date
+  const groupedByDay = useMemo(() => {
+    const groups: { dateKey: string; date: Date; txs: typeof paginated; dayIncome: number; dayExpense: number }[] = [];
+    const map = new Map<string, typeof groups[0]>();
+    for (const tx of paginated) {
+      const key = tx.date.toISOString().slice(0, 10);
+      if (!map.has(key)) {
+        const group = { dateKey: key, date: tx.date, txs: [], dayIncome: 0, dayExpense: 0 };
+        map.set(key, group);
+        groups.push(group);
+      }
+      const g = map.get(key)!;
+      g.txs.push(tx);
+      if (tx.type === 'Income') g.dayIncome += tx.amount;
+      if (tx.type === 'Expense') g.dayExpense += Math.abs(tx.amount);
+    }
+    return groups;
+  }, [paginated]);
+
+  // Reset page when filters or pageSize change
+  useMemo(() => setPage(1), [filters, selectedPeriod, pageSize]);
 
   const expenses = useMemo(() => getExpenses(filtered), [filtered]);
   const totalSpending = useMemo(() => getTotalSpending(expenses), [expenses]);
@@ -88,6 +110,9 @@ export function Transactions() {
       }
       if (accountMenuRef.current && !accountMenuRef.current.contains(e.target as Node)) {
         setShowAccountMenu(false);
+      }
+      if (periodMenuRef.current && !periodMenuRef.current.contains(e.target as Node)) {
+        setShowPeriodMenu(false);
       }
     }
     document.addEventListener('mousedown', handler);
@@ -171,6 +196,39 @@ export function Transactions() {
             value={filters.search}
             onChange={(e) => dispatch({ type: 'SET_FILTER', filter: { search: e.target.value } })}
           />
+        </div>
+
+        {/* Period filter */}
+        <div className="relative" ref={periodMenuRef}>
+          <button
+            onClick={() => setShowPeriodMenu((v) => !v)}
+            className={`flex items-center gap-2 px-4 py-2 bg-slate-50 dark:bg-slate-800 border rounded-lg text-sm font-medium hover:bg-slate-100 transition-colors ${
+              selectedPeriod !== 'all' ? 'border-primary text-primary' : 'border-slate-200 dark:border-slate-700'
+            }`}
+          >
+            <span className="material-symbols-outlined text-sm">calendar_month</span>
+            {selectedPeriod === 'all' ? 'All time' : selectedPeriod}
+            <span className="material-symbols-outlined text-sm">expand_more</span>
+          </button>
+          {showPeriodMenu && (
+            <div className="absolute top-full mt-1 left-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg z-10 min-w-[160px] overflow-hidden max-h-64 overflow-y-auto">
+              <button
+                onClick={() => { dispatch({ type: 'SET_PERIOD', period: 'all' }); setShowPeriodMenu(false); }}
+                className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800 ${selectedPeriod === 'all' ? 'font-semibold text-primary' : ''}`}
+              >
+                All time
+              </button>
+              {availablePeriods.map((p) => (
+                <button
+                  key={p}
+                  onClick={() => { dispatch({ type: 'SET_PERIOD', period: p }); setShowPeriodMenu(false); }}
+                  className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800 ${selectedPeriod === p ? 'font-semibold text-primary' : ''}`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Category filter */}
@@ -299,7 +357,31 @@ export function Transactions() {
                 <td colSpan={5} className="px-6 py-12 text-center text-slate-400 text-sm">No transactions match your filters.</td>
               </tr>
             ) : (
-              paginated.map((tx) => {
+              groupedByDay.map((group) => (
+                <React.Fragment key={group.dateKey}>
+                  {/* Day header row */}
+                  <tr className="bg-slate-50 dark:bg-slate-800/70 border-t-2 border-slate-200 dark:border-slate-700">
+                    <td className="px-6 py-2">
+                      <span className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                        {formatDate(group.date)}
+                      </span>
+                    </td>
+                    <td colSpan={2} className="px-6 py-2 text-xs text-slate-400">
+                      {group.txs.length} transaction{group.txs.length !== 1 ? 's' : ''}
+                    </td>
+                    <td className="px-6 py-2 text-right">
+                      <div className="flex items-center justify-end gap-3 text-xs font-semibold">
+                        {group.dayIncome > 0 && (
+                          <span className="text-emerald-600">+{formatVNDShort(group.dayIncome)}</span>
+                        )}
+                        {group.dayExpense > 0 && (
+                          <span className="text-rose-600">-{formatVNDShort(group.dayExpense)}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td />
+                  </tr>
+                  {group.txs.map((tx) => {
                 const icon = getIcon(tx.category);
                 const isExpense = tx.type === 'Expense';
                 const isExpanded = expandedRow === tx.id;
@@ -309,7 +391,7 @@ export function Transactions() {
                       className={`hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer ${isExpanded ? 'bg-primary/5 dark:bg-primary/10 border-l-4 border-primary' : ''}`}
                       onClick={() => setExpandedRow(isExpanded ? null : tx.id)}
                     >
-                      <td className="px-6 py-4 text-sm whitespace-nowrap font-medium">{formatDate(tx.date)}</td>
+                      <td className="px-6 py-4 text-sm whitespace-nowrap font-medium text-slate-400 dark:text-slate-500 pl-10">—</td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <div className={`size-6 rounded ${icon.bg} flex items-center justify-center`}>
@@ -340,6 +422,10 @@ export function Transactions() {
                                   <span className="font-mono text-xs">{tx.id}</span>
                                 </li>
                                 <li className="flex justify-between border-b border-slate-200/50 dark:border-slate-700/50 pb-1">
+                                  <span className="text-slate-500">Date</span>
+                                  <span className="font-medium">{formatDate(tx.date)}</span>
+                                </li>
+                                <li className="flex justify-between border-b border-slate-200/50 dark:border-slate-700/50 pb-1">
                                   <span className="text-slate-500">Type</span>
                                   <span className={`font-medium ${isExpense ? 'text-rose-600' : 'text-emerald-600'}`}>{tx.type}</span>
                                 </li>
@@ -352,11 +438,17 @@ export function Transactions() {
                                   <span>{tx.account}</span>
                                 </li>
                                 {tx.transferTo && (
-                                  <li className="flex justify-between pb-1">
+                                  <li className="flex justify-between border-b border-slate-200/50 dark:border-slate-700/50 pb-1">
                                     <span className="text-slate-500">Transfer To</span>
                                     <span>{tx.transferTo}</span>
                                   </li>
                                 )}
+                                <li className="flex justify-between pb-1">
+                                  <span className="text-slate-500">Amount</span>
+                                  <span className={`font-bold ${isExpense ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                    {isExpense ? '-' : '+'}{formatVND(tx.amount)}
+                                  </span>
+                                </li>
                               </ul>
                             </div>
                             <div className="space-y-2">
@@ -382,17 +474,30 @@ export function Transactions() {
                     )}
                   </React.Fragment>
                 );
-              })
+              })}
+                </React.Fragment>
+              ))
             )}
           </tbody>
         </table>
 
         <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-900/50">
-          <p className="text-sm text-slate-500">
-            Showing <span className="font-medium">{Math.min((page - 1) * PAGE_SIZE + 1, filtered.length)}</span>–
-            <span className="font-medium">{Math.min(page * PAGE_SIZE, filtered.length)}</span> of{' '}
-            <span className="font-medium">{filtered.length}</span>
-          </p>
+          <div className="flex items-center gap-3">
+            <p className="text-sm text-slate-500">
+              Showing <span className="font-medium">{Math.min((page - 1) * pageSize + 1, filtered.length)}</span>–
+              <span className="font-medium">{Math.min(page * pageSize, filtered.length)}</span> of{' '}
+              <span className="font-medium">{filtered.length}</span>
+            </p>
+            <select
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value))}
+              className="text-sm border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300"
+            >
+              {[10, 25, 50, 100].map((n) => (
+                <option key={n} value={n}>{n} / page</option>
+              ))}
+            </select>
+          </div>
           <div className="flex items-center gap-4">
             <span className="text-sm text-slate-600 dark:text-slate-400 font-medium">Page {page} of {totalPages}</span>
             <div className="flex items-center gap-1">
