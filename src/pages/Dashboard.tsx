@@ -3,6 +3,9 @@ import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { AddTransactionForm } from '../components/AddTransactionModal';
+import { Draft, emptyDraft } from '../components/InlineFields';
+import { InlineEditForm } from '../components/InlineEditForm';
+import { Transaction } from '../types';
 import {
   getExpenses,
   getTotalSpending,
@@ -45,6 +48,10 @@ export function Dashboard() {
   const { state, dispatch } = useApp();
   const [showPeriodMenu, setShowPeriodMenu] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Draft>(() => emptyDraft(state.defaultCategoryExpense, state.defaultCategoryIncome, state.defaultAccount));
+  const [editError, setEditError] = useState('');
 
   const allTxs = state.transactions;
   const period = state.selectedPeriod;
@@ -99,7 +106,8 @@ export function Dashboard() {
     const groups: { dateKey: string; date: Date; txs: typeof txs; dayIncome: number; dayExpense: number }[] = [];
     const map = new Map<string, typeof groups[0]>();
     for (const tx of txs) {
-      const key = tx.date.toISOString().slice(0, 10);
+      const d = tx.date;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       if (!map.has(key)) {
         const group = { dateKey: key, date: tx.date, txs: [] as typeof txs, dayIncome: 0, dayExpense: 0 };
         map.set(key, group);
@@ -119,9 +127,55 @@ export function Dashboard() {
   );
   const allAccounts = state.accounts;
 
-  function handleAddConfirm(tx: import('../types').Transaction) {
+  function handleAddConfirm(tx: Transaction) {
     dispatch({ type: 'ADD_TRANSACTION', transaction: tx });
     setShowAddForm(false);
+  }
+
+  function draftFromTx(tx: Transaction): Draft {
+    return {
+      date: `${tx.date.getFullYear()}-${String(tx.date.getMonth() + 1).padStart(2, '0')}-${String(tx.date.getDate()).padStart(2, '0')}`,
+      type: tx.type,
+      category: tx.category,
+      account: tx.account,
+      transferTo: tx.transferTo,
+      amountStr: String(Math.abs(tx.amount)),
+    };
+  }
+
+  function draftToTx(d: Draft, id: string): Transaction | null {
+    const amt = parseFloat(d.amountStr);
+    const needsCategory = d.type !== 'Transfer';
+    if (!d.date || (needsCategory && !d.category.trim()) || !d.account.trim() || !d.amountStr || isNaN(amt) || amt <= 0) return null;
+    if (d.type === 'Transfer' && !d.transferTo.trim()) return null;
+    return {
+      id,
+      date: new Date(d.date),
+      type: d.type,
+      category: d.category.trim(),
+      account: d.account.trim(),
+      transferTo: d.transferTo.trim(),
+      amount: d.type === 'Expense' ? -Math.abs(amt) : Math.abs(amt),
+    };
+  }
+
+  function startEdit(tx: Transaction) {
+    setDraft(draftFromTx(tx));
+    setEditError('');
+    setEditingId(tx.id);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditError('');
+  }
+
+  function confirmEdit(originalId: string) {
+    const tx = draftToTx(draft, originalId);
+    if (!tx) { setEditError('Vui lòng điền đầy đủ thông tin hợp lệ.'); return; }
+    dispatch({ type: 'EDIT_TRANSACTION', transaction: tx });
+    setEditingId(null);
+    setEditError('');
   }
 
   const hasData = allTxs.length > 0;
@@ -194,7 +248,7 @@ export function Dashboard() {
               </span>
             )}
           </div>
-          <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-3">{formatVNDShort(totalSpending)}</h3>
+          <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-3">{formatVND(totalSpending)}</h3>
           <p className="text-slate-500 text-sm font-medium mt-0.5">Total Spending</p>
           <p className="text-slate-400 text-xs mt-1">{prevPeriod ? `vs. ${formatMonth(prevPeriod)}` : 'all time'}</p>
         </div>
@@ -205,10 +259,10 @@ export function Dashboard() {
               <span className="material-symbols-outlined text-emerald-600 text-xl">trending_up</span>
             </div>
           </div>
-          <h3 className="text-2xl font-bold text-emerald-600 mt-3">{formatVNDShort(totalIncome)}</h3>
+          <h3 className="text-2xl font-bold text-emerald-600 mt-3">{formatVND(totalIncome)}</h3>
           <p className="text-slate-500 text-sm font-medium mt-0.5">Total Income</p>
           <p className={`text-xs mt-1 font-medium ${netFlow >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-            Net: {netFlow >= 0 ? '+' : ''}{formatVNDShort(netFlow)}
+            Net: {netFlow >= 0 ? '+' : ''}{formatVND(netFlow)}
           </p>
         </div>
 
@@ -367,39 +421,76 @@ export function Dashboard() {
               {groupedRecentTxs.map((group) => (
                 <React.Fragment key={group.dateKey}>
                   <tr className="bg-slate-50 dark:bg-slate-800/70 border-t-2 border-slate-200 dark:border-slate-700">
-                    <td className="px-6 py-2">
-                      <span className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                    <td className="px-6 py-3">
+                      <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
                         {formatDate(group.date)}
                       </span>
                     </td>
-                    <td className="px-6 py-2 text-xs text-slate-400">
-                      {group.txs.length} transaction{group.txs.length !== 1 ? 's' : ''}
+                    <td className="px-6 py-3 text-sm font-medium text-slate-500 dark:text-slate-400">
+                      {group.txs.length} giao dịch
                     </td>
-                    <td className="px-6 py-2 text-right">
-                      <div className="flex items-center justify-end gap-3 text-xs font-semibold">
-                        {group.dayIncome > 0 && <span className="text-emerald-600">+{formatVNDShort(group.dayIncome)}</span>}
-                        {group.dayExpense > 0 && <span className="text-rose-600">-{formatVNDShort(group.dayExpense)}</span>}
+                    <td className="px-6 py-3 text-right">
+                      <div className="flex items-center justify-end gap-4 text-sm font-bold">
+                        {group.dayIncome > 0 && <span className="text-emerald-600">+{formatVND(group.dayIncome)}</span>}
+                        {group.dayExpense > 0 && <span className="text-rose-600">-{formatVND(group.dayExpense)}</span>}
                       </div>
                     </td>
                   </tr>
                   {group.txs.map((tx) => {
                     const icon = getCategoryIcon(tx.category);
                     const isExpense = tx.type === 'Expense';
+                    const isExpanded = expandedRow === tx.id;
                     return (
-                      <tr key={tx.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors border-t border-slate-100 dark:border-slate-800">
-                        <td className="px-6 py-3">
-                          <div className="flex items-center gap-2 pl-4">
-                            <div className={`size-7 rounded ${icon.bg} ${icon.color} flex items-center justify-center`}>
-                              <span className="material-symbols-outlined text-base">{icon.icon}</span>
+                      <React.Fragment key={tx.id}>
+                        <tr
+                          className={`hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors border-t border-slate-100 dark:border-slate-800 cursor-pointer ${isExpanded ? 'bg-primary/5 dark:bg-primary/10 border-l-4 border-primary' : ''}`}
+                          onClick={() => {
+                            if (isExpanded) {
+                              setExpandedRow(null);
+                              cancelEdit();
+                            } else {
+                              setExpandedRow(tx.id);
+                              startEdit(tx);
+                            }
+                          }}
+                        >
+                          <td className="px-6 py-3">
+                            <div className="flex items-center gap-2 pl-4">
+                              <div className={`size-7 rounded ${icon.bg} ${icon.color} flex items-center justify-center`}>
+                                <span className="material-symbols-outlined text-base">{icon.icon}</span>
+                              </div>
+                              <span className="text-sm font-medium">{tx.category}</span>
                             </div>
-                            <span className="text-sm font-medium">{tx.category}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-3 text-sm text-slate-500 dark:text-slate-400">{tx.account}</td>
-                        <td className={`px-6 py-3 text-right text-sm font-bold ${isExpense ? 'text-rose-600' : 'text-emerald-600'}`}>
-                          {isExpense ? '-' : '+'}{formatVND(tx.amount)}
-                        </td>
-                      </tr>
+                          </td>
+                          <td className="px-6 py-3 text-sm text-slate-500 dark:text-slate-400">{tx.account}</td>
+                          <td className={`px-6 py-3 text-right text-sm font-bold ${isExpense ? 'text-rose-600' : 'text-emerald-600'}`}>
+                            {isExpense ? '-' : '+'}{formatVND(tx.amount)}
+                          </td>
+                        </tr>
+
+                        {isExpanded && (
+                          <tr className="bg-primary/5 dark:bg-primary/10">
+                            <td colSpan={3} className="px-6 py-5 border-t border-primary/10">
+                              <InlineEditForm
+                                draft={draft}
+                                onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
+                                expenseCategories={state.expenseCategories}
+                                incomeCategories={state.incomeCategories}
+                                allAccounts={allAccounts}
+                                error={editError}
+                                onSave={() => confirmEdit(tx.id)}
+                                onCancel={() => { setExpandedRow(null); cancelEdit(); }}
+                                onDelete={() => {
+                                  if (confirm('Xóa giao dịch này?')) {
+                                    dispatch({ type: 'DELETE_TRANSACTION', id: tx.id });
+                                    setExpandedRow(null);
+                                  }
+                                }}
+                              />
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     );
                   })}
                 </React.Fragment>

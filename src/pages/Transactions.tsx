@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { getExpenses, getTotalSpending, getTotalIncome, getAvgDaily, filterByPeriod, getAvailablePeriods } from '../utils/analytics';
 import { formatVND, formatVNDShort, formatDate } from '../utils/formatters';
-import { Transaction, TransactionType } from '../types';
-import { Combobox } from '../components/Combobox';
+import { Transaction } from '../types';
 import { AddTransactionForm } from '../components/AddTransactionModal';
+import { Draft, emptyDraft } from '../components/InlineFields';
+import { InlineEditForm } from '../components/InlineEditForm';
 
 const CATEGORY_ICONS: Record<string, { icon: string; color: string; bg: string }> = {
   Transport: { icon: 'directions_car', color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/30' },
@@ -25,31 +26,9 @@ function getIcon(category: string) {
   return CATEGORY_ICONS[category] || { icon: 'receipt_long', color: 'text-slate-600', bg: 'bg-slate-100 dark:bg-slate-800' };
 }
 
-const TRANSACTION_TYPES: TransactionType[] = ['Expense', 'Income', 'Transfer', 'Account'];
-
-interface Draft {
-  date: string;
-  type: TransactionType;
-  category: string;
-  account: string;
-  transferTo: string;
-  amountStr: string;
-}
-
-function emptyDraft(defaultCategoryExpense = '', defaultCategoryIncome = '', defaultAccount = ''): Draft {
-  return {
-    date: new Date().toISOString().slice(0, 10),
-    type: 'Expense',
-    category: defaultCategoryExpense,
-    account: defaultAccount,
-    transferTo: '',
-    amountStr: '',
-  };
-}
-
 function draftFromTx(tx: Transaction): Draft {
   return {
-    date: tx.date.toISOString().slice(0, 10),
+    date: `${tx.date.getFullYear()}-${String(tx.date.getMonth() + 1).padStart(2, '0')}-${String(tx.date.getDate()).padStart(2, '0')}`,
     type: tx.type,
     category: tx.category,
     account: tx.account,
@@ -76,119 +55,6 @@ function draftToTx(draft: Draft, id: string): Transaction | null {
   };
 }
 
-// Shared inline field styling
-const fieldCls = 'w-full px-2 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition';
-
-function InlineFields({
-  draft,
-  onChange,
-  expenseCategories,
-  incomeCategories,
-  allAccounts,
-  defaultCategoryExpense = '',
-  defaultCategoryIncome = '',
-}: {
-  draft: Draft;
-  onChange: (patch: Partial<Draft>) => void;
-  expenseCategories: string[];
-  incomeCategories: string[];
-  allAccounts: string[];
-  defaultCategoryExpense?: string;
-  defaultCategoryIncome?: string;
-}) {
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-      {/* Type */}
-      <div className="col-span-2 md:col-span-3">
-        <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Loại</p>
-        <div className="flex gap-1.5 flex-wrap">
-          {TRANSACTION_TYPES.map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => {
-                const newCategory = t === 'Expense' ? defaultCategoryExpense : t === 'Income' ? defaultCategoryIncome : '';
-                onChange({ type: t, transferTo: '', category: newCategory });
-              }}
-              className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-colors ${
-                draft.type === t
-                  ? 'bg-primary text-white border-primary'
-                  : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50'
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Date */}
-      <div>
-        <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Ngày</p>
-        <input
-          type="date"
-          value={draft.date}
-          onChange={(e) => onChange({ date: e.target.value })}
-          className={fieldCls}
-        />
-      </div>
-
-      {/* Category */}
-      <div>
-        <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Danh mục</p>
-        <Combobox
-          value={draft.category}
-          onChange={(v) => onChange({ category: v })}
-          options={draft.type === 'Expense' ? expenseCategories : draft.type === 'Income' ? incomeCategories : []}
-          placeholder="Coffee, Transport..."
-          allowCustom
-        />
-      </div>
-
-      {/* Account */}
-      <div>
-        <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Tài khoản</p>
-        <Combobox
-          value={draft.account}
-          onChange={(v) => onChange({ account: v })}
-          options={allAccounts}
-          placeholder="Tiền mặt..."
-          allowCustom
-        />
-      </div>
-
-      {/* Transfer To (only Transfer type) */}
-      {draft.type === 'Transfer' && (
-        <div>
-          <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Chuyển đến</p>
-          <Combobox
-            value={draft.transferTo}
-            onChange={(v) => onChange({ transferTo: v })}
-            options={allAccounts}
-            placeholder="Tài khoản đích..."
-            allowCustom
-          />
-        </div>
-      )}
-
-      {/* Amount */}
-      <div>
-        <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">
-          Số tiền (VND){draft.type === 'Expense' && <span className="ml-1 text-rose-400 normal-case font-normal">— tự ghi âm</span>}
-        </p>
-        <input
-          type="number"
-          min="1"
-          step="any"
-          value={draft.amountStr}
-          onChange={(e) => onChange({ amountStr: e.target.value })}
-          placeholder="50000"
-          className={fieldCls}
-        />
-      </div>
-    </div>
-  );
-}
 
 export function Transactions() {
   const { state, dispatch } = useApp();
@@ -253,7 +119,8 @@ export function Transactions() {
     const groups: { dateKey: string; date: Date; txs: typeof paginated; dayIncome: number; dayExpense: number }[] = [];
     const map = new Map<string, typeof groups[0]>();
     for (const tx of paginated) {
-      const key = tx.date.toISOString().slice(0, 10);
+      const d = tx.date;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       if (!map.has(key)) {
         const group = { dateKey: key, date: tx.date, txs: [], dayIncome: 0, dayExpense: 0 };
         map.set(key, group);
@@ -387,7 +254,7 @@ export function Transactions() {
           </div>
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Income</p>
-            <span className="text-xl font-bold text-emerald-600">{formatVNDShort(totalIncome)}</span>
+            <span className="text-xl font-bold text-emerald-600">{formatVND(totalIncome)}</span>
           </div>
         </div>
         <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4">
@@ -396,7 +263,7 @@ export function Transactions() {
           </div>
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Expenses</p>
-            <span className="text-xl font-bold text-rose-600">{formatVNDShort(totalSpending)}</span>
+            <span className="text-xl font-bold text-rose-600">{formatVND(totalSpending)}</span>
           </div>
         </div>
         <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4">
@@ -405,7 +272,7 @@ export function Transactions() {
           </div>
           <div>
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Net Flow</p>
-            <span className={`text-xl font-bold ${netFlow >= 0 ? 'text-primary' : 'text-rose-600'}`}>{netFlow >= 0 ? '+' : ''}{formatVNDShort(netFlow)}</span>
+            <span className={`text-xl font-bold ${netFlow >= 0 ? 'text-primary' : 'text-rose-600'}`}>{netFlow >= 0 ? '+' : ''}{formatVND(netFlow)}</span>
           </div>
         </div>
       </div>
@@ -555,22 +422,20 @@ export function Transactions() {
 
       {/* Table */}
       <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
-              <th className="px-6 py-4 text-xs font-bold uppercase text-slate-500 tracking-wider">Date</th>
-              <th className="px-6 py-4 text-xs font-bold uppercase text-slate-500 tracking-wider">Category</th>
-              <th className="px-6 py-4 text-xs font-bold uppercase text-slate-500 tracking-wider">Account</th>
-              <th className="px-6 py-4 text-xs font-bold uppercase text-slate-500 tracking-wider text-right">Amount</th>
-              <th className="px-6 py-4 w-10"></th>
+        <table className="w-full text-left">
+          <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 text-xs font-bold uppercase tracking-wider">
+            <tr>
+              <th className="px-6 py-3">Category</th>
+              <th className="px-6 py-3">Account</th>
+              <th className="px-6 py-3 text-right">Amount</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+          <tbody>
 
             {/* Inline Add Row */}
             {isAdding && (
               <tr>
-                <td colSpan={5} className="p-4">
+                <td colSpan={3} className="p-4">
                   <AddTransactionForm
                     open={isAdding}
                     onClose={() => setIsAdding(false)}
@@ -588,161 +453,81 @@ export function Transactions() {
 
             {paginated.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-slate-400 text-sm">No transactions match your filters.</td>
+                <td colSpan={3} className="px-6 py-12 text-center text-slate-400 text-sm">No transactions match your filters.</td>
               </tr>
             ) : (
               groupedByDay.map((group) => (
                 <React.Fragment key={group.dateKey}>
                   {/* Day header row */}
                   <tr className="bg-slate-50 dark:bg-slate-800/70 border-t-2 border-slate-200 dark:border-slate-700">
-                    <td className="px-6 py-2">
-                      <span className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                    <td className="px-6 py-3">
+                      <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
                         {formatDate(group.date)}
                       </span>
                     </td>
-                    <td colSpan={2} className="px-6 py-2 text-xs text-slate-400">
-                      {group.txs.length} transaction{group.txs.length !== 1 ? 's' : ''}
+                    <td className="px-6 py-3 text-sm font-medium text-slate-500 dark:text-slate-400">
+                      {group.txs.length} giao dịch
                     </td>
-                    <td className="px-6 py-2 text-right">
-                      <div className="flex items-center justify-end gap-3 text-xs font-semibold">
-                        {group.dayIncome > 0 && <span className="text-emerald-600">+{formatVNDShort(group.dayIncome)}</span>}
-                        {group.dayExpense > 0 && <span className="text-rose-600">-{formatVNDShort(group.dayExpense)}</span>}
+                    <td className="px-6 py-3 text-right">
+                      <div className="flex items-center justify-end gap-4 text-sm font-bold">
+                        {group.dayIncome > 0 && <span className="text-emerald-600">+{formatVND(group.dayIncome)}</span>}
+                        {group.dayExpense > 0 && <span className="text-rose-600">-{formatVND(group.dayExpense)}</span>}
                       </div>
                     </td>
-                    <td />
                   </tr>
 
                   {group.txs.map((tx) => {
                     const icon = getIcon(tx.category);
                     const isExpense = tx.type === 'Expense';
                     const isExpanded = expandedRow === tx.id;
-                    const isEditingThis = editingId === tx.id;
 
                     return (
                       <React.Fragment key={tx.id}>
                         <tr
                           className={`hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer ${isExpanded ? 'bg-primary/5 dark:bg-primary/10 border-l-4 border-primary' : ''}`}
                           onClick={() => {
-                            if (isEditingThis) return; // don't collapse while editing
-                            setExpandedRow(isExpanded ? null : tx.id);
-                            if (isExpanded) cancelEdit();
+                            if (isExpanded) {
+                              setExpandedRow(null);
+                              cancelEdit();
+                            } else {
+                              setExpandedRow(tx.id);
+                              startEdit(tx);
+                            }
                           }}
                         >
-                          <td className="px-6 py-4 text-sm whitespace-nowrap font-medium text-slate-400 dark:text-slate-500 pl-10">—</td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-2">
-                              <div className={`size-6 rounded ${icon.bg} flex items-center justify-center`}>
-                                <span className={`material-symbols-outlined ${icon.color} text-sm`}>{icon.icon}</span>
+                          <td className="px-6 py-3">
+                            <div className="flex items-center gap-2 pl-4">
+                              <div className={`size-7 rounded ${icon.bg} ${icon.color} flex items-center justify-center`}>
+                                <span className="material-symbols-outlined text-base">{icon.icon}</span>
                               </div>
                               <span className="text-sm font-medium">{tx.category}</span>
                             </div>
                           </td>
-                          <td className="px-6 py-4 text-sm text-slate-500 dark:text-slate-400">{tx.account}</td>
-                          <td className={`px-6 py-4 text-sm font-bold text-right ${isExpense ? 'text-rose-600' : 'text-emerald-600'}`}>
+                          <td className="px-6 py-3 text-sm text-slate-500 dark:text-slate-400">{tx.account}</td>
+                          <td className={`px-6 py-3 text-right text-sm font-bold ${isExpense ? 'text-rose-600' : 'text-emerald-600'}`}>
                             {isExpense ? '-' : '+'}{formatVND(tx.amount)}
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className={`material-symbols-outlined ${isExpanded ? 'text-primary' : 'text-slate-300'}`}>
-                              {isExpanded ? 'expand_less' : 'chevron_right'}
-                            </span>
                           </td>
                         </tr>
 
                         {isExpanded && (
                           <tr className="bg-primary/5 dark:bg-primary/10">
-                            <td colSpan={5} className="px-12 py-6 border-t border-primary/10">
-                              {isEditingThis ? (
-                                /* ── Edit Mode ── */
-                                <div>
-                                  <p className="text-[10px] uppercase font-bold text-primary mb-3 tracking-wide">Chỉnh sửa giao dịch</p>
-                                  <InlineFields
-                                    draft={draft}
-                                    onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
-                                    expenseCategories={state.expenseCategories}
-              incomeCategories={state.incomeCategories}
-                                    allAccounts={allTransactionAccounts}
-                                  />
-                                  {editError && <p className="text-xs text-rose-500 mt-2">{editError}</p>}
-                                  <div className="flex gap-2 mt-4">
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); confirmEdit(tx.id); }}
-                                      className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
-                                    >
-                                      <span className="material-symbols-outlined text-sm">check</span> Lưu thay đổi
-                                    </button>
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); cancelEdit(); }}
-                                      className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                                    >
-                                      <span className="material-symbols-outlined text-sm">close</span> Hủy
-                                    </button>
-                                  </div>
-                                </div>
-                              ) : (
-                                /* ── View Mode ── */
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                  <div className="space-y-2">
-                                    <p className="text-[10px] uppercase font-bold text-slate-400 mb-3">Details</p>
-                                    <ul className="text-sm space-y-2">
-                                      <li className="flex justify-between border-b border-slate-200/50 dark:border-slate-700/50 pb-1">
-                                        <span className="text-slate-500">Transaction ID</span>
-                                        <span className="font-mono text-xs">{tx.id}</span>
-                                      </li>
-                                      <li className="flex justify-between border-b border-slate-200/50 dark:border-slate-700/50 pb-1">
-                                        <span className="text-slate-500">Date</span>
-                                        <span className="font-medium">{formatDate(tx.date)}</span>
-                                      </li>
-                                      <li className="flex justify-between border-b border-slate-200/50 dark:border-slate-700/50 pb-1">
-                                        <span className="text-slate-500">Type</span>
-                                        <span className={`font-medium ${isExpense ? 'text-rose-600' : 'text-emerald-600'}`}>{tx.type}</span>
-                                      </li>
-                                      <li className="flex justify-between border-b border-slate-200/50 dark:border-slate-700/50 pb-1">
-                                        <span className="text-slate-500">Category</span>
-                                        <span>{tx.category}</span>
-                                      </li>
-                                      <li className="flex justify-between border-b border-slate-200/50 dark:border-slate-700/50 pb-1">
-                                        <span className="text-slate-500">Account</span>
-                                        <span>{tx.account}</span>
-                                      </li>
-                                      {tx.transferTo && (
-                                        <li className="flex justify-between border-b border-slate-200/50 dark:border-slate-700/50 pb-1">
-                                          <span className="text-slate-500">Transfer To</span>
-                                          <span>{tx.transferTo}</span>
-                                        </li>
-                                      )}
-                                      <li className="flex justify-between pb-1">
-                                        <span className="text-slate-500">Amount</span>
-                                        <span className={`font-bold ${isExpense ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                          {isExpense ? '-' : '+'}{formatVND(tx.amount)}
-                                        </span>
-                                      </li>
-                                    </ul>
-                                  </div>
-                                  <div className="space-y-2">
-                                    <p className="text-[10px] uppercase font-bold text-slate-400 mb-3">Actions</p>
-                                    <div className="flex flex-col gap-2">
-                                      <button
-                                        onClick={(e) => { e.stopPropagation(); startEdit(tx); }}
-                                        className="flex items-center gap-2 text-sm font-medium px-4 py-2 text-primary bg-primary/5 dark:bg-primary/10 border border-primary/20 rounded-lg hover:bg-primary/10 transition-colors"
-                                      >
-                                        <span className="material-symbols-outlined text-sm">edit</span> Chỉnh sửa
-                                      </button>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          if (confirm('Xóa giao dịch này?')) {
-                                            dispatch({ type: 'DELETE_TRANSACTION', id: tx.id });
-                                            setExpandedRow(null);
-                                          }
-                                        }}
-                                        className="flex items-center gap-2 text-sm font-medium px-4 py-2 text-red-600 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-lg hover:bg-red-100 transition-colors"
-                                      >
-                                        <span className="material-symbols-outlined text-sm">delete</span> Xóa giao dịch
-                                      </button>
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
+                            <td colSpan={3} className="px-12 py-6 border-t border-primary/10">
+                              <InlineEditForm
+                                draft={draft}
+                                onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
+                                expenseCategories={state.expenseCategories}
+                                incomeCategories={state.incomeCategories}
+                                allAccounts={allTransactionAccounts}
+                                error={editError}
+                                onSave={() => confirmEdit(tx.id)}
+                                onCancel={() => { setExpandedRow(null); cancelEdit(); }}
+                                onDelete={() => {
+                                  if (confirm('Xóa giao dịch này?')) {
+                                    dispatch({ type: 'DELETE_TRANSACTION', id: tx.id });
+                                    setExpandedRow(null);
+                                  }
+                                }}
+                              />
                             </td>
                           </tr>
                         )}
