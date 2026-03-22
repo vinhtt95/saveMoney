@@ -1,11 +1,11 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis, YAxis, LineChart, Line } from 'recharts';
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { AddTransactionForm } from '../components/AddTransactionModal';
 import { Draft, emptyDraft } from '../components/InlineFields';
 import { InlineEditForm } from '../components/InlineEditForm';
-import { Transaction, Budget as BudgetType } from '../types';
+import { Transaction, Budget as BudgetType, GoldPriceCache } from '../types';
 import {
   getExpenses,
   getTotalSpending,
@@ -19,10 +19,13 @@ import {
   getCategoryDailyTrend,
   getCategoryWeeklyTrend,
   getCategoryMonthlyTrend,
+  getAccountNetTotals,
 } from '../utils/analytics';
 import { formatVND, formatVNDShort, formatDate, formatMonth, toYYYYMM, toYYYYMMDD } from '../utils/formatters';
 import { categoryName, accountName } from '../utils/lookup';
 import { Category, Account } from '../types';
+
+import { loadCachedGoldPrices } from '../services/goldPriceService';
 
 const BUDGET_CAT_COLORS = ['#144bb8', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#ec4899'];
 
@@ -214,6 +217,40 @@ export function Dashboard() {
     setEditError('');
   }
 
+  // Wealth section
+  const [goldCache, setGoldCache] = useState<GoldPriceCache | null>(null);
+  const loadGoldCache = useCallback(() => {
+    const c = loadCachedGoldPrices();
+    if (c) setGoldCache(c);
+  }, []);
+  useEffect(() => { loadGoldCache(); }, [loadGoldCache]);
+
+  const accountNetTotals = useMemo(() => getAccountNetTotals(state.transactions), [state.transactions]);
+  const totalAccountBalance = useMemo(
+    () => state.accounts.reduce((sum, acc) => {
+      const initial = state.accountBalances[acc.id] ?? 0;
+      const net = accountNetTotals[acc.id] ?? 0;
+      return sum + initial + net;
+    }, 0),
+    [state.accounts, state.accountBalances, accountNetTotals]
+  );
+
+  const totalGoldValue = useMemo(() => {
+    if (!goldCache) return 0;
+    return state.goldAssets.reduce((sum, asset) => {
+      let price: number | null = null;
+      if (asset.brand === 'world') {
+        price = goldCache.world?.spotPerLuong ?? null;
+      } else {
+        const source = asset.brand === 'SJC' ? goldCache.sjc : goldCache.btmc;
+        price = source?.products.find((p) => p.name === asset.productName)?.buyPrice ?? null;
+      }
+      return price ? sum + price * asset.quantity : sum;
+    }, 0);
+  }, [goldCache, state.goldAssets]);
+
+  const totalWealth = totalAccountBalance + totalGoldValue;
+
   // Budget section state
   const [budgets] = useState<BudgetType[]>(loadBudgets);
   const [selectedBudgetId, setSelectedBudgetId] = useState<string>(() => budgets[0]?.id || '');
@@ -402,6 +439,46 @@ export function Dashboard() {
           {largestTx && <p className="text-slate-400 text-xs mt-1">Largest: {formatVNDShort(Math.abs(largestTx.amount))}</p>}
         </div>
       </div>
+
+      {/* Wealth Cards */}
+      {(totalWealth > 0 || state.goldAssets.length > 0) && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+          {/* Account balances */}
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <div className="size-10 bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center justify-center mb-3">
+              <span className="material-symbols-outlined text-slate-600 text-xl">account_balance_wallet</span>
+            </div>
+            <h3 className="text-2xl font-bold text-slate-900 dark:text-white">{formatVND(totalAccountBalance)}</h3>
+            <p className="text-slate-500 text-sm font-medium mt-0.5">Số dư tài khoản</p>
+            <p className="text-slate-400 text-xs mt-1">{state.accounts.length} tài khoản</p>
+          </div>
+
+          {/* Gold assets */}
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <div className="size-10 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center mb-3">
+              <span className="material-symbols-outlined text-amber-600 text-xl">diamond</span>
+            </div>
+            <h3 className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+              {totalGoldValue > 0 ? formatVND(totalGoldValue) : '—'}
+            </h3>
+            <p className="text-slate-500 text-sm font-medium mt-0.5">Tài sản vàng</p>
+            <p className="text-slate-400 text-xs mt-1">
+              {state.goldAssets.length} tài sản
+              {totalGoldValue === 0 && state.goldAssets.length > 0 ? ' · cần tải giá' : ''}
+            </p>
+          </div>
+
+          {/* Total wealth */}
+          <div className="bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30 p-6 rounded-xl border border-amber-200 dark:border-amber-800/50 shadow-sm">
+            <div className="size-10 bg-amber-200/60 dark:bg-amber-800/30 rounded-lg flex items-center justify-center mb-3">
+              <span className="material-symbols-outlined text-amber-700 dark:text-amber-300 text-xl">account_balance</span>
+            </div>
+            <h3 className="text-2xl font-bold text-amber-700 dark:text-amber-300">{formatVND(totalWealth)}</h3>
+            <p className="text-slate-600 dark:text-slate-300 text-sm font-medium mt-0.5">Tổng tài sản</p>
+            <p className="text-slate-400 text-xs mt-1">tài khoản + vàng</p>
+          </div>
+        </div>
+      )}
 
       {/* Budget Section */}
       {budgets.length > 0 && selectedBudget && (

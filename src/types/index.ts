@@ -101,6 +101,19 @@ export interface GoldPriceCache {
   cachedAt: string;
 }
 
+// --- Wealth / Asset Types ---
+
+export type GoldBrand = 'SJC' | 'BTMC' | 'world';
+
+export interface GoldAsset {
+  id: string;
+  brand: GoldBrand;
+  productName: string; // product name from price list, or 'Spot' for world
+  quantity: number;    // in lượng
+  note?: string;
+  createdAt: string;   // ISO timestamp
+}
+
 export interface AppState {
   transactions: Transaction[];
   filters: FilterState;
@@ -111,4 +124,5 @@ export interface AppState {
   defaultCategoryExpenseId: string;
   defaultCategoryIncomeId: string;
   defaultAccountId: string;
+  goldAssets: GoldAsset[];
 }

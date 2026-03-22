@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import { Account, AppState, Category, DatabaseBackup, FilterState, Transaction } from '../types';
+import { Account, AppState, Category, DatabaseBackup, FilterState, GoldAsset, Transaction } from '../types';
 import { getAvailablePeriods } from '../utils/analytics';
 import { toYYYYMM } from '../utils/formatters';
 import { migrateStorageV1ToV2, CATEGORIES_V2_KEY, ACCOUNTS_V2_KEY } from '../utils/migration';
@@ -7,10 +7,14 @@ import { migrateStorageV1ToV2, CATEGORIES_V2_KEY, ACCOUNTS_V2_KEY } from '../uti
 const STORAGE_KEY = 'savemoney_transactions';
 const ACCOUNT_BALANCES_KEY = 'savemoney_account_balances';
 const DEFAULTS_KEY = 'savemoney_defaults';
+const GOLD_ASSETS_KEY = 'savemoney_gold_assets';
 
 type Action =
   | { type: 'IMPORT'; transactions: Transaction[]; newCategories?: Category[]; newAccounts?: Account[] }
   | { type: 'CLEAR' }
+  | { type: 'ADD_GOLD_ASSET'; asset: GoldAsset }
+  | { type: 'EDIT_GOLD_ASSET'; asset: GoldAsset }
+  | { type: 'DELETE_GOLD_ASSET'; id: string }
   | { type: 'SET_FILTER'; filter: Partial<FilterState> }
   | { type: 'SET_PERIOD'; period: string }
   | { type: 'DELETE_TRANSACTION'; id: string }
@@ -45,6 +49,7 @@ const initialState: AppState = {
   defaultCategoryExpenseId: '',
   defaultCategoryIncomeId: '',
   defaultAccountId: '',
+  goldAssets: [],
 };
 
 function serializeTransactions(txs: Transaction[]): string {
@@ -71,7 +76,7 @@ function loadJSON<T>(key: string, fallback: T): T {
 function loadFromStorage(): Pick<
   AppState,
   'transactions' | 'categories' | 'accounts' | 'accountBalances' |
-  'defaultCategoryExpenseId' | 'defaultCategoryIncomeId' | 'defaultAccountId'
+  'defaultCategoryExpenseId' | 'defaultCategoryIncomeId' | 'defaultAccountId' | 'goldAssets'
 > {
   try {
     // Run v1→v2 migration if needed (idempotent)
@@ -84,6 +89,7 @@ function loadFromStorage(): Pick<
     const accounts = loadJSON<Account[]>(ACCOUNTS_V2_KEY, []);
     const accountBalances = loadJSON<Record<string, number>>(ACCOUNT_BALANCES_KEY, {});
     const defaults = loadJSON<Record<string, string>>(DEFAULTS_KEY, {});
+    const goldAssets = loadJSON<GoldAsset[]>(GOLD_ASSETS_KEY, []);
 
     return {
       transactions,
@@ -93,6 +99,7 @@ function loadFromStorage(): Pick<
       defaultCategoryExpenseId: defaults.defaultCategoryExpenseId ?? '',
       defaultCategoryIncomeId: defaults.defaultCategoryIncomeId ?? '',
       defaultAccountId: defaults.defaultAccountId ?? '',
+      goldAssets,
     };
   } catch {
     return {
@@ -103,6 +110,7 @@ function loadFromStorage(): Pick<
       defaultCategoryExpenseId: '',
       defaultCategoryIncomeId: '',
       defaultAccountId: '',
+      goldAssets: [],
     };
   }
 }
@@ -208,6 +216,12 @@ function reducer(state: AppState, action: Action): AppState {
         defaultCategoryIncomeId: action.defaultCategoryIncomeId,
         defaultAccountId: action.defaultAccountId,
       };
+    case 'ADD_GOLD_ASSET':
+      return { ...state, goldAssets: [...state.goldAssets, action.asset] };
+    case 'EDIT_GOLD_ASSET':
+      return { ...state, goldAssets: state.goldAssets.map((a) => a.id === action.asset.id ? action.asset : a) };
+    case 'DELETE_GOLD_ASSET':
+      return { ...state, goldAssets: state.goldAssets.filter((a) => a.id !== action.id) };
     case 'RESTORE_BACKUP': {
       const { backup } = action;
       const transactions = backup.transactions.map((t) => ({ ...t, date: new Date(t.date) }));
@@ -278,6 +292,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }));
     } catch { /* ignore */ }
   }, [state.defaultCategoryExpenseId, state.defaultCategoryIncomeId, state.defaultAccountId]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(GOLD_ASSETS_KEY, JSON.stringify(state.goldAssets));
+    } catch { /* ignore */ }
+  }, [state.goldAssets]);
 
   return <AppContext.Provider value={{ state, dispatch }}>{children}</AppContext.Provider>;
 }
