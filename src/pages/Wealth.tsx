@@ -1,25 +1,42 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import type { GoldAsset, GoldBrand, GoldPriceCache } from '../types';
+import type { GoldAsset, GoldBrand, GoldPriceCache, GoldProduct, GoldProductRegistry } from '../types';
 import { useApp } from '../context/AppContext';
 import { fetchGoldPrices, loadCachedGoldPrices, isCacheValid } from '../services/goldPriceService';
+import { loadRegistry } from '../services/goldHistoryService';
 import { formatVND } from '../utils/formatters';
 
-function resolveGoldPrice(asset: GoldAsset, cache: GoldPriceCache | null): number | null {
+function resolveGoldPrice(
+  asset: GoldAsset,
+  cache: GoldPriceCache | null,
+  registry: GoldProductRegistry | null
+): number | null {
   if (!cache) return null;
   if (asset.brand === 'world') {
     return cache.world?.spotPerLuong ?? null;
   }
+  // Prefer ID-based lookup via registry
+  if (asset.productId && registry) {
+    const product = registry.products.find(p => p.id === asset.productId);
+    if (product) {
+      const source = product.brand === 'SJC' ? cache.sjc : cache.btmc;
+      if (source?.products[product.sortOrder]) {
+        return source.products[product.sortOrder].buyPrice;
+      }
+    }
+  }
+  // Fallback: name-based match for legacy assets without productId
   const source = asset.brand === 'SJC' ? cache.sjc : cache.btmc;
   if (!source) return null;
   const product = source.products.find((p) => p.name === asset.productName);
   return product?.buyPrice ?? null;
 }
 
-function getProductsForBrand(brand: GoldBrand, cache: GoldPriceCache | null): string[] {
-  if (!cache) return [];
-  if (brand === 'world') return ['Spot (XAUUSD)'];
-  const source = brand === 'SJC' ? cache.sjc : cache.btmc;
-  return source?.products.map((p) => p.name) ?? [];
+function getRegistryProductsForBrand(brand: GoldBrand, registry: GoldProductRegistry | null): GoldProduct[] {
+  if (!registry) return [];
+  if (brand === 'world') {
+    return registry.products.filter(p => p.id === 'world_spot');
+  }
+  return registry.products.filter(p => p.brand === brand);
 }
 
 const BRAND_LABELS: Record<GoldBrand, string> = { SJC: 'SJC', BTMC: 'BTMC', world: 'Thế giới' };
@@ -31,23 +48,24 @@ const BRAND_COLORS: Record<GoldBrand, string> = {
 
 interface AssetFormState {
   brand: GoldBrand;
+  productId: string;
   productName: string;
   quantity: string;
   note: string;
 }
 
-const defaultForm: AssetFormState = { brand: 'SJC', productName: '', quantity: '', note: '' };
+const defaultForm: AssetFormState = { brand: 'SJC', productId: '', productName: '', quantity: '', note: '' };
 
 function AssetModal({
   open,
   editing,
-  cache,
+  registry,
   onSave,
   onClose,
 }: {
   open: boolean;
   editing: GoldAsset | null;
-  cache: GoldPriceCache | null;
+  registry: GoldProductRegistry | null;
   onSave: (data: Omit<GoldAsset, 'id' | 'createdAt'>) => void;
   onClose: () => void;
 }) {
@@ -55,18 +73,26 @@ function AssetModal({
 
   useEffect(() => {
     if (open) {
-      setForm(editing
-        ? { brand: editing.brand, productName: editing.productName, quantity: String(editing.quantity), note: editing.note ?? '' }
-        : defaultForm
-      );
+      if (editing) {
+        setForm({
+          brand: editing.brand,
+          productId: editing.productId ?? '',
+          productName: editing.productName,
+          quantity: String(editing.quantity),
+          note: editing.note ?? '',
+        });
+      } else {
+        const firstProduct = getRegistryProductsForBrand('SJC', registry)[0];
+        setForm({ ...defaultForm, productId: firstProduct?.id ?? '', productName: firstProduct?.name ?? '' });
+      }
     }
-  }, [open, editing]);
+  }, [open, editing]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const products = getProductsForBrand(form.brand, cache);
+  const products = getRegistryProductsForBrand(form.brand, registry);
 
   useEffect(() => {
     if (!editing && products.length > 0) {
-      setForm((f) => ({ ...f, productName: products[0] }));
+      setForm((f) => ({ ...f, productId: products[0].id, productName: products[0].name }));
     }
   }, [form.brand, products.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -76,12 +102,23 @@ function AssetModal({
     e.preventDefault();
     const qty = parseFloat(form.quantity);
     if (!form.productName || isNaN(qty) || qty <= 0) return;
-    onSave({ brand: form.brand, productName: form.productName, quantity: qty, note: form.note || undefined });
+    onSave({
+      brand: form.brand,
+      productId: form.productId || undefined,
+      productName: form.productName,
+      quantity: qty,
+      note: form.note || undefined,
+    });
   };
 
   const handleBrandChange = (brand: GoldBrand) => {
-    const prods = getProductsForBrand(brand, cache);
-    setForm((f) => ({ ...f, brand, productName: prods[0] ?? '' }));
+    const prods = getRegistryProductsForBrand(brand, registry);
+    setForm((f) => ({ ...f, brand, productId: prods[0]?.id ?? '', productName: prods[0]?.name ?? '' }));
+  };
+
+  const handleProductChange = (productId: string) => {
+    const product = registry?.products.find(p => p.id === productId);
+    setForm((f) => ({ ...f, productId, productName: product?.name ?? '' }));
   };
 
   return (
@@ -123,17 +160,17 @@ function AssetModal({
             </label>
             {products.length > 0 ? (
               <select
-                value={form.productName}
-                onChange={(e) => setForm((f) => ({ ...f, productName: e.target.value }))}
+                value={form.productId}
+                onChange={(e) => handleProductChange(e.target.value)}
                 className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-400"
               >
                 {products.map((p) => (
-                  <option key={p} value={p}>{p}</option>
+                  <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
               </select>
             ) : (
               <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-sm text-slate-400">
-                {cache ? 'Không có dữ liệu giá' : 'Đang tải giá...'}
+                Đang tải danh sách...
               </div>
             )}
           </div>
@@ -193,6 +230,7 @@ export function Wealth() {
   const { state, dispatch } = useApp();
   const { goldAssets } = state;
   const [cache, setCache] = useState<GoldPriceCache | null>(null);
+  const [registry] = useState<GoldProductRegistry | null>(() => loadRegistry());
   const [loadingPrices, setLoadingPrices] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<GoldAsset | null>(null);
@@ -241,7 +279,7 @@ export function Wealth() {
   };
 
   const totalGold = goldAssets.reduce((sum, asset) => {
-    const price = resolveGoldPrice(asset, cache);
+    const price = resolveGoldPrice(asset, cache, registry);
     return price ? sum + price * asset.quantity : sum;
   }, 0);
 
@@ -305,7 +343,7 @@ export function Wealth() {
         ) : (
           <div className="space-y-2">
             {goldAssets.map((asset) => {
-              const price = resolveGoldPrice(asset, cache);
+              const price = resolveGoldPrice(asset, cache, registry);
               const total = price ? price * asset.quantity : null;
               return (
                 <div
@@ -379,7 +417,7 @@ export function Wealth() {
       <AssetModal
         open={modalOpen}
         editing={editing}
-        cache={cache}
+        registry={registry}
         onSave={handleSave}
         onClose={() => { setModalOpen(false); setEditing(null); }}
       />

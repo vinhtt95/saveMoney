@@ -108,10 +108,52 @@ export type GoldBrand = 'SJC' | 'BTMC' | 'world';
 export interface GoldAsset {
   id: string;
   brand: GoldBrand;
+  productId?: string;  // stable ID referencing GoldProduct.id
   productName: string; // product name from price list, or 'Spot' for world
   quantity: number;    // in lượng
   note?: string;
   createdAt: string;   // ISO timestamp
+}
+
+// --- Gold Product Registry ---
+
+export interface GoldProduct {
+  id: string;        // e.g. 'sjc_001', 'btmc_003', 'world_spot', 'world_futures'
+  brand: GoldBrand;
+  name: string;      // display name (may update over time; ID stays stable)
+  sortOrder: number; // position in source array — stable identity anchor
+}
+
+export interface GoldProductRegistry {
+  products: GoldProduct[];
+  version: number;
+  updatedAt: string;
+}
+
+// --- Gold Price History ---
+
+export interface GoldPricePoint {
+  productId: string;
+  buyPrice: number;   // VND per lượng
+  sellPrice: number;  // VND per lượng
+}
+
+export interface GoldPriceSnapshot {
+  date: string;        // 'YYYY-MM-DD'
+  recordedAt: string;  // full ISO timestamp
+  prices: GoldPricePoint[];
+  world: {
+    spot: number;
+    futures: number;
+    usdvnd: number;
+    spotPerLuong: number;
+    futuresPerLuong: number;
+  } | null;
+}
+
+export interface GoldPriceHistory {
+  snapshots: GoldPriceSnapshot[];
+  version: 1;
 }
 
 export interface AppState {

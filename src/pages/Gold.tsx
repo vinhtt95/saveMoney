@@ -1,7 +1,16 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import type { GoldPriceCache, GoldSourceData, GoldProductPrice } from '../types';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import type { GoldPriceCache, GoldSourceData, GoldProductPrice, GoldProduct, GoldProductRegistry, GoldPriceHistory } from '../types';
 import { fetchGoldPrices, loadCachedGoldPrices, isCacheValid } from '../services/goldPriceService';
+import {
+  loadRegistry,
+  loadGoldHistory,
+  getHistoryForProduct,
+  getWorldHistoryForPeriod,
+} from '../services/goldHistoryService';
 import { formatVND } from '../utils/formatters';
+import GoldPriceChart from '../components/GoldPriceChart';
+import type { ChartSeries } from '../components/GoldPriceChart';
+import type { GoldBrand } from '../types';
 
 function formatUSD(value: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(value);
@@ -71,10 +80,170 @@ function GoldTable({ data, loading, error }: { data: GoldSourceData | null; load
   );
 }
 
+type Period = '7d' | '30d' | '90d' | 'all';
+
+const PERIOD_OPTIONS: { value: Period; label: string; days: number | null }[] = [
+  { value: '7d', label: '7 ngày', days: 7 },
+  { value: '30d', label: '30 ngày', days: 30 },
+  { value: '90d', label: '90 ngày', days: 90 },
+  { value: 'all', label: 'Tất cả', days: null },
+];
+
+const MAX_SELECTED = 4;
+
+function getBrandLabel(brand: GoldBrand): string {
+  if (brand === 'SJC') return 'SJC';
+  if (brand === 'BTMC') return 'Bảo Tín Minh Châu';
+  return 'Thế giới';
+}
+
+function getBrandBadgeClass(brand: GoldBrand): string {
+  if (brand === 'SJC') return 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400';
+  if (brand === 'BTMC') return 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400';
+  return 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400';
+}
+
+interface GoldHistorySectionProps {
+  registry: GoldProductRegistry;
+  history: GoldPriceHistory;
+}
+
+function GoldHistorySection({ registry, history }: GoldHistorySectionProps) {
+  const [period, setPeriod] = useState<Period>('30d');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  const periodDays = PERIOD_OPTIONS.find(p => p.value === period)?.days ?? null;
+
+  // Group products by brand for the selector UI
+  const grouped = useMemo(() => {
+    const brands: GoldBrand[] = ['SJC', 'BTMC', 'world'];
+    return brands.map(brand => ({
+      brand,
+      label: getBrandLabel(brand),
+      products: registry.products.filter(p => p.brand === brand),
+    })).filter(g => g.products.length > 0);
+  }, [registry]);
+
+  function toggleProduct(id: string) {
+    setSelectedIds(prev => {
+      if (prev.includes(id)) return prev.filter(x => x !== id);
+      if (prev.length >= MAX_SELECTED) return prev; // max limit
+      return [...prev, id];
+    });
+  }
+
+  const series: ChartSeries[] = useMemo(() => {
+    return selectedIds
+      .map(id => {
+        const product = registry.products.find(p => p.id === id);
+        if (!product) return null;
+        return {
+          productId: id,
+          label: product.name,
+          brand: product.brand,
+          data: getHistoryForProduct(id, history, periodDays),
+        };
+      })
+      .filter((s): s is ChartSeries => s !== null);
+  }, [selectedIds, registry, history, periodDays]);
+
+  const worldSeries = useMemo(
+    () => getWorldHistoryForPeriod(history, periodDays),
+    [history, periodDays]
+  );
+
+  const snapshotCount = history.snapshots.length;
+  const oldestDate = snapshotCount > 0 ? history.snapshots[0].date : null;
+
+  return (
+    <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 space-y-5">
+      {/* Section header */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <span className="material-symbols-outlined text-slate-500">show_chart</span>
+          <h2 className="font-semibold text-slate-800 dark:text-slate-100">Lịch Sử Giá</h2>
+          {snapshotCount > 0 && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400">
+              {snapshotCount} ngày{oldestDate ? ` · từ ${oldestDate}` : ''}
+            </span>
+          )}
+        </div>
+        {/* Period selector */}
+        <div className="flex gap-1">
+          {PERIOD_OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => setPeriod(opt.value)}
+              className={`px-3 py-1 text-xs font-medium rounded-lg transition-colors ${
+                period === opt.value
+                  ? 'bg-amber-500 text-white'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {snapshotCount === 0 ? (
+        <div className="flex flex-col items-center justify-center py-10 text-slate-400 space-y-2">
+          <span className="material-symbols-outlined text-3xl">history</span>
+          <p className="text-sm">Chưa có dữ liệu lịch sử. Hãy làm mới giá để bắt đầu ghi nhận.</p>
+        </div>
+      ) : (
+        <>
+          {/* Product multi-selector */}
+          <div className="space-y-3">
+            <p className="text-xs text-slate-400">
+              Chọn tối đa {MAX_SELECTED} loại vàng để so sánh
+              {selectedIds.length > 0 && ` · đã chọn ${selectedIds.length}`}
+            </p>
+            {grouped.map(group => (
+              <div key={group.brand}>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500 mb-1.5">
+                  {group.label}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {group.products.map((product: GoldProduct) => {
+                    const selected = selectedIds.includes(product.id);
+                    const disabled = !selected && selectedIds.length >= MAX_SELECTED;
+                    return (
+                      <button
+                        key={product.id}
+                        onClick={() => toggleProduct(product.id)}
+                        disabled={disabled}
+                        className={`px-2.5 py-1 text-xs rounded-lg border transition-colors ${
+                          selected
+                            ? `${getBrandBadgeClass(group.brand)} border-transparent font-medium`
+                            : disabled
+                            ? 'border-slate-200 dark:border-slate-700 text-slate-300 dark:text-slate-600 cursor-not-allowed'
+                            : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
+                        }`}
+                      >
+                        {product.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Chart */}
+          <GoldPriceChart series={series} worldSeries={worldSeries} />
+        </>
+      )}
+    </div>
+  );
+}
+
 export function Gold() {
   const [cache, setCache] = useState<GoldPriceCache | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetchErrors, setFetchErrors] = useState<{ sjc?: boolean; btmc?: boolean; world?: boolean }>({});
+  const [registry, setRegistry] = useState<GoldProductRegistry>(() => loadRegistry());
+  const [history, setHistory] = useState<GoldPriceHistory>(() => loadGoldHistory());
 
   const load = useCallback(async (force = false) => {
     const existing = loadCachedGoldPrices();
@@ -91,8 +260,10 @@ export function Gold() {
         sjc: !result.sjc || result.sjc.products.length === 0,
         btmc: !result.btmc || result.btmc.products.length === 0,
       });
+      // Refresh registry and history after fetch (snapshot may have been recorded)
+      setRegistry(loadRegistry());
+      setHistory(loadGoldHistory());
     } catch {
-      // preserve existing cache on full failure
       if (existing) setCache(existing);
     } finally {
       setLoading(false);
@@ -225,6 +396,9 @@ export function Gold() {
           <GoldTable data={cache?.btmc ?? null} loading={loading && !cache?.btmc} error={fetchErrors.btmc} />
         </div>
       </div>
+
+      {/* Price History Section */}
+      <GoldHistorySection registry={registry} history={history} />
 
       {/* Note */}
       <p className="text-xs text-slate-400 text-center">

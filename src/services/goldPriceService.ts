@@ -1,5 +1,6 @@
 import type { GoldPriceCache, GoldSourceData, WorldGoldData } from '../types';
 import { parseSJCJson, parseBTMCHtml } from '../utils/goldParser';
+import { maybeRecordTodaySnapshot } from './goldHistoryService';
 
 const TROY_OZ_PER_LUONG = 37.5 / 31.1035; // ≈ 1.2057
 const CACHE_KEY = 'savemoney_gold_cache';
@@ -115,5 +116,6 @@ export async function fetchGoldPrices(): Promise<GoldPriceCache> {
 
   const cache: GoldPriceCache = { world, sjc, btmc, cachedAt: new Date().toISOString() };
   saveCachedGoldPrices(cache);
+  maybeRecordTodaySnapshot(cache);
   return cache;
 }
