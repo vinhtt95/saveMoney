@@ -134,7 +134,7 @@ function AccountTxList({ account, transactions, allCategories, allAccounts }: Ac
 }
 
 export function Accounts() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, actions } = useApp();
 
   // expandedAccount holds account ID
   const [expandedAccountId, setExpandedAccountId] = useState<string | null>(null);
@@ -168,7 +168,7 @@ export function Accounts() {
     [accountData]
   );
 
-  function handleAddAccount() {
+  async function handleAddAccount() {
     const name = newAccountName.trim();
     if (!name) {
       setAddError('Tên tài khoản không được trống');
@@ -179,13 +179,13 @@ export function Accounts() {
       return;
     }
     const account: Account = { id: crypto.randomUUID(), name };
-    dispatch({ type: 'SET_ACCOUNTS', accounts: [...state.accounts, account].sort((a, b) => a.name.localeCompare(b.name)) });
+    await actions.addAccount(account);
     setIsAdding(false);
     setNewAccountName('');
     setAddError('');
   }
 
-  function handleRename(accId: string) {
+  async function handleRename(accId: string) {
     const newName = nameInput.trim();
     const acc = state.accounts.find((a) => a.id === accId);
     if (!newName || !acc || newName === acc.name) {
@@ -196,11 +196,11 @@ export function Accounts() {
       setEditingNameId(null);
       return;
     }
-    dispatch({ type: 'RENAME_ACCOUNT', id: accId, newName });
+    await actions.renameAccount(accId, newName);
     setEditingNameId(null);
   }
 
-  function handleDelete(accId: string) {
+  async function handleDelete(accId: string) {
     const acc = state.accounts.find((a) => a.id === accId);
     if (!acc) return;
     const txCount = state.transactions.filter(
@@ -212,17 +212,15 @@ export function Accounts() {
       );
       if (!confirmed) return;
     }
-    const newBalances = { ...state.accountBalances };
-    delete newBalances[accId];
-    dispatch({ type: 'SET_ACCOUNTS', accounts: state.accounts.filter((a) => a.id !== accId) });
-    dispatch({ type: 'SET_ACCOUNT_BALANCES', accountBalances: newBalances });
+    await actions.deleteAccount(accId);
     if (expandedAccountId === accId) setExpandedAccountId(null);
   }
 
-  function handleSaveBalance(accId: string) {
+  async function handleSaveBalance(accId: string) {
     const val = parseFloat(balanceInput);
-    const newBalances = { ...state.accountBalances, [accId]: isNaN(val) ? 0 : val };
-    dispatch({ type: 'SET_ACCOUNT_BALANCES', accountBalances: newBalances });
+    const balance = isNaN(val) ? 0 : val;
+    await actions.setAccountBalance(accId, balance);
+    dispatch({ type: 'SET_ACCOUNT_BALANCES', accountBalances: { ...state.accountBalances, [accId]: balance } });
     setEditingBalanceId(null);
   }
 

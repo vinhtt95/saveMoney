@@ -58,7 +58,7 @@ function draftToTx(draft: Draft, id: string): Transaction | null {
 
 
 export function Transactions() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, actions } = useApp();
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -172,14 +172,14 @@ export function Transactions() {
   function handleNewCategory(name: string, type: 'Expense' | 'Income'): string {
     const id = crypto.randomUUID();
     const cat: Category = { id, name, type };
-    dispatch({ type: 'ADD_CATEGORY', category: cat });
+    actions.addCategory(cat); // fire-and-forget: optimistic dispatch happens inside
     return id;
   }
 
   function handleNewAccount(name: string): string {
     const id = crypto.randomUUID();
     const acc: Account = { id, name };
-    dispatch({ type: 'SET_ACCOUNTS', accounts: [...accounts, acc] });
+    actions.addAccount(acc); // fire-and-forget
     return id;
   }
 
@@ -188,8 +188,8 @@ export function Transactions() {
     setEditingId(null);
   }
 
-  function handleAddConfirm(tx: Transaction) {
-    dispatch({ type: 'ADD_TRANSACTION', transaction: tx });
+  async function handleAddConfirm(tx: Transaction) {
+    await actions.addTransaction(tx);
     setIsAdding(false);
   }
 
@@ -204,10 +204,10 @@ export function Transactions() {
     setEditError('');
   }
 
-  function confirmEdit(originalId: string) {
+  async function confirmEdit(originalId: string) {
     const tx = draftToTx(draft, originalId);
     if (!tx) { setEditError('Vui lòng điền đầy đủ thông tin hợp lệ.'); return; }
-    dispatch({ type: 'EDIT_TRANSACTION', transaction: tx });
+    await actions.editTransaction(tx);
     setEditingId(null);
     setEditError('');
   }
@@ -545,9 +545,9 @@ export function Transactions() {
                                 error={editError}
                                 onSave={() => confirmEdit(tx.id)}
                                 onCancel={() => { setExpandedRow(null); cancelEdit(); }}
-                                onDelete={() => {
+                                onDelete={async () => {
                                   if (confirm('Xóa giao dịch này?')) {
-                                    dispatch({ type: 'DELETE_TRANSACTION', id: tx.id });
+                                    await actions.deleteTransaction(tx.id);
                                     setExpandedRow(null);
                                   }
                                 }}

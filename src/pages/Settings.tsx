@@ -17,7 +17,7 @@ interface ParsedPreviewRow {
 }
 
 export function Settings() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, actions } = useApp();
   const [activeTab, setActiveTab] = useState<Tab>('data');
   const [preview, setPreview] = useState<ParsedPreviewRow[]>([]);
   const [pendingTxs, setPendingTxs] = useState<ReturnType<typeof parseCSV>['transactions']>([]);
@@ -72,9 +72,9 @@ export function Settings() {
     if (file) handleFile(file);
   }
 
-  function handleImport() {
+  async function handleImport() {
     if (pendingTxs.length === 0) return;
-    dispatch({ type: 'IMPORT', transactions: pendingTxs, newCategories: pendingNewCategories, newAccounts: pendingNewAccounts });
+    await actions.importData(pendingTxs, pendingNewCategories, pendingNewAccounts);
     setImportMsg(`Successfully imported ${pendingTxs.length} transactions!`);
     setPendingTxs([]);
     setPendingNewCategories([]);
@@ -93,9 +93,9 @@ export function Settings() {
     URL.revokeObjectURL(url);
   }
 
-  function handleClear() {
+  async function handleClear() {
     if (confirm('This will permanently delete all transaction data. Are you sure?')) {
-      dispatch({ type: 'CLEAR' });
+      await actions.clearAll();
       setImportMsg('');
       setPendingTxs([]);
       setPreview([]);
@@ -117,40 +117,38 @@ export function Settings() {
     }
   }
 
-  function handleRestoreBackup() {
+  async function handleRestoreBackup() {
     if (!pendingBackup) return;
     if (!confirm('Thao tác này sẽ GHI ĐÈ toàn bộ dữ liệu hiện tại (giao dịch, danh mục, tài khoản, ngân sách). Tiếp tục?')) return;
-    const { budgets, ...rest } = pendingBackup;
-    dispatch({ type: 'RESTORE_BACKUP', backup: rest });
-    localStorage.setItem('savemoney_budgets', JSON.stringify(budgets));
+    await actions.restoreBackup(pendingBackup);
     setPendingBackup(null);
-    setBackupMsg(`Khôi phục thành công! ${rest.transactions.length} giao dịch, ${budgets.length} ngân sách đã được nạp.`);
+    setBackupMsg(`Khôi phục thành công! ${pendingBackup.transactions.length} giao dịch, ${pendingBackup.budgets.length} ngân sách đã được nạp.`);
   }
 
   const [newCategoryType, setNewCategoryType] = useState<'Expense' | 'Income'>('Expense');
 
-  function addCategory() {
+  async function addCategory() {
     const val = newCategory.trim();
     if (!val) return;
     const category: Category = { id: crypto.randomUUID(), name: val, type: newCategoryType };
-    dispatch({ type: 'ADD_CATEGORY', category });
+    await actions.addCategory(category);
     setNewCategory('');
   }
 
-  function removeCategory(id: string) {
-    dispatch({ type: 'DELETE_CATEGORY', id });
+  async function removeCategory(id: string) {
+    await actions.deleteCategory(id);
   }
 
-  function addAccount() {
+  async function addAccount() {
     const val = newAccount.trim();
     if (!val || state.accounts.some((a) => a.name === val)) return;
     const account: Account = { id: crypto.randomUUID(), name: val };
-    dispatch({ type: 'SET_ACCOUNTS', accounts: [...state.accounts, account].sort((a, b) => a.name.localeCompare(b.name)) });
+    await actions.addAccount(account);
     setNewAccount('');
   }
 
-  function removeAccount(id: string) {
-    dispatch({ type: 'SET_ACCOUNTS', accounts: state.accounts.filter((a) => a.id !== id) });
+  async function removeAccount(id: string) {
+    await actions.deleteAccount(id);
   }
 
   const expenseCategories = state.categories.filter((c) => c.type === 'Expense');
@@ -416,7 +414,7 @@ export function Settings() {
                   value={defaultCategoryExpenseId}
                   onChange={(e) => {
                     setDefaultCategoryExpenseId(e.target.value);
-                    dispatch({ type: 'SET_DEFAULTS', defaultCategoryExpenseId: e.target.value, defaultCategoryIncomeId, defaultAccountId });
+                    actions.setDefaults(e.target.value, defaultCategoryIncomeId, defaultAccountId);
                   }}
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
                 >
@@ -432,7 +430,7 @@ export function Settings() {
                   value={defaultCategoryIncomeId}
                   onChange={(e) => {
                     setDefaultCategoryIncomeId(e.target.value);
-                    dispatch({ type: 'SET_DEFAULTS', defaultCategoryExpenseId, defaultCategoryIncomeId: e.target.value, defaultAccountId });
+                    actions.setDefaults(defaultCategoryExpenseId, e.target.value, defaultAccountId);
                   }}
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
                 >
@@ -448,7 +446,7 @@ export function Settings() {
                   value={defaultAccountId}
                   onChange={(e) => {
                     setDefaultAccountId(e.target.value);
-                    dispatch({ type: 'SET_DEFAULTS', defaultCategoryExpenseId, defaultCategoryIncomeId, defaultAccountId: e.target.value });
+                    actions.setDefaults(defaultCategoryExpenseId, defaultCategoryIncomeId, e.target.value);
                   }}
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
                 >

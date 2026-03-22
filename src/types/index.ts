@@ -157,6 +157,7 @@ export interface GoldPriceHistory {
 }
 
 export interface AppState {
+  isLoading: boolean;
   transactions: Transaction[];
   filters: FilterState;
   selectedPeriod: string; // 'all' | 'YYYY-MM'
@@ -167,4 +168,15 @@ export interface AppState {
   defaultCategoryIncomeId: string;
   defaultAccountId: string;
   goldAssets: GoldAsset[];
+  budgets: Budget[];
+}
+
+export interface AppInitData {
+  categories: Category[];
+  accounts: Account[];
+  accountBalances: Record<string, number>;
+  transactions: Array<Omit<Transaction, 'date'> & { date: string }>;
+  budgets: Budget[];
+  goldAssets: GoldAsset[];
+  settings: Record<string, string>;
 }

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, LineChart, Line, Legend,
@@ -31,29 +31,6 @@ function getIcon(name: string) {
 
 const PIE_COLORS = ['#144bb8', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#ec4899'];
 
-const BUDGET_STORAGE_KEY = 'savemoney_budgets';
-
-function loadBudgets(): BudgetType[] {
-  try {
-    const raw = localStorage.getItem(BUDGET_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    // Migrate old format: budget may have `categories` instead of `categoryIds`
-    return (parsed as Record<string, unknown>[]).map((b) => {
-      if (!b.categoryIds && Array.isArray(b.categories)) {
-        return { ...b, categoryIds: b.categories, categories: undefined };
-      }
-      return b;
-    }) as unknown as BudgetType[];
-  } catch {
-    return [];
-  }
-}
-
-function saveBudgets(budgets: BudgetType[]) {
-  localStorage.setItem(BUDGET_STORAGE_KEY, JSON.stringify(budgets));
-}
 
 function getBudgetStatus(pct: number): { label: string; barColor: string; badgeClass: string } {
   if (pct >= 100) return { label: 'Over budget', barColor: 'bg-rose-500', badgeClass: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400' };
@@ -83,11 +60,9 @@ const emptyForm: FormState = {
 };
 
 export function Budget() {
-  const { state } = useApp();
-  const { transactions, categories, accounts } = state;
+  const { state, actions } = useApp();
+  const { transactions, categories, accounts, budgets } = state;
   const expenseCategories = categories.filter((c) => c.type === 'Expense');
-
-  const [budgets, setBudgets] = useState<BudgetType[]>(loadBudgets);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [analyticsOpenId, setAnalyticsOpenId] = useState<string | null>(null);
   const [selectedCatPerBudget, setSelectedCatPerBudget] = useState<Record<string, string>>({});
@@ -96,10 +71,6 @@ export function Budget() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-
-  useEffect(() => {
-    saveBudgets(budgets);
-  }, [budgets]);
 
   function openCreate() {
     setForm(emptyForm);
@@ -125,7 +96,7 @@ export function Budget() {
     setForm(emptyForm);
   }
 
-  function saveForm() {
+  async function saveForm() {
     const limit = parseFloat(form.limit.replace(/,/g, ''));
     if (!form.name.trim() || isNaN(limit) || limit <= 0 || !form.dateStart || !form.dateEnd) return;
 
@@ -138,21 +109,23 @@ export function Budget() {
         dateEnd: form.dateEnd,
         categoryIds: form.categoryIds,
       };
-      setBudgets((prev) => [...prev, newBudget]);
+      await actions.addBudget(newBudget);
     } else if (formMode === 'edit' && editingId) {
-      setBudgets((prev) =>
-        prev.map((b) =>
-          b.id === editingId
-            ? { ...b, name: form.name.trim(), limit, dateStart: form.dateStart, dateEnd: form.dateEnd, categoryIds: form.categoryIds }
-            : b
-        )
-      );
+      const updated: BudgetType = {
+        id: editingId,
+        name: form.name.trim(),
+        limit,
+        dateStart: form.dateStart,
+        dateEnd: form.dateEnd,
+        categoryIds: form.categoryIds,
+      };
+      await actions.editBudget(updated);
     }
     cancelForm();
   }
 
-  function deleteBudget(id: string) {
-    setBudgets((prev) => prev.filter((b) => b.id !== id));
+  async function deleteBudget(id: string) {
+    await actions.deleteBudget(id);
     if (expandedId === id) setExpandedId(null);
     setDeleteConfirmId(null);
   }

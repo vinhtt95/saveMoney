@@ -18,6 +18,13 @@ export default defineConfig(({mode}) => {
     server: {
       hmr: process.env.DISABLE_HMR !== 'true',
       proxy: {
+        '/api/init': { target: 'http://localhost:3001', changeOrigin: true },
+        '/api/transactions': { target: 'http://localhost:3001', changeOrigin: true },
+        '/api/categories': { target: 'http://localhost:3001', changeOrigin: true },
+        '/api/accounts': { target: 'http://localhost:3001', changeOrigin: true },
+        '/api/budgets': { target: 'http://localhost:3001', changeOrigin: true },
+        '/api/gold-assets': { target: 'http://localhost:3001', changeOrigin: true },
+        '/api/settings': { target: 'http://localhost:3001', changeOrigin: true },
         '/api/gold-futures': {
           target: 'https://query1.finance.yahoo.com',
           changeOrigin: true,

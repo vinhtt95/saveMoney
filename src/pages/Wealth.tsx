@@ -227,7 +227,7 @@ function AssetModal({
 }
 
 export function Wealth() {
-  const { state, dispatch } = useApp();
+  const { state, actions } = useApp();
   const { goldAssets } = state;
   const [cache, setCache] = useState<GoldPriceCache | null>(null);
   const [registry] = useState<GoldProductRegistry | null>(() => loadRegistry());
@@ -255,14 +255,11 @@ export function Wealth() {
 
   useEffect(() => { loadPrices(); }, [loadPrices]);
 
-  const handleSave = (data: Omit<GoldAsset, 'id' | 'createdAt'>) => {
+  const handleSave = async (data: Omit<GoldAsset, 'id' | 'createdAt'>) => {
     if (editing) {
-      dispatch({ type: 'EDIT_GOLD_ASSET', asset: { ...editing, ...data } });
+      await actions.editGoldAsset({ ...editing, ...data });
     } else {
-      dispatch({
-        type: 'ADD_GOLD_ASSET',
-        asset: { ...data, id: crypto.randomUUID(), createdAt: new Date().toISOString() },
-      });
+      await actions.addGoldAsset({ ...data, id: crypto.randomUUID(), createdAt: new Date().toISOString() });
     }
     setModalOpen(false);
     setEditing(null);
@@ -273,8 +270,8 @@ export function Wealth() {
     setModalOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    dispatch({ type: 'DELETE_GOLD_ASSET', id });
+  const handleDelete = async (id: string) => {
+    await actions.deleteGoldAsset(id);
     setDeleteConfirm(null);
   };
 

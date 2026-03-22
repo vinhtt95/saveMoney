@@ -1,6 +1,7 @@
 import React from 'react';
 import { Account, Category, TransactionType } from '../types';
 import { Combobox } from './Combobox';
+import { toYYYYMMDD } from '../utils/formatters';
 
 export const TRANSACTION_TYPES: TransactionType[] = ['Expense', 'Income', 'Transfer', 'Account'];
 
@@ -19,7 +20,7 @@ export function emptyDraft(
   defaultAccountId = ''
 ): Draft {
   return {
-    date: new Date().toISOString().slice(0, 10),
+    date: toYYYYMMDD(new Date()),
     type: 'Expense',
     categoryId: defaultCategoryExpenseId,
     accountId: defaultAccountId,

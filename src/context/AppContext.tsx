@@ -1,15 +1,11 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import { Account, AppState, Category, DatabaseBackup, FilterState, GoldAsset, Transaction } from '../types';
+import React, { createContext, useContext, useEffect, useMemo, useReducer } from 'react';
+import * as api from '../services/api';
+import { Account, AppInitData, AppState, Budget, Category, DatabaseBackup, FilterState, GoldAsset, Transaction } from '../types';
 import { getAvailablePeriods } from '../utils/analytics';
 import { toYYYYMM } from '../utils/formatters';
-import { migrateStorageV1ToV2, CATEGORIES_V2_KEY, ACCOUNTS_V2_KEY } from '../utils/migration';
-
-const STORAGE_KEY = 'savemoney_transactions';
-const ACCOUNT_BALANCES_KEY = 'savemoney_account_balances';
-const DEFAULTS_KEY = 'savemoney_defaults';
-const GOLD_ASSETS_KEY = 'savemoney_gold_assets';
 
 type Action =
+  | { type: 'HYDRATE'; data: AppInitData }
   | { type: 'IMPORT'; transactions: Transaction[]; newCategories?: Category[]; newAccounts?: Account[] }
   | { type: 'CLEAR' }
   | { type: 'ADD_GOLD_ASSET'; asset: GoldAsset }
@@ -28,7 +24,11 @@ type Action =
   | { type: 'SET_ACCOUNT_BALANCES'; accountBalances: Record<string, number> }
   | { type: 'RENAME_ACCOUNT'; id: string; newName: string }
   | { type: 'SET_DEFAULTS'; defaultCategoryExpenseId: string; defaultCategoryIncomeId: string; defaultAccountId: string }
-  | { type: 'RESTORE_BACKUP'; backup: Omit<DatabaseBackup, 'budgets'> };
+  | { type: 'ADD_BUDGET'; budget: Budget }
+  | { type: 'EDIT_BUDGET'; budget: Budget }
+  | { type: 'DELETE_BUDGET'; id: string }
+  | { type: 'SET_BUDGETS'; budgets: Budget[] }
+  | { type: 'RESTORE_BACKUP'; backup: DatabaseBackup };
 
 const defaultFilters: FilterState = {
   search: '',
@@ -40,6 +40,7 @@ const defaultFilters: FilterState = {
 };
 
 const initialState: AppState = {
+  isLoading: true,
   transactions: [],
   filters: defaultFilters,
   selectedPeriod: toYYYYMM(new Date()),
@@ -50,70 +51,8 @@ const initialState: AppState = {
   defaultCategoryIncomeId: '',
   defaultAccountId: '',
   goldAssets: [],
+  budgets: [],
 };
-
-function serializeTransactions(txs: Transaction[]): string {
-  return JSON.stringify(txs.map((t) => ({ ...t, date: t.date.toISOString() })));
-}
-
-function deserializeTransactions(raw: string): Transaction[] {
-  try {
-    const arr = JSON.parse(raw);
-    return arr.map((t: Record<string, unknown>) => ({ ...t, date: new Date(t.date as string) }));
-  } catch {
-    return [];
-  }
-}
-
-function loadJSON<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    if (raw) return JSON.parse(raw) as T;
-  } catch { /* ignore */ }
-  return fallback;
-}
-
-function loadFromStorage(): Pick<
-  AppState,
-  'transactions' | 'categories' | 'accounts' | 'accountBalances' |
-  'defaultCategoryExpenseId' | 'defaultCategoryIncomeId' | 'defaultAccountId' | 'goldAssets'
-> {
-  try {
-    // Run v1→v2 migration if needed (idempotent)
-    migrateStorageV1ToV2();
-
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const transactions = raw ? deserializeTransactions(raw) : [];
-
-    const categories = loadJSON<Category[]>(CATEGORIES_V2_KEY, []);
-    const accounts = loadJSON<Account[]>(ACCOUNTS_V2_KEY, []);
-    const accountBalances = loadJSON<Record<string, number>>(ACCOUNT_BALANCES_KEY, {});
-    const defaults = loadJSON<Record<string, string>>(DEFAULTS_KEY, {});
-    const goldAssets = loadJSON<GoldAsset[]>(GOLD_ASSETS_KEY, []);
-
-    return {
-      transactions,
-      categories,
-      accounts,
-      accountBalances,
-      defaultCategoryExpenseId: defaults.defaultCategoryExpenseId ?? '',
-      defaultCategoryIncomeId: defaults.defaultCategoryIncomeId ?? '',
-      defaultAccountId: defaults.defaultAccountId ?? '',
-      goldAssets,
-    };
-  } catch {
-    return {
-      transactions: [],
-      categories: [],
-      accounts: [],
-      accountBalances: {},
-      defaultCategoryExpenseId: '',
-      defaultCategoryIncomeId: '',
-      defaultAccountId: '',
-      goldAssets: [],
-    };
-  }
-}
 
 function mergeCategories(existing: Category[], incoming: Category[]): Category[] {
   const map = new Map(existing.map((c) => [c.id, c]));
@@ -129,6 +68,26 @@ function mergeAccounts(existing: Account[], incoming: Account[]): Account[] {
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
+    case 'HYDRATE': {
+      const { data } = action;
+      const transactions = data.transactions.map((t) => ({ ...t, date: new Date(t.date) }));
+      const periods = getAvailablePeriods(transactions);
+      const latestPeriod = periods[0] || toYYYYMM(new Date());
+      return {
+        ...state,
+        isLoading: false,
+        transactions,
+        categories: data.categories,
+        accounts: data.accounts,
+        accountBalances: data.accountBalances,
+        goldAssets: data.goldAssets,
+        budgets: data.budgets,
+        defaultCategoryExpenseId: data.settings.defaultCategoryExpenseId ?? '',
+        defaultCategoryIncomeId: data.settings.defaultCategoryIncomeId ?? '',
+        defaultAccountId: data.settings.defaultAccountId ?? '',
+        selectedPeriod: latestPeriod,
+      };
+    }
     case 'IMPORT': {
       const merged = [...state.transactions];
       const existingIds = new Set(state.transactions.map((t) => t.id));
@@ -154,21 +113,15 @@ function reducer(state: AppState, action: Action): AppState {
       };
     }
     case 'CLEAR':
-      return { ...initialState, accountBalances: {} };
+      return { ...initialState, isLoading: false, accountBalances: {} };
     case 'SET_FILTER':
       return { ...state, filters: { ...state.filters, ...action.filter } };
     case 'SET_PERIOD':
       return { ...state, selectedPeriod: action.period };
     case 'DELETE_TRANSACTION':
-      return {
-        ...state,
-        transactions: state.transactions.filter((t) => t.id !== action.id),
-      };
+      return { ...state, transactions: state.transactions.filter((t) => t.id !== action.id) };
     case 'ADD_TRANSACTION':
-      return {
-        ...state,
-        transactions: [action.transaction, ...state.transactions],
-      };
+      return { ...state, transactions: [action.transaction, ...state.transactions] };
     case 'EDIT_TRANSACTION':
       return {
         ...state,
@@ -185,30 +138,26 @@ function reducer(state: AppState, action: Action): AppState {
         categories: [...state.categories, action.category].sort((a, b) => a.name.localeCompare(b.name)),
       };
     }
-    case 'RENAME_CATEGORY': {
-      // No transaction updates needed — transactions reference by ID
+    case 'RENAME_CATEGORY':
       return {
         ...state,
         categories: state.categories.map((c) =>
           c.id === action.id ? { ...c, name: action.newName } : c
         ).sort((a, b) => a.name.localeCompare(b.name)),
       };
-    }
     case 'DELETE_CATEGORY':
       return { ...state, categories: state.categories.filter((c) => c.id !== action.id) };
     case 'SET_ACCOUNTS':
       return { ...state, accounts: action.accounts };
     case 'SET_ACCOUNT_BALANCES':
       return { ...state, accountBalances: action.accountBalances };
-    case 'RENAME_ACCOUNT': {
-      // No transaction updates needed — transactions reference by ID
+    case 'RENAME_ACCOUNT':
       return {
         ...state,
         accounts: state.accounts.map((a) =>
           a.id === action.id ? { ...a, name: action.newName } : a
         ).sort((a, b) => a.name.localeCompare(b.name)),
       };
-    }
     case 'SET_DEFAULTS':
       return {
         ...state,
@@ -222,6 +171,14 @@ function reducer(state: AppState, action: Action): AppState {
       return { ...state, goldAssets: state.goldAssets.map((a) => a.id === action.asset.id ? action.asset : a) };
     case 'DELETE_GOLD_ASSET':
       return { ...state, goldAssets: state.goldAssets.filter((a) => a.id !== action.id) };
+    case 'ADD_BUDGET':
+      return { ...state, budgets: [...state.budgets, action.budget] };
+    case 'EDIT_BUDGET':
+      return { ...state, budgets: state.budgets.map((b) => b.id === action.budget.id ? action.budget : b) };
+    case 'DELETE_BUDGET':
+      return { ...state, budgets: state.budgets.filter((b) => b.id !== action.id) };
+    case 'SET_BUDGETS':
+      return { ...state, budgets: action.budgets };
     case 'RESTORE_BACKUP': {
       const { backup } = action;
       const transactions = backup.transactions.map((t) => ({ ...t, date: new Date(t.date) }));
@@ -236,6 +193,7 @@ function reducer(state: AppState, action: Action): AppState {
         defaultCategoryExpenseId: backup.defaults.defaultCategoryExpenseId,
         defaultCategoryIncomeId: backup.defaults.defaultCategoryIncomeId,
         defaultAccountId: backup.defaults.defaultAccountId,
+        budgets: backup.budgets,
         selectedPeriod: latestPeriod,
         filters: defaultFilters,
       };
@@ -245,61 +203,147 @@ function reducer(state: AppState, action: Action): AppState {
   }
 }
 
+interface AppActions {
+  addTransaction: (t: Transaction) => Promise<void>;
+  editTransaction: (t: Transaction) => Promise<void>;
+  deleteTransaction: (id: string) => Promise<void>;
+  importData: (transactions: Transaction[], categories: Category[], accounts: Account[]) => Promise<void>;
+  clearAll: () => Promise<void>;
+  addCategory: (c: Category) => Promise<void>;
+  renameCategory: (id: string, newName: string) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
+  addAccount: (a: Account) => Promise<void>;
+  renameAccount: (id: string, newName: string) => Promise<void>;
+  deleteAccount: (id: string) => Promise<void>;
+  setAccountBalance: (accountId: string, balance: number) => Promise<void>;
+  setDefaults: (expId: string, incId: string, accId: string) => Promise<void>;
+  addGoldAsset: (a: GoldAsset) => Promise<void>;
+  editGoldAsset: (a: GoldAsset) => Promise<void>;
+  deleteGoldAsset: (id: string) => Promise<void>;
+  addBudget: (b: Budget) => Promise<void>;
+  editBudget: (b: Budget) => Promise<void>;
+  deleteBudget: (id: string) => Promise<void>;
+  restoreBackup: (backup: DatabaseBackup) => Promise<void>;
+}
+
 interface AppContextValue {
   state: AppState;
   dispatch: React.Dispatch<Action>;
+  actions: AppActions;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const stored = loadFromStorage();
-  const [state, dispatch] = useReducer(reducer, {
-    ...initialState,
-    ...stored,
-  });
+  const [state, dispatch] = useReducer(reducer, initialState);
 
+  // Load all data from MySQL on mount
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, serializeTransactions(state.transactions));
-    } catch { /* ignore quota errors */ }
-  }, [state.transactions]);
+    api.fetchInit().then((data) => {
+      dispatch({ type: 'HYDRATE', data });
+    }).catch((err) => {
+      console.error('Failed to load data from server:', err);
+      dispatch({ type: 'HYDRATE', data: { categories: [], accounts: [], accountBalances: {}, transactions: [], budgets: [], goldAssets: [], settings: {} } });
+    });
+  }, []);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(CATEGORIES_V2_KEY, JSON.stringify(state.categories));
-    } catch { /* ignore */ }
-  }, [state.categories]);
+  const actions = useMemo<AppActions>(() => ({
+    async addTransaction(t) {
+      await api.addTransaction(t);
+      dispatch({ type: 'ADD_TRANSACTION', transaction: t });
+    },
+    async editTransaction(t) {
+      await api.editTransaction(t);
+      dispatch({ type: 'EDIT_TRANSACTION', transaction: t });
+    },
+    async deleteTransaction(id) {
+      await api.deleteTransaction(id);
+      dispatch({ type: 'DELETE_TRANSACTION', id });
+    },
+    async importData(transactions, categories, accounts) {
+      await api.bulkAddTransactions(transactions, categories, accounts);
+      dispatch({ type: 'IMPORT', transactions, newCategories: categories, newAccounts: accounts });
+    },
+    async clearAll() {
+      await api.clearAllTransactions();
+      dispatch({ type: 'CLEAR' });
+    },
+    async addCategory(c) {
+      await api.addCategory(c);
+      dispatch({ type: 'ADD_CATEGORY', category: c });
+    },
+    async renameCategory(id, newName) {
+      await api.renameCategory(id, newName);
+      dispatch({ type: 'RENAME_CATEGORY', id, newName });
+    },
+    async deleteCategory(id) {
+      await api.deleteCategory(id);
+      dispatch({ type: 'DELETE_CATEGORY', id });
+    },
+    async addAccount(a) {
+      await api.addAccount(a);
+      // Accounts are typically added through CSV import (bulkAddTransactions) or internal flows.
+      // After adding, refetch to get the updated list.
+      const data = await api.fetchInit();
+      dispatch({ type: 'HYDRATE', data });
+    },
+    async renameAccount(id, newName) {
+      await api.renameAccount(id, newName);
+      dispatch({ type: 'RENAME_ACCOUNT', id, newName });
+    },
+    async deleteAccount(id) {
+      await api.deleteAccount(id);
+      dispatch({ type: 'SET_ACCOUNTS', accounts: [] }); // will re-fetch below
+      const data = await api.fetchInit();
+      dispatch({ type: 'HYDRATE', data });
+    },
+    async setAccountBalance(accountId, balance) {
+      await api.setAccountBalance(accountId, balance);
+      // Will be reflected in state via direct account balance update
+    },
+    async setDefaults(expId, incId, accId) {
+      await api.saveSettings({ defaultCategoryExpenseId: expId, defaultCategoryIncomeId: incId, defaultAccountId: accId });
+      dispatch({ type: 'SET_DEFAULTS', defaultCategoryExpenseId: expId, defaultCategoryIncomeId: incId, defaultAccountId: accId });
+    },
+    async addGoldAsset(a) {
+      await api.addGoldAsset(a);
+      dispatch({ type: 'ADD_GOLD_ASSET', asset: a });
+    },
+    async editGoldAsset(a) {
+      await api.editGoldAsset(a);
+      dispatch({ type: 'EDIT_GOLD_ASSET', asset: a });
+    },
+    async deleteGoldAsset(id) {
+      await api.deleteGoldAsset(id);
+      dispatch({ type: 'DELETE_GOLD_ASSET', id });
+    },
+    async addBudget(b) {
+      await api.addBudget(b);
+      dispatch({ type: 'ADD_BUDGET', budget: b });
+    },
+    async editBudget(b) {
+      await api.editBudget(b);
+      dispatch({ type: 'EDIT_BUDGET', budget: b });
+    },
+    async deleteBudget(id) {
+      await api.deleteBudget(id);
+      dispatch({ type: 'DELETE_BUDGET', id });
+    },
+    async restoreBackup(backup) {
+      await api.restoreBackup(backup);
+      dispatch({ type: 'RESTORE_BACKUP', backup });
+    },
+  }), []);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(ACCOUNTS_V2_KEY, JSON.stringify(state.accounts));
-    } catch { /* ignore */ }
-  }, [state.accounts]);
+  if (state.isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-950">
+        <p className="text-slate-400 text-sm">Loading...</p>
+      </div>
+    );
+  }
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(ACCOUNT_BALANCES_KEY, JSON.stringify(state.accountBalances));
-    } catch { /* ignore */ }
-  }, [state.accountBalances]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(DEFAULTS_KEY, JSON.stringify({
-        defaultCategoryExpenseId: state.defaultCategoryExpenseId,
-        defaultCategoryIncomeId: state.defaultCategoryIncomeId,
-        defaultAccountId: state.defaultAccountId,
-      }));
-    } catch { /* ignore */ }
-  }, [state.defaultCategoryExpenseId, state.defaultCategoryIncomeId, state.defaultAccountId]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(GOLD_ASSETS_KEY, JSON.stringify(state.goldAssets));
-    } catch { /* ignore */ }
-  }, [state.goldAssets]);
-
-  return <AppContext.Provider value={{ state, dispatch }}>{children}</AppContext.Provider>;
+  return <AppContext.Provider value={{ state, dispatch, actions }}>{children}</AppContext.Provider>;
 }
 
 export function useApp(): AppContextValue {

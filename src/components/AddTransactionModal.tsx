@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Account, Category, TransactionType, Transaction } from '../types';
 import { Combobox } from './Combobox';
-import { formatVND } from '../utils/formatters';
+import { formatVND, toYYYYMMDD } from '../utils/formatters';
 
 interface Draft {
   date: string;
@@ -45,7 +45,7 @@ function emptyDraft(
   defaultAccountId: string
 ): Draft {
   return {
-    date: new Date().toISOString().slice(0, 10),
+    date: toYYYYMMDD(new Date()),
     type: mode,
     categoryId: mode === 'Expense' ? defaultCategoryExpenseId : mode === 'Income' ? defaultCategoryIncomeId : '',
     accountId: defaultAccountId,

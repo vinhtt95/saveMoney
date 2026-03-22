@@ -1,5 +1,6 @@
 import { Account, Category, Transaction, TransactionType } from '../types';
 import { getCategoryIdByName, getAccountIdByName } from './lookup';
+import { toYYYYMMDD } from './formatters';
 
 export interface ParseCSVResult {
   transactions: Transaction[];
@@ -55,7 +56,11 @@ export function parseCSV(
 
     const [dateStr, typeStr, categoryName, accountName, transferToName, amountStr] = cols;
 
-    const date = new Date(dateStr);
+    // Parse date-only strings (YYYY-MM-DD) as local midnight to avoid UTC day-shift
+    const normalized = /^\d{4}-\d{2}-\d{2}$/.test(dateStr.trim())
+      ? dateStr.trim() + 'T00:00:00'
+      : dateStr.trim();
+    const date = new Date(normalized);
     if (isNaN(date.getTime())) return;
 
     const type = typeStr as TransactionType;
@@ -91,7 +96,7 @@ export function exportCSV(
 
   const header = 'Date, Transaction Type, Category, Account, Transfer To, Amount';
   const rows = transactions.map((tx) => {
-    const dateStr = tx.date.toISOString();
+    const dateStr = toYYYYMMDD(tx.date);
     const amountStr = tx.amount >= 0 ? `+${tx.amount}` : `${tx.amount}`;
     const category = catMap.get(tx.categoryId) ?? tx.categoryId;
     const account = accMap.get(tx.accountId) ?? tx.accountId;

@@ -28,7 +28,7 @@ function typeBadge(type: Transaction['type']) {
 }
 
 export function Categories() {
-  const { state, dispatch } = useApp();
+  const { state, actions } = useApp();
 
   const [activeTab, setActiveTab] = useState<'Expense' | 'Income'>('Expense');
   // selectedCategory now stores Category ID
@@ -76,7 +76,7 @@ export function Categories() {
     setAddError('');
   }
 
-  function handleAdd() {
+  async function handleAdd() {
     const name = newCategoryName.trim();
     if (!name) {
       setAddError('Tên danh mục không được trống');
@@ -87,13 +87,13 @@ export function Categories() {
       return;
     }
     const category = { id: crypto.randomUUID(), name, type: activeTab };
-    dispatch({ type: 'ADD_CATEGORY', category });
+    await actions.addCategory(category);
     setIsAdding(false);
     setNewCategoryName('');
     setAddError('');
   }
 
-  function handleRename(cat: Category) {
+  async function handleRename(cat: Category) {
     const newName = editingName.trim();
     if (!newName || newName === cat.name) {
       setEditingCategoryId(null);
@@ -103,11 +103,11 @@ export function Categories() {
       setEditingCategoryId(null);
       return;
     }
-    dispatch({ type: 'RENAME_CATEGORY', id: cat.id, newName });
+    await actions.renameCategory(cat.id, newName);
     setEditingCategoryId(null);
   }
 
-  function handleDelete(cat: Category) {
+  async function handleDelete(cat: Category) {
     const txCount = state.transactions.filter(
       (t) => t.categoryId === cat.id && t.type === activeTab
     ).length;
@@ -117,7 +117,7 @@ export function Categories() {
       );
       if (!confirmed) return;
     }
-    dispatch({ type: 'DELETE_CATEGORY', id: cat.id });
+    await actions.deleteCategory(cat.id);
     if (selectedCategoryId === cat.id) setSelectedCategoryId(null);
   }
 
