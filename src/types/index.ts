@@ -71,6 +71,36 @@ export interface DatabaseBackup {
   budgets: Budget[];
 }
 
+// --- Gold Price Types ---
+
+export interface GoldProductPrice {
+  name: string;          // Vietnamese product name
+  buyPrice: number;      // VND per lượng
+  sellPrice: number;     // VND per lượng
+}
+
+export interface GoldSourceData {
+  source: 'SJC' | 'BTMC';
+  products: GoldProductPrice[];
+  fetchedAt: string;     // ISO timestamp
+}
+
+export interface WorldGoldData {
+  spot: number;              // XAUUSD spot price, USD per troy oz
+  futures: number;           // GC=F futures price, USD per troy oz
+  usdvnd: number;            // VND per 1 USD
+  spotPerLuong: number;      // spot * (37.5/31.1035) * usdvnd
+  futuresPerLuong: number;   // futures * (37.5/31.1035) * usdvnd
+  fetchedAt: string;
+}
+
+export interface GoldPriceCache {
+  world: WorldGoldData | null;
+  sjc: GoldSourceData | null;
+  btmc: GoldSourceData | null;
+  cachedAt: string;
+}
+
 export interface AppState {
   transactions: Transaction[];
   filters: FilterState;

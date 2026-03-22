@@ -16,9 +16,30 @@ export default defineConfig(({mode}) => {
       },
     },
     server: {
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
-      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
+      proxy: {
+        '/api/gold-futures': {
+          target: 'https://query1.finance.yahoo.com',
+          changeOrigin: true,
+          rewrite: (p) => p.replace('/api/gold-futures', ''),
+          headers: { 'User-Agent': 'Mozilla/5.0' },
+        },
+        '/api/fx': {
+          target: 'https://open.er-api.com',
+          changeOrigin: true,
+          rewrite: (p) => p.replace('/api/fx', ''),
+        },
+        '/api/sjc': {
+          target: 'https://sjc.com.vn',
+          changeOrigin: true,
+          rewrite: (p) => p.replace('/api/sjc', ''),
+        },
+        '/api/btmc': {
+          target: 'https://btmc.vn',
+          changeOrigin: true,
+          rewrite: (p) => p.replace('/api/btmc', ''),
+        },
+      },
     },
   };
 });

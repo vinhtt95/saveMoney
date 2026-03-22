@@ -12,6 +12,7 @@ import { Settings } from './pages/Settings';
 import { Accounts } from './pages/Accounts';
 import { Categories } from './pages/Categories';
 import { Budget } from './pages/Budget';
+import { Gold } from './pages/Gold';
 import { AppProvider } from './context/AppContext';
 
 export default function App() {
@@ -27,6 +28,7 @@ export default function App() {
             <Route path="categories" element={<Categories />} />
             <Route path="budget" element={<Budget />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="gold" element={<Gold />} />
           </Route>
         </Routes>
       </BrowserRouter>
