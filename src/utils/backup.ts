@@ -1,4 +1,5 @@
-import { AppState, Budget, DatabaseBackup } from '../types';
+import { AppState, Budget, DatabaseBackup, DatabaseBackupV1 } from '../types';
+import { migrateBackupV1 } from './migration';
 
 const BUDGETS_KEY = 'savemoney_budgets';
 
@@ -13,17 +14,16 @@ export function exportDatabase(state: AppState): void {
   })();
 
   const backup: DatabaseBackup = {
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     transactions: state.transactions.map((t) => ({ ...t, date: t.date.toISOString() })),
-    expenseCategories: state.expenseCategories,
-    incomeCategories: state.incomeCategories,
+    categories: state.categories,
     accounts: state.accounts,
     accountBalances: state.accountBalances,
     defaults: {
-      defaultCategoryExpense: state.defaultCategoryExpense,
-      defaultCategoryIncome: state.defaultCategoryIncome,
-      defaultAccount: state.defaultAccount,
+      defaultCategoryExpenseId: state.defaultCategoryExpenseId,
+      defaultCategoryIncomeId: state.defaultCategoryIncomeId,
+      defaultAccountId: state.defaultAccountId,
     },
     budgets,
   };
@@ -46,12 +46,16 @@ export function readBackupFile(file: File): Promise<DatabaseBackup> {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const parsed = JSON.parse(e.target?.result as string) as DatabaseBackup;
+        const parsed = JSON.parse(e.target?.result as string) as DatabaseBackup | DatabaseBackupV1;
         if (typeof parsed.version !== 'number' || !Array.isArray(parsed.transactions)) {
           reject(new Error('Invalid backup file format.'));
           return;
         }
-        resolve(parsed);
+        if (parsed.version === 1) {
+          resolve(migrateBackupV1(parsed as DatabaseBackupV1));
+        } else {
+          resolve(parsed as DatabaseBackup);
+        }
       } catch {
         reject(new Error('Failed to parse backup file.'));
       }

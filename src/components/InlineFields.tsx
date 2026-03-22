@@ -1,5 +1,5 @@
 import React from 'react';
-import { TransactionType } from '../types';
+import { Account, Category, TransactionType } from '../types';
 import { Combobox } from './Combobox';
 
 export const TRANSACTION_TYPES: TransactionType[] = ['Expense', 'Income', 'Transfer', 'Account'];
@@ -7,19 +7,23 @@ export const TRANSACTION_TYPES: TransactionType[] = ['Expense', 'Income', 'Trans
 export interface Draft {
   date: string;
   type: TransactionType;
-  category: string;
-  account: string;
-  transferTo: string;
+  categoryId: string;
+  accountId: string;
+  transferToId: string;
   amountStr: string;
 }
 
-export function emptyDraft(defaultCategoryExpense = '', defaultCategoryIncome = '', defaultAccount = ''): Draft {
+export function emptyDraft(
+  defaultCategoryExpenseId = '',
+  defaultCategoryIncomeId = '',
+  defaultAccountId = ''
+): Draft {
   return {
     date: new Date().toISOString().slice(0, 10),
     type: 'Expense',
-    category: defaultCategoryExpense,
-    account: defaultAccount,
-    transferTo: '',
+    categoryId: defaultCategoryExpenseId,
+    accountId: defaultAccountId,
+    transferToId: '',
     amountStr: '',
   };
 }
@@ -33,17 +37,56 @@ export function InlineFields({
   expenseCategories,
   incomeCategories,
   allAccounts,
-  defaultCategoryExpense = '',
-  defaultCategoryIncome = '',
+  defaultCategoryExpenseId = '',
+  defaultCategoryIncomeId = '',
+  onNewCategory,
+  onNewAccount,
 }: {
   draft: Draft;
   onChange: (patch: Partial<Draft>) => void;
-  expenseCategories: string[];
-  incomeCategories: string[];
-  allAccounts: string[];
-  defaultCategoryExpense?: string;
-  defaultCategoryIncome?: string;
+  expenseCategories: Category[];
+  incomeCategories: Category[];
+  allAccounts: Account[];
+  defaultCategoryExpenseId?: string;
+  defaultCategoryIncomeId?: string;
+  onNewCategory?: (name: string, type: 'Expense' | 'Income') => string;
+  onNewAccount?: (name: string) => string;
 }) {
+  const expenseOpts = expenseCategories.map((c) => ({ value: c.id, label: c.name }));
+  const incomeOpts = incomeCategories.map((c) => ({ value: c.id, label: c.name }));
+  const accountOpts = allAccounts.map((a) => ({ value: a.id, label: a.name }));
+
+  function handleCategoryChange(v: string) {
+    const allCats = [...expenseCategories, ...incomeCategories];
+    if (allCats.some((c) => c.id === v)) {
+      onChange({ categoryId: v });
+    } else if (onNewCategory) {
+      const type = draft.type === 'Income' ? 'Income' : 'Expense';
+      const id = onNewCategory(v, type);
+      onChange({ categoryId: id });
+    }
+  }
+
+  function handleAccountChange(v: string) {
+    if (allAccounts.some((a) => a.id === v)) {
+      onChange({ accountId: v });
+    } else if (onNewAccount) {
+      const id = onNewAccount(v);
+      onChange({ accountId: id });
+    }
+  }
+
+  function handleTransferToChange(v: string) {
+    if (allAccounts.some((a) => a.id === v)) {
+      onChange({ transferToId: v });
+    } else if (onNewAccount) {
+      const id = onNewAccount(v);
+      onChange({ transferToId: id });
+    }
+  }
+
+  const categoryOpts = draft.type === 'Expense' ? expenseOpts : draft.type === 'Income' ? incomeOpts : [];
+
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
       {/* Type */}
@@ -55,8 +98,8 @@ export function InlineFields({
               key={t}
               type="button"
               onClick={() => {
-                const newCategory = t === 'Expense' ? defaultCategoryExpense : t === 'Income' ? defaultCategoryIncome : '';
-                onChange({ type: t, transferTo: '', category: newCategory });
+                const newCategoryId = t === 'Expense' ? defaultCategoryExpenseId : t === 'Income' ? defaultCategoryIncomeId : '';
+                onChange({ type: t, transferToId: '', categoryId: newCategoryId });
               }}
               className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-colors ${
                 draft.type === t
@@ -85,9 +128,9 @@ export function InlineFields({
       <div>
         <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Danh mục</p>
         <Combobox
-          value={draft.category}
-          onChange={(v) => onChange({ category: v })}
-          options={draft.type === 'Expense' ? expenseCategories : draft.type === 'Income' ? incomeCategories : []}
+          value={draft.categoryId}
+          onChange={handleCategoryChange}
+          options={categoryOpts}
           placeholder="Coffee, Transport..."
           allowCustom
         />
@@ -97,9 +140,9 @@ export function InlineFields({
       <div>
         <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Tài khoản</p>
         <Combobox
-          value={draft.account}
-          onChange={(v) => onChange({ account: v })}
-          options={allAccounts}
+          value={draft.accountId}
+          onChange={handleAccountChange}
+          options={accountOpts}
           placeholder="Tiền mặt..."
           allowCustom
         />
@@ -110,9 +153,9 @@ export function InlineFields({
         <div>
           <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Chuyển đến</p>
           <Combobox
-            value={draft.transferTo}
-            onChange={(v) => onChange({ transferTo: v })}
-            options={allAccounts}
+            value={draft.transferToId}
+            onChange={handleTransferToChange}
+            options={accountOpts}
             placeholder="Tài khoản đích..."
             allowCustom
           />

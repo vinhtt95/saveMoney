@@ -13,12 +13,13 @@ import {
   getCategoryMonthlyTrend,
 } from '../utils/analytics';
 import { formatVND, formatVNDShort, toYYYYMM } from '../utils/formatters';
+import { categoryName } from '../utils/lookup';
 
 const CATEGORY_COLORS = ['#144bb8', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
 export function Analytics() {
   const { state } = useApp();
-  const { transactions } = state;
+  const { transactions, categories } = state;
 
   const allTxs = transactions;
 
@@ -30,8 +31,8 @@ export function Analytics() {
   const [matrixTo, setMatrixTo] = useState(defaultTo || '');
   const [showTopN, setShowTopN] = useState(5);
 
-  const allCategories = useMemo(() => getCategoryBreakdown(getExpenses(allTxs)).map((c) => c.category), [allTxs]);
-  const [trendCategory, setTrendCategory] = useState(() => allCategories[0] || '');
+  const allCategoryIds = useMemo(() => getCategoryBreakdown(getExpenses(allTxs)).map((c) => c.categoryId), [allTxs]);
+  const [trendCategory, setTrendCategory] = useState(() => allCategoryIds[0] || '');
 
   const trendPeriods = useMemo(
     () => allPeriods.filter((p) => p >= matrixFrom && p <= matrixTo).slice().reverse(),
@@ -140,8 +141,8 @@ export function Analytics() {
                       labelFormatter={(label) => `Tháng ${label}`}
                     />
                     <Legend />
-                    {matrixCats.map((cat, i) => (
-                      <Bar key={cat} dataKey={cat} stackId="a" fill={CATEGORY_COLORS[i % CATEGORY_COLORS.length]} radius={i === matrixCats.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
+                    {matrixCats.map((catId, i) => (
+                      <Bar key={catId} dataKey={catId} name={categoryName(categories, catId)} stackId="a" fill={CATEGORY_COLORS[i % CATEGORY_COLORS.length]} radius={i === matrixCats.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
                     ))}
                   </BarChart>
                 </ResponsiveContainer>
@@ -158,7 +159,7 @@ export function Analytics() {
                 {trendCategory && (
                   <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/10 rounded-lg">
                     <div className="size-2.5 rounded-full bg-primary"></div>
-                    <span className="text-sm font-bold text-primary">{trendCategory}</span>
+                    <span className="text-sm font-bold text-primary">{categoryName(categories, trendCategory)}</span>
                   </div>
                 )}
               </div>
@@ -168,7 +169,7 @@ export function Analytics() {
                     <LineChart data={trendData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                       <XAxis dataKey="month" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
                       <YAxis tickFormatter={(v) => formatVNDShort(v)} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={72} />
-                      <Tooltip formatter={(value: number) => [formatVND(value), trendCategory]} labelFormatter={(label) => `Tháng ${label}`} />
+                      <Tooltip formatter={(value: number) => [formatVND(value), categoryName(categories, trendCategory)]} labelFormatter={(label) => `Tháng ${label}`} />
                       <Line type="monotone" dataKey="amount" stroke="#144bb8" strokeWidth={2} dot={{ r: 4, fill: '#144bb8' }} activeDot={{ r: 6 }} />
                     </LineChart>
                   </ResponsiveContainer>
@@ -198,22 +199,22 @@ export function Analytics() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {matrixCats.map((cat, ci) => {
-                      const isSelected = trendCategory === cat;
-                      const values = matrixData.map((row) => (row[cat] as number) || 0);
+                    {matrixCats.map((catId, ci) => {
+                      const isSelected = trendCategory === catId;
+                      const values = matrixData.map((row) => (row[catId] as number) || 0);
                       const first = values.find((v) => v > 0) || 0;
                       const last = values[values.length - 1];
                       const overallChange = first > 0 ? ((last - first) / first) * 100 : null;
                       return (
                         <tr
-                          key={cat}
-                          onClick={() => setTrendCategory(cat)}
+                          key={catId}
+                          onClick={() => setTrendCategory(catId)}
                           className={`cursor-pointer transition-colors ${isSelected ? 'bg-primary/5 dark:bg-primary/10' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
                         >
                           <td className={`px-4 py-3 sticky left-0 font-medium ${isSelected ? 'bg-primary/5 dark:bg-primary/10' : 'bg-white dark:bg-slate-900'}`}>
                             <div className="flex items-center gap-2">
                               <div className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: CATEGORY_COLORS[ci % CATEGORY_COLORS.length] }}></div>
-                              <span className={`truncate max-w-[110px] ${isSelected ? 'text-primary font-bold' : ''}`}>{cat}</span>
+                              <span className={`truncate max-w-[110px] ${isSelected ? 'text-primary font-bold' : ''}`}>{categoryName(categories, catId)}</span>
                               {isSelected && <span className="material-symbols-outlined text-xs text-primary">show_chart</span>}
                             </div>
                           </td>

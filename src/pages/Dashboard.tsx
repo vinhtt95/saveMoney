@@ -21,6 +21,8 @@ import {
   getCategoryMonthlyTrend,
 } from '../utils/analytics';
 import { formatVND, formatVNDShort, formatDate, formatMonth, toYYYYMM, toYYYYMMDD } from '../utils/formatters';
+import { categoryName, accountName } from '../utils/lookup';
+import { Category, Account } from '../types';
 
 const BUDGET_CAT_COLORS = ['#144bb8', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#ec4899'];
 
@@ -72,7 +74,7 @@ export function Dashboard() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Draft>(() => emptyDraft(state.defaultCategoryExpense, state.defaultCategoryIncome, state.defaultAccount));
+  const [draft, setDraft] = useState<Draft>(() => emptyDraft(state.defaultCategoryExpenseId, state.defaultCategoryIncomeId, state.defaultAccountId));
   const [editError, setEditError] = useState('');
 
   const allTxs = state.transactions;
@@ -143,11 +145,9 @@ export function Dashboard() {
     return groups;
   }, [periodTxs]);
 
-  const allCategories = useMemo(
-    () => [...state.expenseCategories, ...state.incomeCategories].sort(),
-    [state.expenseCategories, state.incomeCategories]
-  );
-  const allAccounts = state.accounts;
+  const { categories, accounts } = state;
+  const expenseCategories = useMemo(() => categories.filter((c) => c.type === 'Expense'), [categories]);
+  const incomeCategories = useMemo(() => categories.filter((c) => c.type === 'Income'), [categories]);
 
   function handleAddConfirm(tx: Transaction) {
     dispatch({ type: 'ADD_TRANSACTION', transaction: tx });
@@ -158,9 +158,9 @@ export function Dashboard() {
     return {
       date: `${tx.date.getFullYear()}-${String(tx.date.getMonth() + 1).padStart(2, '0')}-${String(tx.date.getDate()).padStart(2, '0')}`,
       type: tx.type,
-      category: tx.category,
-      account: tx.account,
-      transferTo: tx.transferTo,
+      categoryId: tx.categoryId,
+      accountId: tx.accountId,
+      transferToId: tx.transferToId,
       amountStr: String(Math.abs(tx.amount)),
     };
   }
@@ -168,17 +168,31 @@ export function Dashboard() {
   function draftToTx(d: Draft, id: string): Transaction | null {
     const amt = parseFloat(d.amountStr);
     const needsCategory = d.type !== 'Transfer';
-    if (!d.date || (needsCategory && !d.category.trim()) || !d.account.trim() || !d.amountStr || isNaN(amt) || amt <= 0) return null;
-    if (d.type === 'Transfer' && !d.transferTo.trim()) return null;
+    if (!d.date || (needsCategory && !d.categoryId) || !d.accountId || !d.amountStr || isNaN(amt) || amt <= 0) return null;
+    if (d.type === 'Transfer' && !d.transferToId) return null;
     return {
       id,
       date: new Date(d.date),
       type: d.type,
-      category: d.category.trim(),
-      account: d.account.trim(),
-      transferTo: d.transferTo.trim(),
+      categoryId: d.categoryId,
+      accountId: d.accountId,
+      transferToId: d.transferToId,
       amount: d.type === 'Expense' ? -Math.abs(amt) : Math.abs(amt),
     };
+  }
+
+  function handleNewCategory(name: string, type: 'Expense' | 'Income'): string {
+    const id = crypto.randomUUID();
+    const cat: Category = { id, name, type };
+    dispatch({ type: 'ADD_CATEGORY', category: cat });
+    return id;
+  }
+
+  function handleNewAccount(name: string): string {
+    const id = crypto.randomUUID();
+    const acc: Account = { id, name };
+    dispatch({ type: 'SET_ACCOUNTS', accounts: [...accounts, acc] });
+    return id;
   }
 
   function startEdit(tx: Transaction) {
@@ -216,7 +230,7 @@ export function Dashboard() {
     return allTxs.filter(
       (t) =>
         t.type === 'Expense' &&
-        selectedBudget.categories.includes(t.category) &&
+        selectedBudget.categoryIds.includes(t.categoryId) &&
         toYYYYMMDD(t.date) >= selectedBudget.dateStart &&
         toYYYYMMDD(t.date) <= selectedBudget.dateEnd
     );
@@ -436,7 +450,7 @@ export function Dashboard() {
                   {budgetMatrixCats.length > 0 ? (
                     (() => {
                       const catMap = new Map<string, number>();
-                      budgetMatchingTxs.forEach((t) => catMap.set(t.category, (catMap.get(t.category) ?? 0) + Math.abs(t.amount)));
+                      budgetMatchingTxs.forEach((t) => catMap.set(t.categoryId, (catMap.get(t.categoryId) ?? 0) + Math.abs(t.amount)));
                       return [...catMap.entries()].sort((a, b) => b[1] - a[1]).map(([cat, val], i) => (
                         <div
                           key={cat}
@@ -470,7 +484,7 @@ export function Dashboard() {
                       {budgetTrendCat && (
                         <div className="flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 rounded-lg">
                           <div className="size-2 rounded-full bg-primary" />
-                          <span className="text-xs font-bold text-primary">{budgetTrendCat}</span>
+                          <span className="text-xs font-bold text-primary">{categoryName(categories, budgetTrendCat)}</span>
                         </div>
                       )}
                     </div>
@@ -492,7 +506,7 @@ export function Dashboard() {
                         <LineChart data={budgetTrendData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                           <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
                           <YAxis tickFormatter={(v) => formatVNDShort(v)} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={72} />
-                          <Tooltip formatter={(value: number) => [formatVND(value), budgetTrendCat]} />
+                          <Tooltip formatter={(value: number) => [formatVND(value), categoryName(categories, budgetTrendCat)]} />
                           <Line type="monotone" dataKey="amount" stroke="#144bb8" strokeWidth={2} dot={{ r: 3, fill: '#144bb8' }} activeDot={{ r: 5 }} />
                         </LineChart>
                       </ResponsiveContainer>
@@ -516,19 +530,19 @@ export function Dashboard() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                        {budgetMatrixCats.map((cat, ci) => {
-                          const isSel = budgetTrendCat === cat;
-                          const total = budgetMatrixData.reduce((s, row) => s + ((row[cat] as number) || 0), 0);
+                        {budgetMatrixCats.map((catId, ci) => {
+                          const isSel = budgetTrendCat === catId;
+                          const total = budgetMatrixData.reduce((s, row) => s + ((row[catId] as number) || 0), 0);
                           return (
                             <tr
-                              key={cat}
-                              onClick={() => setBudgetTrendCat(cat)}
+                              key={catId}
+                              onClick={() => setBudgetTrendCat(catId)}
                               className={`cursor-pointer transition-colors ${isSel ? 'bg-primary/5 dark:bg-primary/10' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
                             >
                               <td className="px-3 py-2.5 font-medium">
                                 <div className="flex items-center gap-1.5">
                                   <div className="size-2 rounded-full shrink-0" style={{ backgroundColor: BUDGET_CAT_COLORS[ci % BUDGET_CAT_COLORS.length] }} />
-                                  <span className={`truncate text-xs ${isSel ? 'text-primary font-bold' : 'text-slate-700 dark:text-slate-300'}`}>{cat}</span>
+                                  <span className={`truncate text-xs ${isSel ? 'text-primary font-bold' : 'text-slate-700 dark:text-slate-300'}`}>{categoryName(categories, catId)}</span>
                                 </div>
                               </td>
                               <td className={`px-3 py-2.5 text-right text-xs font-bold whitespace-nowrap ${isSel ? 'text-primary' : 'text-slate-700 dark:text-slate-300'}`}>
@@ -592,15 +606,16 @@ export function Dashboard() {
           {topCategories.length > 0 ? (
             <div className="space-y-4">
               {topCategories.map((cat) => {
-                const icon = getCategoryIcon(cat.category);
+                const name = categoryName(categories, cat.categoryId);
+                const icon = getCategoryIcon(name);
                 return (
-                <div key={cat.category} className="space-y-2">
+                <div key={cat.categoryId} className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
                       <div className={`size-7 rounded-lg ${icon.bg} ${icon.color} flex items-center justify-center`}>
                         <span className="material-symbols-outlined text-base">{icon.icon}</span>
                       </div>
-                      <span className="font-medium text-slate-700 dark:text-slate-300">{cat.category}</span>
+                      <span className="font-medium text-slate-700 dark:text-slate-300">{name}</span>
                     </div>
                     <div className="text-right">
                       <span className="text-slate-900 dark:text-white font-bold">{formatVNDShort(cat.total)}</span>
@@ -646,12 +661,14 @@ export function Dashboard() {
               open={showAddForm}
               onClose={() => setShowAddForm(false)}
               onConfirm={handleAddConfirm}
-              expenseCategories={state.expenseCategories}
-              incomeCategories={state.incomeCategories}
-              allAccounts={allAccounts}
-              defaultCategoryExpense={state.defaultCategoryExpense}
-              defaultCategoryIncome={state.defaultCategoryIncome}
-              defaultAccount={state.defaultAccount}
+              expenseCategories={expenseCategories}
+              incomeCategories={incomeCategories}
+              allAccounts={accounts}
+              defaultCategoryExpenseId={state.defaultCategoryExpenseId}
+              defaultCategoryIncomeId={state.defaultCategoryIncomeId}
+              defaultAccountId={state.defaultAccountId}
+              onNewCategory={handleNewCategory}
+              onNewAccount={handleNewAccount}
             />
           </div>
         )}
@@ -684,7 +701,9 @@ export function Dashboard() {
                     </td>
                   </tr>
                   {group.txs.map((tx) => {
-                    const icon = getCategoryIcon(tx.category);
+                    const txCatName = categoryName(categories, tx.categoryId);
+                    const txAccName = accountName(accounts, tx.accountId);
+                    const icon = getCategoryIcon(txCatName);
                     const isExpense = tx.type === 'Expense';
                     const isExpanded = expandedRow === tx.id;
                     return (
@@ -706,10 +725,10 @@ export function Dashboard() {
                               <div className={`size-7 rounded ${icon.bg} ${icon.color} flex items-center justify-center`}>
                                 <span className="material-symbols-outlined text-base">{icon.icon}</span>
                               </div>
-                              <span className="text-sm font-medium">{tx.category}</span>
+                              <span className="text-sm font-medium">{txCatName}</span>
                             </div>
                           </td>
-                          <td className="px-6 py-3 text-sm text-slate-500 dark:text-slate-400">{tx.account}</td>
+                          <td className="px-6 py-3 text-sm text-slate-500 dark:text-slate-400">{txAccName}</td>
                           <td className={`px-6 py-3 text-right text-sm font-bold ${isExpense ? 'text-rose-600' : 'text-emerald-600'}`}>
                             {isExpense ? '-' : '+'}{formatVND(tx.amount)}
                           </td>
@@ -721,9 +740,9 @@ export function Dashboard() {
                               <InlineEditForm
                                 draft={draft}
                                 onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
-                                expenseCategories={state.expenseCategories}
-                                incomeCategories={state.incomeCategories}
-                                allAccounts={allAccounts}
+                                expenseCategories={expenseCategories}
+                                incomeCategories={incomeCategories}
+                                allAccounts={accounts}
                                 error={editError}
                                 onSave={() => confirmEdit(tx.id)}
                                 onCancel={() => { setExpandedRow(null); cancelEdit(); }}
@@ -733,6 +752,8 @@ export function Dashboard() {
                                     setExpandedRow(null);
                                   }
                                 }}
+                                onNewCategory={handleNewCategory}
+                                onNewAccount={handleNewAccount}
                               />
                             </td>
                           </tr>

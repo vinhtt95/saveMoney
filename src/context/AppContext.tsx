@@ -1,39 +1,35 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
-import { AppState, DatabaseBackup, FilterState, Transaction } from '../types';
+import { Account, AppState, Category, DatabaseBackup, FilterState, Transaction } from '../types';
 import { getAvailablePeriods } from '../utils/analytics';
 import { toYYYYMM } from '../utils/formatters';
+import { migrateStorageV1ToV2, CATEGORIES_V2_KEY, ACCOUNTS_V2_KEY } from '../utils/migration';
 
 const STORAGE_KEY = 'savemoney_transactions';
-const CATEGORIES_KEY = 'savemoney_categories'; // legacy key (migration)
-const EXPENSE_CATEGORIES_KEY = 'savemoney_expense_categories';
-const INCOME_CATEGORIES_KEY = 'savemoney_income_categories';
-const ACCOUNTS_KEY = 'savemoney_accounts';
 const ACCOUNT_BALANCES_KEY = 'savemoney_account_balances';
 const DEFAULTS_KEY = 'savemoney_defaults';
 
 type Action =
-  | { type: 'IMPORT'; transactions: Transaction[] }
+  | { type: 'IMPORT'; transactions: Transaction[]; newCategories?: Category[]; newAccounts?: Account[] }
   | { type: 'CLEAR' }
   | { type: 'SET_FILTER'; filter: Partial<FilterState> }
   | { type: 'SET_PERIOD'; period: string }
   | { type: 'DELETE_TRANSACTION'; id: string }
   | { type: 'ADD_TRANSACTION'; transaction: Transaction }
   | { type: 'EDIT_TRANSACTION'; transaction: Transaction }
-  | { type: 'SET_EXPENSE_CATEGORIES'; categories: string[] }
-  | { type: 'SET_INCOME_CATEGORIES'; categories: string[] }
-  | { type: 'ADD_CATEGORY'; name: string; categoryType: 'Expense' | 'Income' }
-  | { type: 'RENAME_CATEGORY'; oldName: string; newName: string; categoryType: 'Expense' | 'Income' }
-  | { type: 'DELETE_CATEGORY'; name: string; categoryType: 'Expense' | 'Income' }
-  | { type: 'SET_ACCOUNTS'; accounts: string[] }
+  | { type: 'SET_CATEGORIES'; categories: Category[] }
+  | { type: 'ADD_CATEGORY'; category: Category }
+  | { type: 'RENAME_CATEGORY'; id: string; newName: string }
+  | { type: 'DELETE_CATEGORY'; id: string }
+  | { type: 'SET_ACCOUNTS'; accounts: Account[] }
   | { type: 'SET_ACCOUNT_BALANCES'; accountBalances: Record<string, number> }
-  | { type: 'RENAME_ACCOUNT'; oldName: string; newName: string }
-  | { type: 'SET_DEFAULTS'; defaultCategoryExpense: string; defaultCategoryIncome: string; defaultAccount: string }
+  | { type: 'RENAME_ACCOUNT'; id: string; newName: string }
+  | { type: 'SET_DEFAULTS'; defaultCategoryExpenseId: string; defaultCategoryIncomeId: string; defaultAccountId: string }
   | { type: 'RESTORE_BACKUP'; backup: Omit<DatabaseBackup, 'budgets'> };
 
 const defaultFilters: FilterState = {
   search: '',
-  categories: [],
-  accounts: [],
+  categoryIds: [],
+  accountIds: [],
   types: [],
   dateStart: null,
   dateEnd: null,
@@ -43,13 +39,12 @@ const initialState: AppState = {
   transactions: [],
   filters: defaultFilters,
   selectedPeriod: toYYYYMM(new Date()),
-  expenseCategories: [],
-  incomeCategories: [],
+  categories: [],
   accounts: [],
   accountBalances: {},
-  defaultCategoryExpense: '',
-  defaultCategoryIncome: '',
-  defaultAccount: '',
+  defaultCategoryExpenseId: '',
+  defaultCategoryIncomeId: '',
+  defaultAccountId: '',
 };
 
 function serializeTransactions(txs: Transaction[]): string {
@@ -65,109 +60,63 @@ function deserializeTransactions(raw: string): Transaction[] {
   }
 }
 
-function loadStringList(key: string): string[] {
+function loadJSON<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);
-    if (raw) return JSON.parse(raw) as string[];
-  } catch {
-    // ignore
-  }
-  return [];
-}
-
-function loadDefaults(): { defaultCategoryExpense: string; defaultCategoryIncome: string; defaultAccount: string } {
-  try {
-    const raw = localStorage.getItem(DEFAULTS_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as Record<string, string>;
-      return {
-        defaultCategoryExpense: parsed.defaultCategoryExpense ?? parsed.defaultCategory ?? '',
-        defaultCategoryIncome: parsed.defaultCategoryIncome ?? '',
-        defaultAccount: parsed.defaultAccount ?? '',
-      };
-    }
+    if (raw) return JSON.parse(raw) as T;
   } catch { /* ignore */ }
-  return { defaultCategoryExpense: '', defaultCategoryIncome: '', defaultAccount: '' };
+  return fallback;
 }
 
-function loadAccountBalances(): Record<string, number> {
+function loadFromStorage(): Pick<
+  AppState,
+  'transactions' | 'categories' | 'accounts' | 'accountBalances' |
+  'defaultCategoryExpenseId' | 'defaultCategoryIncomeId' | 'defaultAccountId'
+> {
   try {
-    const raw = localStorage.getItem(ACCOUNT_BALANCES_KEY);
-    if (raw) return JSON.parse(raw) as Record<string, number>;
-  } catch { /* ignore */ }
-  return {};
-}
+    // Run v1→v2 migration if needed (idempotent)
+    migrateStorageV1ToV2();
 
-function loadFromStorage(): Pick<AppState, 'transactions' | 'expenseCategories' | 'incomeCategories' | 'accounts' | 'accountBalances' | 'defaultCategoryExpense' | 'defaultCategoryIncome' | 'defaultAccount'> {
-  try {
     const raw = localStorage.getItem(STORAGE_KEY);
     const transactions = raw ? deserializeTransactions(raw) : [];
-    const defaults = loadDefaults();
 
-    // Check if new keys already exist
-    const hasNewKeys =
-      localStorage.getItem(EXPENSE_CATEGORIES_KEY) !== null ||
-      localStorage.getItem(INCOME_CATEGORIES_KEY) !== null;
-
-    let expenseCategories: string[];
-    let incomeCategories: string[];
-
-    if (hasNewKeys) {
-      expenseCategories = loadStringList(EXPENSE_CATEGORIES_KEY);
-      incomeCategories = loadStringList(INCOME_CATEGORIES_KEY);
-    } else {
-      // Migrate from legacy flat categories list
-      const legacyCategories = loadStringList(CATEGORIES_KEY);
-      if (legacyCategories.length > 0) {
-        const expenseSet = new Set<string>();
-        const incomeSet = new Set<string>();
-        const ambiguousSet = new Set<string>();
-        transactions.forEach((t) => {
-          if (t.category) {
-            if (t.type === 'Expense') expenseSet.add(t.category);
-            else if (t.type === 'Income') incomeSet.add(t.category);
-          }
-        });
-        legacyCategories.forEach((cat) => {
-          const isExpense = expenseSet.has(cat);
-          const isIncome = incomeSet.has(cat);
-          if (isExpense && !isIncome) expenseSet.add(cat);
-          else if (isIncome && !isExpense) incomeSet.add(cat);
-          else ambiguousSet.add(cat); // used in both or unused → put in expense
-        });
-        // Combine: known expense + ambiguous into expense, known income into income
-        expenseCategories = [...new Set([...legacyCategories.filter((c) => !incomeSet.has(c) || expenseSet.has(c)), ...ambiguousSet])].sort();
-        incomeCategories = [...incomeSet].filter((c) => !expenseSet.has(c)).sort();
-        // Ensure all legacy categories are accounted for
-        const allAssigned = new Set([...expenseCategories, ...incomeCategories]);
-        legacyCategories.forEach((c) => {
-          if (!allAssigned.has(c)) expenseCategories.push(c);
-        });
-        expenseCategories = [...new Set(expenseCategories)].sort();
-        incomeCategories = [...new Set(incomeCategories)].sort();
-      } else {
-        expenseCategories = [];
-        incomeCategories = [];
-      }
-    }
+    const categories = loadJSON<Category[]>(CATEGORIES_V2_KEY, []);
+    const accounts = loadJSON<Account[]>(ACCOUNTS_V2_KEY, []);
+    const accountBalances = loadJSON<Record<string, number>>(ACCOUNT_BALANCES_KEY, {});
+    const defaults = loadJSON<Record<string, string>>(DEFAULTS_KEY, {});
 
     return {
       transactions,
-      expenseCategories,
-      incomeCategories,
-      accounts: loadStringList(ACCOUNTS_KEY),
-      accountBalances: loadAccountBalances(),
-      ...defaults,
+      categories,
+      accounts,
+      accountBalances,
+      defaultCategoryExpenseId: defaults.defaultCategoryExpenseId ?? '',
+      defaultCategoryIncomeId: defaults.defaultCategoryIncomeId ?? '',
+      defaultAccountId: defaults.defaultAccountId ?? '',
     };
   } catch {
-    return { transactions: [], expenseCategories: [], incomeCategories: [], accounts: [], accountBalances: {}, defaultCategoryExpense: '', defaultCategoryIncome: '', defaultAccount: '' };
+    return {
+      transactions: [],
+      categories: [],
+      accounts: [],
+      accountBalances: {},
+      defaultCategoryExpenseId: '',
+      defaultCategoryIncomeId: '',
+      defaultAccountId: '',
+    };
   }
 }
 
-function mergeUnique(existing: string[], incoming: string[]): string[] {
-  const set = new Set(existing);
-  incoming.forEach((v) => { if (v) set.add(v); });
-  return [...set].sort();
+function mergeCategories(existing: Category[], incoming: Category[]): Category[] {
+  const map = new Map(existing.map((c) => [c.id, c]));
+  incoming.forEach((c) => { if (!map.has(c.id)) map.set(c.id, c); });
+  return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function mergeAccounts(existing: Account[], incoming: Account[]): Account[] {
+  const map = new Map(existing.map((a) => [a.id, a]));
+  incoming.forEach((a) => { if (!map.has(a.id)) map.set(a.id, a); });
+  return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function reducer(state: AppState, action: Action): AppState {
@@ -181,26 +130,18 @@ function reducer(state: AppState, action: Action): AppState {
       const periods = getAvailablePeriods(merged);
       const latestPeriod = periods[0] || toYYYYMM(new Date());
 
-      // Auto-detect and split categories by transaction type
-      const newExpenseCategories = mergeUnique(
-        state.expenseCategories,
-        action.transactions.filter((t) => t.type === 'Expense' && t.category).map((t) => t.category)
-      );
-      const newIncomeCategories = mergeUnique(
-        state.incomeCategories,
-        action.transactions.filter((t) => t.type === 'Income' && t.category).map((t) => t.category)
-      );
+      const newCategories = action.newCategories
+        ? mergeCategories(state.categories, action.newCategories)
+        : state.categories;
+      const newAccounts = action.newAccounts
+        ? mergeAccounts(state.accounts, action.newAccounts)
+        : state.accounts;
 
-      const newAccounts = mergeUnique(
-        state.accounts,
-        action.transactions.flatMap((t) => [t.account, t.transferTo]).filter(Boolean)
-      );
       return {
         ...state,
         transactions: merged,
         selectedPeriod: latestPeriod,
-        expenseCategories: newExpenseCategories,
-        incomeCategories: newIncomeCategories,
+        categories: newCategories,
         accounts: newAccounts,
       };
     }
@@ -227,62 +168,46 @@ function reducer(state: AppState, action: Action): AppState {
           t.id === action.transaction.id ? action.transaction : t
         ),
       };
-    case 'SET_EXPENSE_CATEGORIES':
-      return { ...state, expenseCategories: action.categories };
-    case 'SET_INCOME_CATEGORIES':
-      return { ...state, incomeCategories: action.categories };
+    case 'SET_CATEGORIES':
+      return { ...state, categories: action.categories };
     case 'ADD_CATEGORY': {
-      const { name, categoryType } = action;
-      if (categoryType === 'Expense') {
-        if (state.expenseCategories.includes(name)) return state;
-        return { ...state, expenseCategories: [...state.expenseCategories, name].sort() };
-      } else {
-        if (state.incomeCategories.includes(name)) return state;
-        return { ...state, incomeCategories: [...state.incomeCategories, name].sort() };
-      }
+      if (state.categories.some((c) => c.id === action.category.id)) return state;
+      return {
+        ...state,
+        categories: [...state.categories, action.category].sort((a, b) => a.name.localeCompare(b.name)),
+      };
     }
     case 'RENAME_CATEGORY': {
-      const { oldName, newName, categoryType } = action;
-      const updatedTransactions = state.transactions.map((t) =>
-        t.category === oldName && t.type === categoryType ? { ...t, category: newName } : t
-      );
-      if (categoryType === 'Expense') {
-        const updated = state.expenseCategories.map((c) => (c === oldName ? newName : c)).sort();
-        return { ...state, expenseCategories: updated, transactions: updatedTransactions };
-      } else {
-        const updated = state.incomeCategories.map((c) => (c === oldName ? newName : c)).sort();
-        return { ...state, incomeCategories: updated, transactions: updatedTransactions };
-      }
+      // No transaction updates needed — transactions reference by ID
+      return {
+        ...state,
+        categories: state.categories.map((c) =>
+          c.id === action.id ? { ...c, name: action.newName } : c
+        ).sort((a, b) => a.name.localeCompare(b.name)),
+      };
     }
-    case 'DELETE_CATEGORY': {
-      const { name, categoryType } = action;
-      if (categoryType === 'Expense') {
-        return { ...state, expenseCategories: state.expenseCategories.filter((c) => c !== name) };
-      } else {
-        return { ...state, incomeCategories: state.incomeCategories.filter((c) => c !== name) };
-      }
-    }
+    case 'DELETE_CATEGORY':
+      return { ...state, categories: state.categories.filter((c) => c.id !== action.id) };
     case 'SET_ACCOUNTS':
       return { ...state, accounts: action.accounts };
     case 'SET_ACCOUNT_BALANCES':
       return { ...state, accountBalances: action.accountBalances };
-    case 'SET_DEFAULTS':
-      return { ...state, defaultCategoryExpense: action.defaultCategoryExpense, defaultCategoryIncome: action.defaultCategoryIncome, defaultAccount: action.defaultAccount };
     case 'RENAME_ACCOUNT': {
-      const { oldName, newName } = action;
-      const newAccounts = state.accounts.map((a) => (a === oldName ? newName : a));
-      const newBalances = { ...state.accountBalances };
-      if (oldName in newBalances) {
-        newBalances[newName] = newBalances[oldName];
-        delete newBalances[oldName];
-      }
-      const newTransactions = state.transactions.map((t) => ({
-        ...t,
-        account: t.account === oldName ? newName : t.account,
-        transferTo: t.transferTo === oldName ? newName : t.transferTo,
-      }));
-      return { ...state, accounts: newAccounts, accountBalances: newBalances, transactions: newTransactions };
+      // No transaction updates needed — transactions reference by ID
+      return {
+        ...state,
+        accounts: state.accounts.map((a) =>
+          a.id === action.id ? { ...a, name: action.newName } : a
+        ).sort((a, b) => a.name.localeCompare(b.name)),
+      };
     }
+    case 'SET_DEFAULTS':
+      return {
+        ...state,
+        defaultCategoryExpenseId: action.defaultCategoryExpenseId,
+        defaultCategoryIncomeId: action.defaultCategoryIncomeId,
+        defaultAccountId: action.defaultAccountId,
+      };
     case 'RESTORE_BACKUP': {
       const { backup } = action;
       const transactions = backup.transactions.map((t) => ({ ...t, date: new Date(t.date) }));
@@ -291,13 +216,12 @@ function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         transactions,
-        expenseCategories: backup.expenseCategories,
-        incomeCategories: backup.incomeCategories,
+        categories: backup.categories,
         accounts: backup.accounts,
         accountBalances: backup.accountBalances,
-        defaultCategoryExpense: backup.defaults.defaultCategoryExpense,
-        defaultCategoryIncome: backup.defaults.defaultCategoryIncome,
-        defaultAccount: backup.defaults.defaultAccount,
+        defaultCategoryExpenseId: backup.defaults.defaultCategoryExpenseId,
+        defaultCategoryIncomeId: backup.defaults.defaultCategoryIncomeId,
+        defaultAccountId: backup.defaults.defaultAccountId,
         selectedPeriod: latestPeriod,
         filters: defaultFilters,
       };
@@ -324,26 +248,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, serializeTransactions(state.transactions));
-    } catch {
-      // ignore quota errors
-    }
+    } catch { /* ignore quota errors */ }
   }, [state.transactions]);
 
   useEffect(() => {
     try {
-      localStorage.setItem(EXPENSE_CATEGORIES_KEY, JSON.stringify(state.expenseCategories));
+      localStorage.setItem(CATEGORIES_V2_KEY, JSON.stringify(state.categories));
     } catch { /* ignore */ }
-  }, [state.expenseCategories]);
+  }, [state.categories]);
 
   useEffect(() => {
     try {
-      localStorage.setItem(INCOME_CATEGORIES_KEY, JSON.stringify(state.incomeCategories));
-    } catch { /* ignore */ }
-  }, [state.incomeCategories]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(state.accounts));
+      localStorage.setItem(ACCOUNTS_V2_KEY, JSON.stringify(state.accounts));
     } catch { /* ignore */ }
   }, [state.accounts]);
 
@@ -355,9 +271,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     try {
-      localStorage.setItem(DEFAULTS_KEY, JSON.stringify({ defaultCategoryExpense: state.defaultCategoryExpense, defaultCategoryIncome: state.defaultCategoryIncome, defaultAccount: state.defaultAccount }));
+      localStorage.setItem(DEFAULTS_KEY, JSON.stringify({
+        defaultCategoryExpenseId: state.defaultCategoryExpenseId,
+        defaultCategoryIncomeId: state.defaultCategoryIncomeId,
+        defaultAccountId: state.defaultAccountId,
+      }));
     } catch { /* ignore */ }
-  }, [state.defaultCategoryExpense, state.defaultCategoryIncome, state.defaultAccount]);
+  }, [state.defaultCategoryExpenseId, state.defaultCategoryIncomeId, state.defaultAccountId]);
 
   return <AppContext.Provider value={{ state, dispatch }}>{children}</AppContext.Provider>;
 }

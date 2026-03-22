@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Account, Category } from '../types';
 import { Combobox } from './Combobox';
 import { Draft } from './InlineFields';
 import { formatVND } from '../utils/formatters';
@@ -32,13 +33,15 @@ const fieldCls =
 interface Props {
   draft: Draft;
   onChange: (patch: Partial<Draft>) => void;
-  expenseCategories: string[];
-  incomeCategories: string[];
-  allAccounts: string[];
+  expenseCategories: Category[];
+  incomeCategories: Category[];
+  allAccounts: Account[];
   error?: string;
   onSave: () => void;
   onCancel: () => void;
   onDelete: () => void;
+  onNewCategory?: (name: string, type: 'Expense' | 'Income') => string;
+  onNewAccount?: (name: string) => string;
 }
 
 export function InlineEditForm({
@@ -51,6 +54,8 @@ export function InlineEditForm({
   onSave,
   onCancel,
   onDelete,
+  onNewCategory,
+  onNewAccount,
 }: Props) {
   const [amountFocused, setAmountFocused] = useState(false);
   const mode = (draft.type === 'Account' ? 'Expense' : draft.type) as Mode;
@@ -59,6 +64,40 @@ export function InlineEditForm({
     !amountFocused && draft.amountStr
       ? Number(draft.amountStr).toLocaleString('vi-VN')
       : draft.amountStr;
+
+  const expenseOpts = expenseCategories.map((c) => ({ value: c.id, label: c.name }));
+  const incomeOpts = incomeCategories.map((c) => ({ value: c.id, label: c.name }));
+  const accountOpts = allAccounts.map((a) => ({ value: a.id, label: a.name }));
+  const categoryOpts = draft.type === 'Expense' ? expenseOpts : incomeOpts;
+
+  function handleCategoryChange(v: string) {
+    const allCats = [...expenseCategories, ...incomeCategories];
+    if (allCats.some((c) => c.id === v)) {
+      onChange({ categoryId: v });
+    } else if (onNewCategory) {
+      const type = draft.type === 'Income' ? 'Income' : 'Expense';
+      const id = onNewCategory(v, type);
+      onChange({ categoryId: id });
+    }
+  }
+
+  function handleAccountChange(v: string) {
+    if (allAccounts.some((a) => a.id === v)) {
+      onChange({ accountId: v });
+    } else if (onNewAccount) {
+      const id = onNewAccount(v);
+      onChange({ accountId: id });
+    }
+  }
+
+  function handleTransferToChange(v: string) {
+    if (allAccounts.some((a) => a.id === v)) {
+      onChange({ transferToId: v });
+    } else if (onNewAccount) {
+      const id = onNewAccount(v);
+      onChange({ transferToId: id });
+    }
+  }
 
   return (
     <div className={`bg-white dark:bg-slate-900 rounded-xl shadow-sm ${styles.accent}`}>
@@ -71,13 +110,13 @@ export function InlineEditForm({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                const newCategory =
+                const newCategoryId =
                   m === 'Expense'
-                    ? (expenseCategories[0] ?? '')
+                    ? (expenseCategories[0]?.id ?? '')
                     : m === 'Income'
-                    ? (incomeCategories[0] ?? '')
+                    ? (incomeCategories[0]?.id ?? '')
                     : '';
-                onChange({ type: m, category: newCategory, transferTo: '' });
+                onChange({ type: m, categoryId: newCategoryId, transferToId: '' });
               }}
               className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all ${
                 mode === m
@@ -119,11 +158,11 @@ export function InlineEditForm({
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Từ tài khoản <span className="text-rose-400">*</span></p>
-                <Combobox value={draft.account} onChange={(v) => onChange({ account: v })} options={allAccounts} placeholder="Tài khoản nguồn..." allowCustom />
+                <Combobox value={draft.accountId} onChange={handleAccountChange} options={accountOpts} placeholder="Tài khoản nguồn..." allowCustom />
               </div>
               <div>
                 <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Đến tài khoản <span className="text-rose-400">*</span></p>
-                <Combobox value={draft.transferTo} onChange={(v) => onChange({ transferTo: v })} options={allAccounts} placeholder="Tài khoản đích..." allowCustom />
+                <Combobox value={draft.transferToId} onChange={handleTransferToChange} options={accountOpts} placeholder="Tài khoản đích..." allowCustom />
               </div>
               <div>
                 <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Ngày <span className="text-rose-400">*</span></p>
@@ -135,16 +174,16 @@ export function InlineEditForm({
               <div>
                 <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Danh mục <span className="text-rose-400">*</span></p>
                 <Combobox
-                  value={draft.category}
-                  onChange={(v) => onChange({ category: v })}
-                  options={draft.type === 'Expense' ? expenseCategories : incomeCategories}
+                  value={draft.categoryId}
+                  onChange={handleCategoryChange}
+                  options={categoryOpts}
                   placeholder="Coffee, Transport..."
                   allowCustom
                 />
               </div>
               <div>
                 <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Tài khoản <span className="text-rose-400">*</span></p>
-                <Combobox value={draft.account} onChange={(v) => onChange({ account: v })} options={allAccounts} placeholder="Tiền mặt..." allowCustom />
+                <Combobox value={draft.accountId} onChange={handleAccountChange} options={accountOpts} placeholder="Tiền mặt..." allowCustom />
               </div>
               <div>
                 <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Ngày <span className="text-rose-400">*</span></p>

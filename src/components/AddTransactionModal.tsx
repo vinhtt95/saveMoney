@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
-import { TransactionType, Transaction } from '../types';
+import { Account, Category, TransactionType, Transaction } from '../types';
 import { Combobox } from './Combobox';
 import { formatVND } from '../utils/formatters';
 
 interface Draft {
   date: string;
   type: TransactionType;
-  category: string;
-  account: string;
-  transferTo: string;
+  categoryId: string;
+  accountId: string;
+  transferToId: string;
   amountStr: string;
 }
 
@@ -40,32 +40,32 @@ const AMOUNT_COLOR: Record<Mode, string> = {
 
 function emptyDraft(
   mode: Mode,
-  defaultCategoryExpense: string,
-  defaultCategoryIncome: string,
-  defaultAccount: string
+  defaultCategoryExpenseId: string,
+  defaultCategoryIncomeId: string,
+  defaultAccountId: string
 ): Draft {
   return {
     date: new Date().toISOString().slice(0, 10),
     type: mode,
-    category: mode === 'Expense' ? defaultCategoryExpense : mode === 'Income' ? defaultCategoryIncome : '',
-    account: defaultAccount,
-    transferTo: '',
+    categoryId: mode === 'Expense' ? defaultCategoryExpenseId : mode === 'Income' ? defaultCategoryIncomeId : '',
+    accountId: defaultAccountId,
+    transferToId: '',
     amountStr: '',
   };
 }
 
 function draftToTx(draft: Draft, id: string): Transaction | null {
   const amt = parseFloat(draft.amountStr);
-  if (!draft.date || !draft.account.trim() || !draft.amountStr || isNaN(amt) || amt <= 0) return null;
-  if (draft.type !== 'Transfer' && !draft.category.trim()) return null;
-  if (draft.type === 'Transfer' && !draft.transferTo.trim()) return null;
+  if (!draft.date || !draft.accountId || !draft.amountStr || isNaN(amt) || amt <= 0) return null;
+  if (draft.type !== 'Transfer' && !draft.categoryId) return null;
+  if (draft.type === 'Transfer' && !draft.transferToId) return null;
   return {
     id,
     date: new Date(draft.date),
     type: draft.type,
-    category: draft.type === 'Transfer' ? '' : draft.category.trim(),
-    account: draft.account.trim(),
-    transferTo: draft.transferTo.trim(),
+    categoryId: draft.type === 'Transfer' ? '' : draft.categoryId,
+    accountId: draft.accountId,
+    transferToId: draft.transferToId,
     amount: draft.type === 'Expense' ? -Math.abs(amt) : Math.abs(amt),
   };
 }
@@ -74,12 +74,14 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onConfirm: (tx: Transaction) => void;
-  expenseCategories: string[];
-  incomeCategories: string[];
-  allAccounts: string[];
-  defaultCategoryExpense?: string;
-  defaultCategoryIncome?: string;
-  defaultAccount?: string;
+  expenseCategories: Category[];
+  incomeCategories: Category[];
+  allAccounts: Account[];
+  defaultCategoryExpenseId?: string;
+  defaultCategoryIncomeId?: string;
+  defaultAccountId?: string;
+  onNewCategory?: (name: string, type: 'Expense' | 'Income') => string;
+  onNewAccount?: (name: string) => string;
 }
 
 export function AddTransactionForm({
@@ -89,21 +91,27 @@ export function AddTransactionForm({
   expenseCategories,
   incomeCategories,
   allAccounts,
-  defaultCategoryExpense = '',
-  defaultCategoryIncome = '',
-  defaultAccount = '',
+  defaultCategoryExpenseId = '',
+  defaultCategoryIncomeId = '',
+  defaultAccountId = '',
+  onNewCategory,
+  onNewAccount,
 }: Props) {
   const [mode, setMode] = useState<Mode>('Expense');
   const [draft, setDraft] = useState<Draft>(() =>
-    emptyDraft('Expense', defaultCategoryExpense, defaultCategoryIncome, defaultAccount)
+    emptyDraft('Expense', defaultCategoryExpenseId, defaultCategoryIncomeId, defaultAccountId)
   );
   const [error, setError] = useState('');
   const [amountFocused, setAmountFocused] = useState(false);
 
+  const expenseOpts = expenseCategories.map((c) => ({ value: c.id, label: c.name }));
+  const incomeOpts = incomeCategories.map((c) => ({ value: c.id, label: c.name }));
+  const accountOpts = allAccounts.map((a) => ({ value: a.id, label: a.name }));
+
   useEffect(() => {
     if (open) {
       setMode('Expense');
-      setDraft(emptyDraft('Expense', defaultCategoryExpense, defaultCategoryIncome, defaultAccount));
+      setDraft(emptyDraft('Expense', defaultCategoryExpenseId, defaultCategoryIncomeId, defaultAccountId));
       setError('');
     }
   }, [open]);
@@ -114,14 +122,43 @@ export function AddTransactionForm({
     setDraft((d) => ({
       ...d,
       type: m,
-      category: m === 'Expense' ? defaultCategoryExpense : m === 'Income' ? defaultCategoryIncome : '',
-      transferTo: '',
+      categoryId: m === 'Expense' ? defaultCategoryExpenseId : m === 'Income' ? defaultCategoryIncomeId : '',
+      transferToId: '',
     }));
   }
 
   function patch(p: Partial<Draft>) {
     setDraft((d) => ({ ...d, ...p }));
     setError('');
+  }
+
+  function handleCategoryChange(v: string) {
+    const allCats = [...expenseCategories, ...incomeCategories];
+    if (allCats.some((c) => c.id === v)) {
+      patch({ categoryId: v });
+    } else if (onNewCategory) {
+      const type = mode === 'Income' ? 'Income' : 'Expense';
+      const id = onNewCategory(v, type);
+      patch({ categoryId: id });
+    }
+  }
+
+  function handleAccountChange(v: string) {
+    if (allAccounts.some((a) => a.id === v)) {
+      patch({ accountId: v });
+    } else if (onNewAccount) {
+      const id = onNewAccount(v);
+      patch({ accountId: id });
+    }
+  }
+
+  function handleTransferToChange(v: string) {
+    if (allAccounts.some((a) => a.id === v)) {
+      patch({ transferToId: v });
+    } else if (onNewAccount) {
+      const id = onNewAccount(v);
+      patch({ transferToId: id });
+    }
   }
 
   function handleConfirm() {
@@ -139,6 +176,7 @@ export function AddTransactionForm({
   const displayAmount = !amountFocused && draft.amountStr
     ? Number(draft.amountStr).toLocaleString('vi-VN')
     : draft.amountStr;
+  const categoryOpts = mode === 'Expense' ? expenseOpts : mode === 'Income' ? incomeOpts : [];
 
   return (
     <div className={`bg-white dark:bg-slate-900 rounded-xl shadow-sm ${styles.accent}`}>
@@ -190,11 +228,11 @@ export function AddTransactionForm({
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Từ tài khoản <span className="text-rose-400">*</span></p>
-                <Combobox value={draft.account} onChange={(v) => patch({ account: v })} options={allAccounts} placeholder="Tài khoản nguồn..." allowCustom />
+                <Combobox value={draft.accountId} onChange={handleAccountChange} options={accountOpts} placeholder="Tài khoản nguồn..." allowCustom />
               </div>
               <div>
                 <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Đến tài khoản <span className="text-rose-400">*</span></p>
-                <Combobox value={draft.transferTo} onChange={(v) => patch({ transferTo: v })} options={allAccounts} placeholder="Tài khoản đích..." allowCustom />
+                <Combobox value={draft.transferToId} onChange={handleTransferToChange} options={accountOpts} placeholder="Tài khoản đích..." allowCustom />
               </div>
               <div>
                 <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Ngày</p>
@@ -207,11 +245,11 @@ export function AddTransactionForm({
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 <div>
                   <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Danh mục <span className="text-rose-400">*</span></p>
-                  <Combobox value={draft.category} onChange={(v) => patch({ category: v })} options={mode === 'Expense' ? expenseCategories : mode === 'Income' ? incomeCategories : []} placeholder="Coffee, Transport..." allowCustom />
+                  <Combobox value={draft.categoryId} onChange={handleCategoryChange} options={categoryOpts} placeholder="Coffee, Transport..." allowCustom />
                 </div>
                 <div>
                   <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Tài khoản</p>
-                  <Combobox value={draft.account} onChange={(v) => patch({ account: v })} options={allAccounts} placeholder="Tiền mặt..." allowCustom />
+                  <Combobox value={draft.accountId} onChange={handleAccountChange} options={accountOpts} placeholder="Tiền mặt..." allowCustom />
                 </div>
                 <div>
                   <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Ngày</p>
@@ -223,7 +261,6 @@ export function AddTransactionForm({
           )}
         </div>
 
-        {/* Error */}
         {error && (
           <p className="text-xs text-rose-500 flex items-center gap-1 mt-3">
             <span className="material-symbols-outlined text-sm">error</span>
@@ -231,7 +268,6 @@ export function AddTransactionForm({
           </p>
         )}
 
-        {/* Actions */}
         <div className="flex gap-2 mt-4 justify-end">
           <button
             type="button"

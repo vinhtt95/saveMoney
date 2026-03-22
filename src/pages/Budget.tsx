@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { useApp } from '../context/AppContext';
 import type { Budget as BudgetType } from '../types';
+import { categoryName as resolveCategoryName, accountName as resolveAccountName } from '../utils/lookup';
 import { formatVND, formatVNDShort, formatDate, toYYYYMM, toYYYYMMDD } from '../utils/formatters';
 import { getCategoryMonthMatrix, getCategoryMonthlyTrend, getCategoryDailyTrend, getCategoryWeeklyTrend, getAvailablePeriods } from '../utils/analytics';
 
@@ -24,8 +25,8 @@ const CATEGORY_ICONS: Record<string, { icon: string; color: string; bg: string }
   Health: { icon: 'favorite', color: 'text-rose-600', bg: 'bg-rose-100 dark:bg-rose-900/30' },
   Food: { icon: 'restaurant', color: 'text-orange-600', bg: 'bg-orange-100 dark:bg-orange-900/30' },
 };
-function getIcon(cat: string) {
-  return CATEGORY_ICONS[cat] || { icon: 'receipt_long', color: 'text-slate-600', bg: 'bg-slate-100 dark:bg-slate-800' };
+function getIcon(name: string) {
+  return CATEGORY_ICONS[name] || { icon: 'receipt_long', color: 'text-slate-600', bg: 'bg-slate-100 dark:bg-slate-800' };
 }
 
 const PIE_COLORS = ['#144bb8', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#ec4899'];
@@ -37,9 +38,14 @@ function loadBudgets(): BudgetType[] {
     const raw = localStorage.getItem(BUDGET_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    // Guard against old format (BudgetMap = plain object)
     if (!Array.isArray(parsed)) return [];
-    return parsed;
+    // Migrate old format: budget may have `categories` instead of `categoryIds`
+    return (parsed as Record<string, unknown>[]).map((b) => {
+      if (!b.categoryIds && Array.isArray(b.categories)) {
+        return { ...b, categoryIds: b.categories, categories: undefined };
+      }
+      return b;
+    }) as unknown as BudgetType[];
   } catch {
     return [];
   }
@@ -65,7 +71,7 @@ interface FormState {
   limit: string;
   dateStart: string;
   dateEnd: string;
-  categories: string[];
+  categoryIds: string[];
 }
 
 const emptyForm: FormState = {
@@ -73,12 +79,13 @@ const emptyForm: FormState = {
   limit: '',
   dateStart: '',
   dateEnd: '',
-  categories: [],
+  categoryIds: [],
 };
 
 export function Budget() {
   const { state } = useApp();
-  const { transactions, expenseCategories } = state;
+  const { transactions, categories, accounts } = state;
+  const expenseCategories = categories.filter((c) => c.type === 'Expense');
 
   const [budgets, setBudgets] = useState<BudgetType[]>(loadBudgets);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -106,7 +113,7 @@ export function Budget() {
       limit: String(budget.limit),
       dateStart: budget.dateStart,
       dateEnd: budget.dateEnd,
-      categories: [...budget.categories],
+      categoryIds: [...budget.categoryIds],
     });
     setEditingId(budget.id);
     setFormMode('edit');
@@ -129,14 +136,14 @@ export function Budget() {
         limit,
         dateStart: form.dateStart,
         dateEnd: form.dateEnd,
-        categories: form.categories,
+        categoryIds: form.categoryIds,
       };
       setBudgets((prev) => [...prev, newBudget]);
     } else if (formMode === 'edit' && editingId) {
       setBudgets((prev) =>
         prev.map((b) =>
           b.id === editingId
-            ? { ...b, name: form.name.trim(), limit, dateStart: form.dateStart, dateEnd: form.dateEnd, categories: form.categories }
+            ? { ...b, name: form.name.trim(), limit, dateStart: form.dateStart, dateEnd: form.dateEnd, categoryIds: form.categoryIds }
             : b
         )
       );
@@ -150,12 +157,12 @@ export function Budget() {
     setDeleteConfirmId(null);
   }
 
-  function toggleCategory(cat: string) {
+  function toggleCategory(catId: string) {
     setForm((prev) => ({
       ...prev,
-      categories: prev.categories.includes(cat)
-        ? prev.categories.filter((c) => c !== cat)
-        : [...prev.categories, cat],
+      categoryIds: prev.categoryIds.includes(catId)
+        ? prev.categoryIds.filter((c) => c !== catId)
+        : [...prev.categoryIds, catId],
     }));
   }
 
@@ -165,7 +172,7 @@ export function Budget() {
         .filter(
           (t) =>
             t.type === 'Expense' &&
-            budget.categories.includes(t.category) &&
+            budget.categoryIds.includes(t.categoryId) &&
             toYYYYMMDD(t.date) >= budget.dateStart &&
             toYYYYMMDD(t.date) <= budget.dateEnd
         )
@@ -174,22 +181,24 @@ export function Budget() {
       const spent = matchingTxs.reduce((sum, t) => sum + Math.abs(t.amount), 0);
       const pct = budget.limit > 0 ? (spent / budget.limit) * 100 : 0;
 
-      // Category breakdown for pie chart
-      const catMap = new Map<string, number>();
+      // Category breakdown for pie chart — use name for display
+      const catMap = new Map<string, { id: string; name: string; value: number }>();
       matchingTxs.forEach((t) => {
-        catMap.set(t.category, (catMap.get(t.category) ?? 0) + Math.abs(t.amount));
+        const name = resolveCategoryName(categories, t.categoryId);
+        if (!catMap.has(t.categoryId)) catMap.set(t.categoryId, { id: t.categoryId, name, value: 0 });
+        catMap.get(t.categoryId)!.value += Math.abs(t.amount);
       });
-      const pieData = [...catMap.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .map(([name, value]) => ({ name, value }));
+      const pieData = [...catMap.values()]
+        .sort((a, b) => b.value - a.value)
+        .map(({ id, name, value }) => ({ id, name, value }));
 
-      // Group by day for the transaction table
+      // Group by day
       const groupMap = new Map<string, { dateKey: string; date: Date; txs: typeof matchingTxs; dayTotal: number }>();
-      const groups: typeof groupMap extends Map<string, infer V> ? V[] : never[] = [];
+      const groups: { dateKey: string; date: Date; txs: typeof matchingTxs; dayTotal: number }[] = [];
       for (const tx of matchingTxs) {
         const key = toYYYYMMDD(tx.date);
         if (!groupMap.has(key)) {
-          const g = { dateKey: key, date: tx.date, txs: [], dayTotal: 0 };
+          const g = { dateKey: key, date: tx.date, txs: [] as typeof matchingTxs, dayTotal: 0 };
           groupMap.set(key, g);
           groups.push(g);
         }
@@ -198,24 +207,24 @@ export function Budget() {
         g.dayTotal += Math.abs(tx.amount);
       }
 
-      // Analytics: month matrix
+      // Analytics: month matrix (keys are categoryIds)
       const fromPeriod = toYYYYMM(new Date(budget.dateStart + 'T00:00:00'));
       const toPeriod = toYYYYMM(new Date(budget.dateEnd + 'T00:00:00'));
       const matrixData = matchingTxs.length > 0 ? getCategoryMonthMatrix(matchingTxs, fromPeriod, toPeriod) : [];
       const matrixPeriods = getAvailablePeriods(matchingTxs).filter((p) => p >= fromPeriod && p <= toPeriod).slice().reverse();
-      const matrixCats = matrixData.length > 0
+      const matrixCatIds = matrixData.length > 0
         ? (() => {
-            const cats = Object.keys(matrixData[0]).filter((k) => k !== 'month');
+            const ids = Object.keys(matrixData[0]).filter((k) => k !== 'month');
             const totals: Record<string, number> = {};
-            cats.forEach((cat) => { totals[cat] = matrixData.reduce((s, row) => s + ((row[cat] as number) || 0), 0); });
-            return cats.sort((a, b) => totals[b] - totals[a]);
+            ids.forEach((id) => { totals[id] = matrixData.reduce((s, row) => s + ((row[id] as number) || 0), 0); });
+            return ids.sort((a, b) => totals[b] - totals[a]);
           })()
         : [];
       const isMultiMonth = fromPeriod !== toPeriod;
 
-      return { budget, matchingTxs, spent, pct, pieData, groups, matrixData, matrixPeriods, matrixCats, isMultiMonth, fromPeriod, toPeriod };
+      return { budget, matchingTxs, spent, pct, pieData, groups, matrixData, matrixPeriods, matrixCatIds, isMultiMonth, fromPeriod, toPeriod };
     });
-  }, [budgets, transactions]);
+  }, [budgets, transactions, categories]);
 
   const isFormValid =
     form.name.trim().length > 0 &&
@@ -246,7 +255,6 @@ export function Budget() {
       {formMode !== 'none' && (
         <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border-t-4 border-primary overflow-hidden">
           <div className="p-5 space-y-5">
-            {/* Name */}
             <div>
               <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Tên Budget <span className="text-rose-400">*</span></p>
               <input
@@ -258,7 +266,6 @@ export function Budget() {
               />
             </div>
 
-            {/* Hero Limit */}
             <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-5 flex flex-col items-center gap-1">
               <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Hạn mức</p>
               <input
@@ -278,7 +285,6 @@ export function Budget() {
               )}
             </div>
 
-            {/* Date range */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Từ ngày <span className="text-rose-400">*</span></p>
@@ -303,26 +309,26 @@ export function Budget() {
             {/* Categories */}
             <div>
               <p className="text-[10px] uppercase font-bold text-slate-400 mb-2">
-                Danh mục áp dụng {form.categories.length > 0 && <span className="normal-case font-normal text-slate-400">— {form.categories.length} đã chọn</span>}
+                Danh mục áp dụng {form.categoryIds.length > 0 && <span className="normal-case font-normal text-slate-400">— {form.categoryIds.length} đã chọn</span>}
               </p>
               {expenseCategories.length === 0 ? (
                 <p className="text-sm text-slate-400">Chưa có danh mục chi tiêu nào.</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {expenseCategories.map((cat) => {
-                    const selected = form.categories.includes(cat);
+                    const selected = form.categoryIds.includes(cat.id);
                     return (
                       <button
-                        key={cat}
+                        key={cat.id}
                         type="button"
-                        onClick={() => toggleCategory(cat)}
+                        onClick={() => toggleCategory(cat.id)}
                         className={`px-3 py-1.5 text-xs font-semibold rounded-full border transition-colors ${
                           selected
                             ? 'bg-primary text-white border-primary'
                             : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-primary/50'
                         }`}
                       >
-                        {cat}
+                        {cat.name}
                       </button>
                     );
                   })}
@@ -330,7 +336,6 @@ export function Budget() {
               )}
             </div>
 
-            {/* Actions */}
             <div className="flex gap-2 justify-end">
               <button
                 onClick={saveForm}
@@ -371,26 +376,26 @@ export function Budget() {
 
       {budgetsWithStats.length > 0 && (
         <div className="space-y-4">
-          {budgetsWithStats.map(({ budget, matchingTxs, spent, pct, pieData, groups, matrixData, matrixPeriods, matrixCats, isMultiMonth }) => {
+          {budgetsWithStats.map(({ budget, matchingTxs, spent, pct, pieData, groups, matrixData, matrixPeriods, matrixCatIds, isMultiMonth }) => {
             const status = getBudgetStatus(pct);
             const isExpanded = expandedId === budget.id;
             const isAnalyticsOpen = analyticsOpenId === budget.id;
             const remaining = budget.limit - spent;
-            const selectedCat = selectedCatPerBudget[budget.id] || matrixCats[0] || '';
+            const selectedCatId = selectedCatPerBudget[budget.id] || matrixCatIds[0] || '';
+            const selectedCatDisplayName = selectedCatId ? resolveCategoryName(categories, selectedCatId) : '';
             const granularity = trendGranularityPerBudget[budget.id] || 'week';
-            const trendData: { label: string; amount: number }[] = selectedCat
+            const trendData: { label: string; amount: number }[] = selectedCatId
               ? granularity === 'day'
-                ? getCategoryDailyTrend(matchingTxs, selectedCat, budget.dateStart, budget.dateEnd).map((d) => ({ label: d.day, amount: d.amount }))
+                ? getCategoryDailyTrend(matchingTxs, selectedCatId, budget.dateStart, budget.dateEnd).map((d) => ({ label: d.day, amount: d.amount }))
                 : granularity === 'week'
-                  ? getCategoryWeeklyTrend(matchingTxs, selectedCat, budget.dateStart, budget.dateEnd).map((d) => ({ label: d.week, amount: d.amount }))
-                  : matrixPeriods.length > 0 ? getCategoryMonthlyTrend(matchingTxs, selectedCat, matrixPeriods).map((d) => ({ label: d.month, amount: d.amount })) : []
+                  ? getCategoryWeeklyTrend(matchingTxs, selectedCatId, budget.dateStart, budget.dateEnd).map((d) => ({ label: d.week, amount: d.amount }))
+                  : matrixPeriods.length > 0 ? getCategoryMonthlyTrend(matchingTxs, selectedCatId, matrixPeriods).map((d) => ({ label: d.month, amount: d.amount })) : []
               : [];
 
             return (
               <div key={budget.id} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
                 {/* Card overview */}
                 <div className="p-5">
-                  {/* Top row: name + actions */}
                   <div className="flex items-start justify-between gap-4 mb-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
@@ -400,32 +405,32 @@ export function Budget() {
                       <p className="text-xs text-slate-400 mb-2">
                         {formatDate(new Date(budget.dateStart + 'T00:00:00'))} → {formatDate(new Date(budget.dateEnd + 'T00:00:00'))}
                       </p>
-                      {/* Category chips merged with pie legend */}
-                      {budget.categories.length > 0 && (
+                      {budget.categoryIds.length > 0 && (
                         <div className="flex flex-wrap gap-1.5">
-                          {[...budget.categories]
+                          {[...budget.categoryIds]
                             .sort((a, b) => {
-                              const aVal = pieData.find((d) => d.name === a)?.value ?? -1;
-                              const bVal = pieData.find((d) => d.name === b)?.value ?? -1;
+                              const aVal = pieData.find((d) => d.id === a)?.value ?? -1;
+                              const bVal = pieData.find((d) => d.id === b)?.value ?? -1;
                               return bVal - aVal;
                             })
-                            .map((cat) => {
-                            const pieIdx = pieData.findIndex((d) => d.name === cat);
-                            const color = pieIdx >= 0 ? PIE_COLORS[pieIdx % PIE_COLORS.length] : null;
-                            const catPct = pieIdx >= 0 && spent > 0 ? ((pieData[pieIdx].value / spent) * 100).toFixed(0) : null;
-                            return (
-                              <span
-                                key={cat}
-                                className="flex items-center gap-1 px-2 py-0.5 text-xs rounded-full border"
-                                style={color ? { borderColor: color + '60', backgroundColor: color + '15', color } : undefined}
-                              >
-                                {color && <span className="size-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />}
-                                {!color && <span className="size-1.5 rounded-full shrink-0 bg-slate-300 dark:bg-slate-600" />}
-                                <span className={color ? '' : 'text-slate-500 dark:text-slate-400'}>{cat}</span>
-                                {catPct && <span className="font-bold opacity-80">{catPct}%</span>}
-                              </span>
-                            );
-                          })}
+                            .map((catId) => {
+                              const name = resolveCategoryName(categories, catId);
+                              const pieIdx = pieData.findIndex((d) => d.id === catId);
+                              const color = pieIdx >= 0 ? PIE_COLORS[pieIdx % PIE_COLORS.length] : null;
+                              const catPct = pieIdx >= 0 && spent > 0 ? ((pieData[pieIdx].value / spent) * 100).toFixed(0) : null;
+                              return (
+                                <span
+                                  key={catId}
+                                  className="flex items-center gap-1 px-2 py-0.5 text-xs rounded-full border"
+                                  style={color ? { borderColor: color + '60', backgroundColor: color + '15', color } : undefined}
+                                >
+                                  {color && <span className="size-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />}
+                                  {!color && <span className="size-1.5 rounded-full shrink-0 bg-slate-300 dark:bg-slate-600" />}
+                                  <span className={color ? '' : 'text-slate-500 dark:text-slate-400'}>{name}</span>
+                                  {catPct && <span className="font-bold opacity-80">{catPct}%</span>}
+                                </span>
+                              );
+                            })}
                         </div>
                       )}
                     </div>
@@ -446,9 +451,7 @@ export function Budget() {
                     </div>
                   </div>
 
-                  {/* Progress + Pie side by side */}
                   <div className="flex items-center gap-4">
-                    {/* Left: progress */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-end justify-between mb-1.5">
                         <div>
@@ -459,12 +462,11 @@ export function Budget() {
                           {pct.toFixed(0)}%
                         </span>
                       </div>
-                      {/* Stacked bar by category */}
                       <div className="w-full bg-slate-100 dark:bg-slate-800 h-2.5 rounded-full overflow-hidden flex">
                         {pieData.length > 0
                           ? pieData.map((d, i) => (
                               <div
-                                key={d.name}
+                                key={d.id}
                                 className="h-full transition-all"
                                 style={{
                                   width: `${Math.min((d.value / budget.limit) * 100, 100)}%`,
@@ -483,7 +485,6 @@ export function Budget() {
                         </span>
                       </div>
 
-                      {/* Expand toggles */}
                       {matchingTxs.length > 0 && (
                         <div className="mt-3 flex items-center gap-3">
                           <button
@@ -504,12 +505,11 @@ export function Budget() {
                       )}
                     </div>
 
-                    {/* Right: pie chart (no legend, merged into chips above) */}
                     {pieData.length > 0 && (
                       <div className="shrink-0">
                         <ResponsiveContainer width={120} height={120}>
                           <PieChart>
-                            <Pie data={pieData} dataKey="value" cx="50%" cy="50%" innerRadius={28} outerRadius={52} paddingAngle={2} strokeWidth={0}>
+                            <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={28} outerRadius={52} paddingAngle={2} strokeWidth={0}>
                               {pieData.map((_, i) => (
                                 <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                               ))}
@@ -533,8 +533,7 @@ export function Budget() {
                       Analytics
                     </h4>
 
-                    {/* Stacked bar chart (multi-month only) */}
-                    {isMultiMonth && matrixCats.length > 0 && (
+                    {isMultiMonth && matrixCatIds.length > 0 && (
                       <div>
                         <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-3">Chi tiêu theo tháng và danh mục</p>
                         <div className="h-56">
@@ -543,12 +542,12 @@ export function Budget() {
                               <XAxis dataKey="month" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
                               <YAxis tickFormatter={(v) => formatVNDShort(v)} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={72} />
                               <Tooltip
-                                formatter={(value: number, name: string) => [formatVND(value), name]}
+                                formatter={(value: number, catId: string) => [formatVND(value), resolveCategoryName(categories, catId)]}
                                 labelFormatter={(label) => `Tháng ${label}`}
                               />
-                              <Legend />
-                              {matrixCats.map((cat, i) => (
-                                <Bar key={cat} dataKey={cat} stackId="a" fill={PIE_COLORS[i % PIE_COLORS.length]} radius={i === matrixCats.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
+                              <Legend formatter={(catId: string) => resolveCategoryName(categories, catId)} />
+                              {matrixCatIds.map((catId, i) => (
+                                <Bar key={catId} dataKey={catId} stackId="a" fill={PIE_COLORS[i % PIE_COLORS.length]} radius={i === matrixCatIds.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
                               ))}
                             </BarChart>
                           </ResponsiveContainer>
@@ -556,15 +555,14 @@ export function Budget() {
                       </div>
                     )}
 
-                    {/* Line chart for selected category */}
                     <div>
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                           <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Chi tiêu theo danh mục</p>
-                          {selectedCat && (
+                          {selectedCatId && (
                             <div className="flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 rounded-lg">
                               <div className="size-2 rounded-full bg-primary" />
-                              <span className="text-xs font-bold text-primary">{selectedCat}</span>
+                              <span className="text-xs font-bold text-primary">{selectedCatDisplayName}</span>
                             </div>
                           )}
                         </div>
@@ -586,7 +584,7 @@ export function Budget() {
                             <LineChart data={trendData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                               <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
                               <YAxis tickFormatter={(v) => formatVNDShort(v)} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={72} />
-                              <Tooltip formatter={(value: number) => [formatVND(value), selectedCat]} />
+                              <Tooltip formatter={(value: number) => [formatVND(value), selectedCatDisplayName]} />
                               <Line type="monotone" dataKey="amount" stroke="#144bb8" strokeWidth={2} dot={{ r: 3, fill: '#144bb8' }} activeDot={{ r: 5 }} />
                             </LineChart>
                           </ResponsiveContainer>
@@ -612,19 +610,20 @@ export function Budget() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                            {matrixCats.map((cat, ci) => {
-                              const isSel = selectedCat === cat;
-                              const values = matrixData.map((row) => (row[cat] as number) || 0);
+                            {matrixCatIds.map((catId, ci) => {
+                              const isSel = selectedCatId === catId;
+                              const catDisplayName = resolveCategoryName(categories, catId);
+                              const values = matrixData.map((row) => (row[catId] as number) || 0);
                               return (
                                 <tr
-                                  key={cat}
-                                  onClick={() => setSelectedCatPerBudget((prev) => ({ ...prev, [budget.id]: cat }))}
+                                  key={catId}
+                                  onClick={() => setSelectedCatPerBudget((prev) => ({ ...prev, [budget.id]: catId }))}
                                   className={`cursor-pointer transition-colors ${isSel ? 'bg-primary/5 dark:bg-primary/10' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
                                 >
                                   <td className={`px-4 py-2.5 sticky left-0 font-medium ${isSel ? 'bg-primary/5 dark:bg-primary/10' : 'bg-white dark:bg-slate-900'}`}>
                                     <div className="flex items-center gap-2">
                                       <div className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[ci % PIE_COLORS.length] }} />
-                                      <span className={`truncate max-w-[100px] ${isSel ? 'text-primary font-bold' : ''}`}>{cat}</span>
+                                      <span className={`truncate max-w-[100px] ${isSel ? 'text-primary font-bold' : ''}`}>{catDisplayName}</span>
                                       {isSel && <span className="material-symbols-outlined text-xs text-primary">show_chart</span>}
                                     </div>
                                   </td>
@@ -656,7 +655,7 @@ export function Budget() {
                   </div>
                 )}
 
-                {/* Expanded Transactions — grouped by day, table style */}
+                {/* Expanded Transactions */}
                 {isExpanded && (
                   <div className="border-t border-slate-200 dark:border-slate-800">
                     <table className="w-full text-left">
@@ -670,7 +669,6 @@ export function Budget() {
                       <tbody>
                         {groups.map((group) => (
                           <React.Fragment key={group.dateKey}>
-                            {/* Day header */}
                             <tr className="bg-slate-50 dark:bg-slate-800/70 border-t-2 border-slate-200 dark:border-slate-700">
                               <td className="px-6 py-2.5">
                                 <span className="text-sm font-bold text-slate-700 dark:text-slate-200">{formatDate(group.date)}</span>
@@ -678,9 +676,10 @@ export function Budget() {
                               <td className="px-6 py-2.5 text-sm text-slate-400">{group.txs.length} giao dịch</td>
                               <td className="px-6 py-2.5 text-right text-sm font-bold text-rose-600">-{formatVND(group.dayTotal)}</td>
                             </tr>
-                            {/* Transactions */}
                             {group.txs.map((tx) => {
-                              const icon = getIcon(tx.category);
+                              const txCatName = resolveCategoryName(categories, tx.categoryId);
+                              const txAccName = resolveAccountName(accounts, tx.accountId);
+                              const icon = getIcon(txCatName);
                               return (
                                 <tr key={tx.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors border-t border-slate-100 dark:border-slate-800/60">
                                   <td className="px-6 py-3">
@@ -688,12 +687,12 @@ export function Budget() {
                                       <div className={`size-7 rounded ${icon.bg} ${icon.color} flex items-center justify-center shrink-0`}>
                                         <span className="material-symbols-outlined text-base">{icon.icon}</span>
                                       </div>
-                                      <span className="text-sm font-medium text-slate-800 dark:text-slate-200">{tx.category}</span>
+                                      <span className="text-sm font-medium text-slate-800 dark:text-slate-200">{txCatName}</span>
                                     </div>
                                   </td>
-                                  <td className="px-6 py-3 text-sm text-slate-500 dark:text-slate-400">{tx.account}</td>
+                                  <td className="px-6 py-3 text-sm text-slate-500 dark:text-slate-400">{txAccName}</td>
                                   <td className="px-6 py-3 text-right text-sm font-bold text-rose-600 dark:text-rose-400">
-                                    -{formatVND(tx.amount)}
+                                    -{formatVND(Math.abs(tx.amount))}
                                   </td>
                                 </tr>
                               );

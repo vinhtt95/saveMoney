@@ -2,11 +2,12 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { getExpenses, getTotalSpending, getTotalIncome, getAvgDaily, filterByPeriod, getAvailablePeriods } from '../utils/analytics';
-import { formatVND, formatVNDShort, formatDate } from '../utils/formatters';
-import { Transaction } from '../types';
+import { formatVND, formatDate } from '../utils/formatters';
+import { Transaction, Category, Account } from '../types';
 import { AddTransactionForm } from '../components/AddTransactionModal';
 import { Draft, emptyDraft } from '../components/InlineFields';
 import { InlineEditForm } from '../components/InlineEditForm';
+import { categoryName, accountName } from '../utils/lookup';
 
 const CATEGORY_ICONS: Record<string, { icon: string; color: string; bg: string }> = {
   Transport: { icon: 'directions_car', color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/30' },
@@ -22,17 +23,17 @@ const CATEGORY_ICONS: Record<string, { icon: string; color: string; bg: string }
   Investment: { icon: 'trending_up', color: 'text-teal-600', bg: 'bg-teal-100 dark:bg-teal-900/30' },
 };
 
-function getIcon(category: string) {
-  return CATEGORY_ICONS[category] || { icon: 'receipt_long', color: 'text-slate-600', bg: 'bg-slate-100 dark:bg-slate-800' };
+function getIcon(name: string) {
+  return CATEGORY_ICONS[name] || { icon: 'receipt_long', color: 'text-slate-600', bg: 'bg-slate-100 dark:bg-slate-800' };
 }
 
 function draftFromTx(tx: Transaction): Draft {
   return {
     date: `${tx.date.getFullYear()}-${String(tx.date.getMonth() + 1).padStart(2, '0')}-${String(tx.date.getDate()).padStart(2, '0')}`,
     type: tx.type,
-    category: tx.category,
-    account: tx.account,
-    transferTo: tx.transferTo,
+    categoryId: tx.categoryId,
+    accountId: tx.accountId,
+    transferToId: tx.transferToId,
     amountStr: String(Math.abs(tx.amount)),
   };
 }
@@ -40,17 +41,17 @@ function draftFromTx(tx: Transaction): Draft {
 function draftToTx(draft: Draft, id: string): Transaction | null {
   const amt = parseFloat(draft.amountStr);
   const needsCategory = draft.type !== 'Transfer';
-  if (!draft.date || (needsCategory && !draft.category.trim()) || !draft.account.trim() || !draft.amountStr || isNaN(amt) || amt <= 0) {
+  if (!draft.date || (needsCategory && !draft.categoryId) || !draft.accountId || !draft.amountStr || isNaN(amt) || amt <= 0) {
     return null;
   }
-  if (draft.type === 'Transfer' && !draft.transferTo.trim()) return null;
+  if (draft.type === 'Transfer' && !draft.transferToId) return null;
   return {
     id,
     date: new Date(draft.date),
     type: draft.type,
-    category: draft.category.trim(),
-    account: draft.account.trim(),
-    transferTo: draft.transferTo.trim(),
+    categoryId: draft.categoryId,
+    accountId: draft.accountId,
+    transferToId: draft.transferToId,
     amount: draft.type === 'Expense' ? -Math.abs(amt) : Math.abs(amt),
   };
 }
@@ -61,7 +62,7 @@ export function Transactions() {
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Draft>(() => emptyDraft(state.defaultCategoryExpense, state.defaultCategoryIncome, state.defaultAccount));
+  const [draft, setDraft] = useState<Draft>(() => emptyDraft(state.defaultCategoryExpenseId, state.defaultCategoryIncomeId, state.defaultAccountId));
   const [editError, setEditError] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -72,7 +73,10 @@ export function Transactions() {
   const accountMenuRef = useRef<HTMLDivElement>(null);
   const periodMenuRef = useRef<HTMLDivElement>(null);
 
-  const { filters, selectedPeriod, transactions } = state;
+  const { filters, selectedPeriod, transactions, categories, accounts } = state;
+
+  const expenseCategories = useMemo(() => categories.filter((c) => c.type === 'Expense'), [categories]);
+  const incomeCategories = useMemo(() => categories.filter((c) => c.type === 'Income'), [categories]);
 
   const availablePeriods = useMemo(() => getAvailablePeriods(transactions), [transactions]);
 
@@ -81,36 +85,35 @@ export function Transactions() {
     [transactions, selectedPeriod]
   );
 
-  const allCategories = useMemo(
-    () => [...new Set(periodTxs.filter((t) => t.type === 'Expense' || t.type === 'Income').map((t) => t.category))].sort(),
+  // Unique category IDs appearing in this period's transactions (for filter chips)
+  const periodCategoryIds = useMemo(
+    () => [...new Set(periodTxs.filter((t) => t.type === 'Expense' || t.type === 'Income').map((t) => t.categoryId))],
     [periodTxs]
   );
-  const allAccounts = useMemo(
-    () => [...new Set(periodTxs.map((t) => t.account))].sort(),
+  // Unique account IDs appearing in this period's transactions (for filter dropdown)
+  const periodAccountIds = useMemo(
+    () => [...new Set(periodTxs.map((t) => t.accountId))],
     [periodTxs]
   );
-  const allTransactionCategories = useMemo(
-    () => [...state.expenseCategories, ...state.incomeCategories].sort(),
-    [state.expenseCategories, state.incomeCategories]
-  );
-  const allTransactionAccounts = state.accounts;
 
   const filtered = useMemo(() => {
     let txs = periodTxs.filter((t) => t.type === 'Expense' || t.type === 'Income');
     if (filters.search) {
       const q = filters.search.toLowerCase();
       txs = txs.filter(
-        (t) => t.category.toLowerCase().includes(q) || t.account.toLowerCase().includes(q)
+        (t) =>
+          categoryName(categories, t.categoryId).toLowerCase().includes(q) ||
+          accountName(accounts, t.accountId).toLowerCase().includes(q)
       );
     }
-    if (filters.categories.length > 0) {
-      txs = txs.filter((t) => filters.categories.includes(t.category));
+    if (filters.categoryIds.length > 0) {
+      txs = txs.filter((t) => filters.categoryIds.includes(t.categoryId));
     }
-    if (filters.accounts.length > 0) {
-      txs = txs.filter((t) => filters.accounts.includes(t.account));
+    if (filters.accountIds.length > 0) {
+      txs = txs.filter((t) => filters.accountIds.includes(t.accountId));
     }
     return txs.sort((a, b) => b.date.getTime() - a.date.getTime());
-  }, [periodTxs, filters]);
+  }, [periodTxs, filters, categories, accounts]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
@@ -152,18 +155,32 @@ export function Transactions() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  function toggleCategory(cat: string) {
-    const cats = filters.categories.includes(cat)
-      ? filters.categories.filter((c) => c !== cat)
-      : [...filters.categories, cat];
-    dispatch({ type: 'SET_FILTER', filter: { categories: cats } });
+  function toggleCategoryFilter(catId: string) {
+    const ids = filters.categoryIds.includes(catId)
+      ? filters.categoryIds.filter((c) => c !== catId)
+      : [...filters.categoryIds, catId];
+    dispatch({ type: 'SET_FILTER', filter: { categoryIds: ids } });
   }
 
-  function toggleAccount(acc: string) {
-    const accs = filters.accounts.includes(acc)
-      ? filters.accounts.filter((a) => a !== acc)
-      : [...filters.accounts, acc];
-    dispatch({ type: 'SET_FILTER', filter: { accounts: accs } });
+  function toggleAccountFilter(accId: string) {
+    const ids = filters.accountIds.includes(accId)
+      ? filters.accountIds.filter((a) => a !== accId)
+      : [...filters.accountIds, accId];
+    dispatch({ type: 'SET_FILTER', filter: { accountIds: ids } });
+  }
+
+  function handleNewCategory(name: string, type: 'Expense' | 'Income'): string {
+    const id = crypto.randomUUID();
+    const cat: Category = { id, name, type };
+    dispatch({ type: 'ADD_CATEGORY', category: cat });
+    return id;
+  }
+
+  function handleNewAccount(name: string): string {
+    const id = crypto.randomUUID();
+    const acc: Account = { id, name };
+    dispatch({ type: 'SET_ACCOUNTS', accounts: [...accounts, acc] });
+    return id;
   }
 
   function startAdd() {
@@ -217,12 +234,14 @@ export function Transactions() {
               open={isAdding}
               onClose={() => setIsAdding(false)}
               onConfirm={handleAddConfirm}
-              expenseCategories={state.expenseCategories}
-              incomeCategories={state.incomeCategories}
-              allAccounts={allTransactionAccounts}
-              defaultCategoryExpense={state.defaultCategoryExpense}
-              defaultCategoryIncome={state.defaultCategoryIncome}
-              defaultAccount={state.defaultAccount}
+              expenseCategories={expenseCategories}
+              incomeCategories={incomeCategories}
+              allAccounts={accounts}
+              defaultCategoryExpenseId={state.defaultCategoryExpenseId}
+              defaultCategoryIncomeId={state.defaultCategoryIncomeId}
+              defaultAccountId={state.defaultAccountId}
+              onNewCategory={handleNewCategory}
+              onNewAccount={handleNewAccount}
             />
           </div>
         )}
@@ -327,24 +346,24 @@ export function Transactions() {
           <button
             onClick={() => setShowCategoryMenu((v) => !v)}
             className={`flex items-center gap-2 px-4 py-2 bg-slate-50 dark:bg-slate-800 border rounded-lg text-sm font-medium hover:bg-slate-100 transition-colors ${
-              filters.categories.length > 0 ? 'border-primary text-primary' : 'border-slate-200 dark:border-slate-700'
+              filters.categoryIds.length > 0 ? 'border-primary text-primary' : 'border-slate-200 dark:border-slate-700'
             }`}
           >
             <span className="material-symbols-outlined text-sm">category</span>
-            Category {filters.categories.length > 0 && `(${filters.categories.length})`}
+            Category {filters.categoryIds.length > 0 && `(${filters.categoryIds.length})`}
             <span className="material-symbols-outlined text-sm">expand_more</span>
           </button>
           {showCategoryMenu && (
             <div className="absolute top-full mt-1 left-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg z-10 min-w-[180px] overflow-hidden">
-              {allCategories.map((cat) => (
-                <label key={cat} className="flex items-center gap-2 px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer text-sm">
-                  <input type="checkbox" checked={filters.categories.includes(cat)} onChange={() => toggleCategory(cat)} className="rounded" />
-                  {cat}
+              {periodCategoryIds.map((catId) => (
+                <label key={catId} className="flex items-center gap-2 px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer text-sm">
+                  <input type="checkbox" checked={filters.categoryIds.includes(catId)} onChange={() => toggleCategoryFilter(catId)} className="rounded" />
+                  {categoryName(categories, catId)}
                 </label>
               ))}
-              {filters.categories.length > 0 && (
+              {filters.categoryIds.length > 0 && (
                 <button
-                  onClick={() => dispatch({ type: 'SET_FILTER', filter: { categories: [] } })}
+                  onClick={() => dispatch({ type: 'SET_FILTER', filter: { categoryIds: [] } })}
                   className="w-full text-left px-4 py-2 text-xs text-rose-500 hover:bg-rose-50 border-t border-slate-100 dark:border-slate-800"
                 >
                   Clear filter
@@ -359,24 +378,24 @@ export function Transactions() {
           <button
             onClick={() => setShowAccountMenu((v) => !v)}
             className={`flex items-center gap-2 px-4 py-2 bg-slate-50 dark:bg-slate-800 border rounded-lg text-sm font-medium hover:bg-slate-100 transition-colors ${
-              filters.accounts.length > 0 ? 'border-primary text-primary' : 'border-slate-200 dark:border-slate-700'
+              filters.accountIds.length > 0 ? 'border-primary text-primary' : 'border-slate-200 dark:border-slate-700'
             }`}
           >
             <span className="material-symbols-outlined text-sm">payments</span>
-            Account {filters.accounts.length > 0 && `(${filters.accounts.length})`}
+            Account {filters.accountIds.length > 0 && `(${filters.accountIds.length})`}
             <span className="material-symbols-outlined text-sm">expand_more</span>
           </button>
           {showAccountMenu && (
             <div className="absolute top-full mt-1 left-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg z-10 min-w-[180px] overflow-hidden">
-              {allAccounts.map((acc) => (
-                <label key={acc} className="flex items-center gap-2 px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer text-sm">
-                  <input type="checkbox" checked={filters.accounts.includes(acc)} onChange={() => toggleAccount(acc)} className="rounded" />
-                  {acc}
+              {periodAccountIds.map((accId) => (
+                <label key={accId} className="flex items-center gap-2 px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer text-sm">
+                  <input type="checkbox" checked={filters.accountIds.includes(accId)} onChange={() => toggleAccountFilter(accId)} className="rounded" />
+                  {accountName(accounts, accId)}
                 </label>
               ))}
-              {filters.accounts.length > 0 && (
+              {filters.accountIds.length > 0 && (
                 <button
-                  onClick={() => dispatch({ type: 'SET_FILTER', filter: { accounts: [] } })}
+                  onClick={() => dispatch({ type: 'SET_FILTER', filter: { accountIds: [] } })}
                   className="w-full text-left px-4 py-2 text-xs text-rose-500 hover:bg-rose-50 border-t border-slate-100 dark:border-slate-800"
                 >
                   Clear filter
@@ -386,9 +405,9 @@ export function Transactions() {
           )}
         </div>
 
-        {(filters.search || filters.categories.length > 0 || filters.accounts.length > 0) && (
+        {(filters.search || filters.categoryIds.length > 0 || filters.accountIds.length > 0) && (
           <button
-            onClick={() => dispatch({ type: 'SET_FILTER', filter: { search: '', categories: [], accounts: [] } })}
+            onClick={() => dispatch({ type: 'SET_FILTER', filter: { search: '', categoryIds: [], accountIds: [] } })}
             className="px-3 py-2 text-xs text-rose-500 border border-rose-200 rounded-lg hover:bg-rose-50 transition-colors"
           >
             Clear all filters
@@ -397,15 +416,16 @@ export function Transactions() {
       </div>
 
       {/* Quick filter chips */}
-      {allCategories.length > 0 && (
+      {periodCategoryIds.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {allCategories.slice(0, 8).map((cat) => {
-            const icon = getIcon(cat);
-            const active = filters.categories.includes(cat);
+          {periodCategoryIds.slice(0, 8).map((catId) => {
+            const name = categoryName(categories, catId);
+            const icon = getIcon(name);
+            const active = filters.categoryIds.includes(catId);
             return (
               <button
-                key={cat}
-                onClick={() => toggleCategory(cat)}
+                key={catId}
+                onClick={() => toggleCategoryFilter(catId)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
                   active
                     ? 'bg-primary text-white shadow-sm'
@@ -413,7 +433,7 @@ export function Transactions() {
                 }`}
               >
                 <span className={`material-symbols-outlined text-xs ${active ? 'text-white' : icon.color}`}>{icon.icon}</span>
-                {cat}
+                {name}
               </button>
             );
           })}
@@ -440,12 +460,14 @@ export function Transactions() {
                     open={isAdding}
                     onClose={() => setIsAdding(false)}
                     onConfirm={handleAddConfirm}
-                    expenseCategories={state.expenseCategories}
-              incomeCategories={state.incomeCategories}
-                    allAccounts={allTransactionAccounts}
-                    defaultCategoryExpense={state.defaultCategoryExpense}
-                    defaultCategoryIncome={state.defaultCategoryIncome}
-                    defaultAccount={state.defaultAccount}
+                    expenseCategories={expenseCategories}
+                    incomeCategories={incomeCategories}
+                    allAccounts={accounts}
+                    defaultCategoryExpenseId={state.defaultCategoryExpenseId}
+                    defaultCategoryIncomeId={state.defaultCategoryIncomeId}
+                    defaultAccountId={state.defaultAccountId}
+                    onNewCategory={handleNewCategory}
+                    onNewAccount={handleNewAccount}
                   />
                 </td>
               </tr>
@@ -477,7 +499,9 @@ export function Transactions() {
                   </tr>
 
                   {group.txs.map((tx) => {
-                    const icon = getIcon(tx.category);
+                    const catName = categoryName(categories, tx.categoryId);
+                    const accName = accountName(accounts, tx.accountId);
+                    const icon = getIcon(catName);
                     const isExpense = tx.type === 'Expense';
                     const isExpanded = expandedRow === tx.id;
 
@@ -500,10 +524,10 @@ export function Transactions() {
                               <div className={`size-7 rounded ${icon.bg} ${icon.color} flex items-center justify-center`}>
                                 <span className="material-symbols-outlined text-base">{icon.icon}</span>
                               </div>
-                              <span className="text-sm font-medium">{tx.category}</span>
+                              <span className="text-sm font-medium">{catName}</span>
                             </div>
                           </td>
-                          <td className="px-6 py-3 text-sm text-slate-500 dark:text-slate-400">{tx.account}</td>
+                          <td className="px-6 py-3 text-sm text-slate-500 dark:text-slate-400">{accName}</td>
                           <td className={`px-6 py-3 text-right text-sm font-bold ${isExpense ? 'text-rose-600' : 'text-emerald-600'}`}>
                             {isExpense ? '-' : '+'}{formatVND(tx.amount)}
                           </td>
@@ -515,9 +539,9 @@ export function Transactions() {
                               <InlineEditForm
                                 draft={draft}
                                 onChange={(patch) => setDraft((d) => ({ ...d, ...patch }))}
-                                expenseCategories={state.expenseCategories}
-                                incomeCategories={state.incomeCategories}
-                                allAccounts={allTransactionAccounts}
+                                expenseCategories={expenseCategories}
+                                incomeCategories={incomeCategories}
+                                allAccounts={accounts}
                                 error={editError}
                                 onSave={() => confirmEdit(tx.id)}
                                 onCancel={() => { setExpandedRow(null); cancelEdit(); }}
@@ -527,6 +551,8 @@ export function Transactions() {
                                     setExpandedRow(null);
                                   }
                                 }}
+                                onNewCategory={handleNewCategory}
+                                onNewAccount={handleNewAccount}
                               />
                             </td>
                           </tr>

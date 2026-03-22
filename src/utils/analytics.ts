@@ -38,24 +38,24 @@ export function getAvgDaily(txs: Transaction[]): number {
   return getTotalSpending(expenses) / days;
 }
 
-/** Category breakdown sorted by total descending */
+/** Category breakdown sorted by total descending — keyed by categoryId */
 export function getCategoryBreakdown(
   txs: Transaction[]
-): { category: string; total: number; count: number; percent: number }[] {
+): { categoryId: string; total: number; count: number; percent: number }[] {
   const expenses = getExpenses(txs);
   const total = getTotalSpending(expenses);
   const map: Record<string, { total: number; count: number }> = {};
 
   expenses.forEach((t) => {
     const abs = Math.abs(t.amount);
-    if (!map[t.category]) map[t.category] = { total: 0, count: 0 };
-    map[t.category].total += abs;
-    map[t.category].count += 1;
+    if (!map[t.categoryId]) map[t.categoryId] = { total: 0, count: 0 };
+    map[t.categoryId].total += abs;
+    map[t.categoryId].count += 1;
   });
 
   return Object.entries(map)
-    .map(([category, { total: catTotal, count }]) => ({
-      category,
+    .map(([categoryId, { total: catTotal, count }]) => ({
+      categoryId,
       total: catTotal,
       count,
       percent: total > 0 ? (catTotal / total) * 100 : 0,
@@ -130,21 +130,21 @@ export function getCalendarHeatmap(
   });
 }
 
-/** Account/payment method breakdown */
+/** Account/payment method breakdown — keyed by accountId */
 export function getAccountBreakdown(
   txs: Transaction[]
-): { account: string; total: number; count: number; percent: number }[] {
+): { accountId: string; total: number; count: number; percent: number }[] {
   const expenses = getExpenses(txs);
   const map: Record<string, { total: number; count: number }> = {};
   expenses.forEach((t) => {
-    if (!map[t.account]) map[t.account] = { total: 0, count: 0 };
-    map[t.account].total += Math.abs(t.amount);
-    map[t.account].count += 1;
+    if (!map[t.accountId]) map[t.accountId] = { total: 0, count: 0 };
+    map[t.accountId].total += Math.abs(t.amount);
+    map[t.accountId].count += 1;
   });
   const total = getTotalSpending(expenses);
   return Object.entries(map)
-    .map(([account, { total: accTotal, count }]) => ({
-      account,
+    .map(([accountId, { total: accTotal, count }]) => ({
+      accountId,
       total: accTotal,
       count,
       percent: total > 0 ? (accTotal / total) * 100 : 0,
@@ -152,18 +152,18 @@ export function getAccountBreakdown(
     .sort((a, b) => b.total - a.total);
 }
 
-/** Top N spending days (by total spending on that date) */
+/** Top N spending days (by total spending on that date) — categoryIds as array */
 export function getTopSpendingDays(
   txs: Transaction[],
   n = 5
-): { date: string; total: number; categories: string }[] {
+): { date: string; total: number; categoryIds: string[] }[] {
   const expenses = getExpenses(txs);
   const map: Record<string, { total: number; cats: Set<string> }> = {};
   expenses.forEach((t) => {
     const key = toYYYYMMDD(t.date);
     if (!map[key]) map[key] = { total: 0, cats: new Set() };
     map[key].total += Math.abs(t.amount);
-    map[key].cats.add(t.category);
+    map[key].cats.add(t.categoryId);
   });
   return Object.entries(map)
     .sort(([, a], [, b]) => b.total - a.total)
@@ -171,16 +171,16 @@ export function getTopSpendingDays(
     .map(([date, { total, cats }]) => ({
       date,
       total,
-      categories: Array.from(cats).join(', '),
+      categoryIds: Array.from(cats),
     }));
 }
 
-/** Month-over-month comparison per category (top categories) */
+/** Month-over-month comparison per categoryId (top categories) */
 export function getMonthlyComparison(
   txs: Transaction[],
   currentPeriod: string
 ): {
-  category: string;
+  categoryId: string;
   current: number;
   previous: number;
   changePercent: number;
@@ -194,44 +194,42 @@ export function getMonthlyComparison(
   const previous = getCategoryBreakdown(filterByPeriod(getExpenses(txs), prevPeriod));
 
   const prevMap: Record<string, number> = {};
-  previous.forEach((c) => (prevMap[c.category] = c.total));
+  previous.forEach((c) => (prevMap[c.categoryId] = c.total));
 
   return current.slice(0, 6).map((c) => {
-    const prev = prevMap[c.category] || 0;
+    const prev = prevMap[c.categoryId] || 0;
     const changePercent = prev > 0 ? ((c.total - prev) / prev) * 100 : 100;
     const trend: 'up' | 'down' | 'flat' =
       changePercent > 2 ? 'up' : changePercent < -2 ? 'down' : 'flat';
-    return { category: c.category, current: c.total, previous: prev, changePercent, trend };
+    return { categoryId: c.categoryId, current: c.total, previous: prev, changePercent, trend };
   });
 }
 
-/** Category × month spending matrix for a date range */
+/** Category × month spending matrix for a date range — dynamic keys are categoryIds */
 export function getCategoryMonthMatrix(
   txs: Transaction[],
   fromPeriod: string,
   toPeriod: string
-): { month: string; [category: string]: number | string }[] {
-  // Build sorted list of all YYYY-MM in range
+): { month: string; [categoryId: string]: number | string }[] {
   const allPeriods = getAvailablePeriods(txs).filter(
     (p) => p >= fromPeriod && p <= toPeriod
   ).reverse(); // chronological order
 
-  // Collect all categories in range
   const rangeTxs = txs.filter((t) => {
     const p = toYYYYMM(t.date);
     return p >= fromPeriod && p <= toPeriod;
   });
-  const allCats = getCategoryBreakdown(getExpenses(rangeTxs)).map((c) => c.category);
+  const allCatIds = getCategoryBreakdown(getExpenses(rangeTxs)).map((c) => c.categoryId);
 
   return allPeriods.map((p) => {
     const periodTxs = filterByPeriod(txs, p);
     const bd = getCategoryBreakdown(getExpenses(periodTxs));
     const bdMap: Record<string, number> = {};
-    bd.forEach((c) => (bdMap[c.category] = c.total));
+    bd.forEach((c) => (bdMap[c.categoryId] = c.total));
 
     const row: { month: string; [key: string]: number | string } = { month: p };
-    allCats.forEach((cat) => {
-      row[cat] = bdMap[cat] || 0;
+    allCatIds.forEach((id) => {
+      row[id] = bdMap[id] || 0;
     });
     return row;
   });
@@ -246,19 +244,18 @@ export function getAvailablePeriods(txs: Transaction[]): string[] {
 /** Daily spending trend for a single category within a date range (YYYY-MM-DD) */
 export function getCategoryDailyTrend(
   txs: Transaction[],
-  category: string,
+  categoryId: string,
   dateStart: string,
   dateEnd: string
 ): { day: string; amount: number }[] {
   const expenses = getExpenses(txs).filter(
-    (t) => t.category === category && toYYYYMMDD(t.date) >= dateStart && toYYYYMMDD(t.date) <= dateEnd
+    (t) => t.categoryId === categoryId && toYYYYMMDD(t.date) >= dateStart && toYYYYMMDD(t.date) <= dateEnd
   );
   const map: Record<string, number> = {};
   expenses.forEach((t) => {
     const key = toYYYYMMDD(t.date);
     map[key] = (map[key] || 0) + Math.abs(t.amount);
   });
-  // Fill every day in range
   const result: { day: string; amount: number }[] = [];
   const cur = new Date(dateStart + 'T00:00:00');
   const end = new Date(dateEnd + 'T00:00:00');
@@ -274,19 +271,18 @@ export function getCategoryDailyTrend(
 /** Weekly spending trend for a single category within a date range, grouped by Mon-Sun week */
 export function getCategoryWeeklyTrend(
   txs: Transaction[],
-  category: string,
+  categoryId: string,
   dateStart: string,
   dateEnd: string
 ): { week: string; amount: number }[] {
   const expenses = getExpenses(txs).filter(
-    (t) => t.category === category && toYYYYMMDD(t.date) >= dateStart && toYYYYMMDD(t.date) <= dateEnd
+    (t) => t.categoryId === categoryId && toYYYYMMDD(t.date) >= dateStart && toYYYYMMDD(t.date) <= dateEnd
   );
-  // Group by Monday of each week
   const map: Record<string, number> = {};
   expenses.forEach((t) => {
     const d = new Date(t.date);
-    const dow = d.getDay(); // 0=Sun
-    const diff = dow === 0 ? -6 : 1 - dow; // shift to Monday
+    const dow = d.getDay();
+    const diff = dow === 0 ? -6 : 1 - dow;
     const mon = new Date(d);
     mon.setDate(d.getDate() + diff);
     const key = toYYYYMMDD(mon);
@@ -304,25 +300,25 @@ export function getCategoryWeeklyTrend(
 /** Monthly spending trend for a single category over a range of periods */
 export function getCategoryMonthlyTrend(
   txs: Transaction[],
-  category: string,
+  categoryId: string,
   periods: string[]
 ): { month: string; amount: number }[] {
   const expenses = getExpenses(txs);
   return periods.map((p) => {
     const total = expenses
-      .filter((t) => toYYYYMM(t.date) === p && t.category === category)
+      .filter((t) => toYYYYMM(t.date) === p && t.categoryId === categoryId)
       .reduce((sum, t) => sum + Math.abs(t.amount), 0);
     return { month: p, amount: total };
   });
 }
 
-/** Account spending by week within a period */
+/** Account spending by week within a period — dynamic keys are accountIds */
 export function getAccountByWeek(
   txs: Transaction[],
   period: string
-): { week: string; [account: string]: number | string }[] {
+): { week: string; [accountId: string]: number | string }[] {
   const expenses = filterByPeriod(getExpenses(txs), period);
-  const weeks: { week: string; [account: string]: number | string }[] = [
+  const weeks: { week: string; [accountId: string]: number | string }[] = [
     { week: 'Week 1' },
     { week: 'Week 2' },
     { week: 'Week 3' },
@@ -332,16 +328,15 @@ export function getAccountByWeek(
   expenses.forEach((t) => {
     const day = t.date.getDate();
     const weekIdx = Math.min(Math.floor((day - 1) / 7), 3);
-    const acc = t.account;
-    if (weeks[weekIdx][acc] === undefined) weeks[weekIdx][acc] = 0;
-    (weeks[weekIdx][acc] as number) += Math.abs(t.amount);
+    const id = t.accountId;
+    if (weeks[weekIdx][id] === undefined) weeks[weekIdx][id] = 0;
+    (weeks[weekIdx][id] as number) += Math.abs(t.amount);
   });
 
-  // Fill missing accounts with 0
-  const accounts = [...new Set(expenses.map((t) => t.account))];
+  const accountIds = [...new Set(expenses.map((t) => t.accountId))];
   weeks.forEach((w) => {
-    accounts.forEach((acc) => {
-      if (w[acc] === undefined) w[acc] = 0;
+    accountIds.forEach((id) => {
+      if (w[id] === undefined) w[id] = 0;
     });
   });
 
@@ -350,22 +345,20 @@ export function getAccountByWeek(
 
 /**
  * Compute the net transaction total for each account across all transaction types.
- * - Expense/Income/Account types: amount is already signed, add directly to account
- * - Transfer: debit source account, credit transferTo account
- * Returns a map of account name → net total (does NOT include initial balance offsets).
+ * Returns a map of accountId → net total.
  */
 export function getAccountNetTotals(txs: Transaction[]): Record<string, number> {
   const map: Record<string, number> = {};
   txs.forEach((t) => {
-    if (!map[t.account]) map[t.account] = 0;
+    if (!map[t.accountId]) map[t.accountId] = 0;
     if (t.type === 'Transfer') {
-      map[t.account] -= Math.abs(t.amount);
-      if (t.transferTo) {
-        if (!map[t.transferTo]) map[t.transferTo] = 0;
-        map[t.transferTo] += Math.abs(t.amount);
+      map[t.accountId] -= Math.abs(t.amount);
+      if (t.transferToId) {
+        if (!map[t.transferToId]) map[t.transferToId] = 0;
+        map[t.transferToId] += Math.abs(t.amount);
       }
     } else {
-      map[t.account] += t.amount;
+      map[t.accountId] += t.amount;
     }
   });
   return map;

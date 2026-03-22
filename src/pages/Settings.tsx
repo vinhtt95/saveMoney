@@ -1,29 +1,46 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Account, Category } from '../types';
 import { useApp } from '../context/AppContext';
 import { parseCSV, exportCSV } from '../utils/csvParser';
 import { exportDatabase, readBackupFile } from '../utils/backup';
-import { DatabaseBackup } from '../types';
+import { categoryName, accountName } from '../utils/lookup';
 import { formatVND, formatDate } from '../utils/formatters';
 
 type Tab = 'data' | 'lists' | 'display' | 'about';
 
+interface ParsedPreviewRow {
+  date: Date;
+  type: string;
+  categoryId: string;
+  accountId: string;
+  amount: number;
+}
+
 export function Settings() {
   const { state, dispatch } = useApp();
   const [activeTab, setActiveTab] = useState<Tab>('data');
-  const [preview, setPreview] = useState<ReturnType<typeof parseCSV>>([]);
-  const [pendingTxs, setPendingTxs] = useState<ReturnType<typeof parseCSV>>([]);
+  const [preview, setPreview] = useState<ParsedPreviewRow[]>([]);
+  const [pendingTxs, setPendingTxs] = useState<ReturnType<typeof parseCSV>['transactions']>([]);
+  const [pendingNewCategories, setPendingNewCategories] = useState<Category[]>([]);
+  const [pendingNewAccounts, setPendingNewAccounts] = useState<Account[]>([]);
   const [importMsg, setImportMsg] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [newCategory, setNewCategory] = useState('');
   const [newAccount, setNewAccount] = useState('');
-  const [defaultCategoryExpense, setDefaultCategoryExpense] = useState(state.defaultCategoryExpense);
-  const [defaultCategoryIncome, setDefaultCategoryIncome] = useState(state.defaultCategoryIncome);
-  const [defaultAccount, setDefaultAccount] = useState(state.defaultAccount);
+  const [defaultCategoryExpenseId, setDefaultCategoryExpenseId] = useState(state.defaultCategoryExpenseId);
+  const [defaultCategoryIncomeId, setDefaultCategoryIncomeId] = useState(state.defaultCategoryIncomeId);
+  const [defaultAccountId, setDefaultAccountId] = useState(state.defaultAccountId);
 
-  useEffect(() => { setDefaultCategoryExpense(state.defaultCategoryExpense); }, [state.defaultCategoryExpense]);
-  useEffect(() => { setDefaultCategoryIncome(state.defaultCategoryIncome); }, [state.defaultCategoryIncome]);
-  useEffect(() => { setDefaultAccount(state.defaultAccount); }, [state.defaultAccount]);
+  useEffect(() => { setDefaultCategoryExpenseId(state.defaultCategoryExpenseId); }, [state.defaultCategoryExpenseId]);
+  useEffect(() => { setDefaultCategoryIncomeId(state.defaultCategoryIncomeId); }, [state.defaultCategoryIncomeId]);
+  useEffect(() => { setDefaultAccountId(state.defaultAccountId); }, [state.defaultAccountId]);
+
+  // All categories merged (working set for preview parsing)
+  const allCategoriesRef = React.useRef(state.categories);
+  allCategoriesRef.current = state.categories;
+  const allAccountsRef = React.useRef(state.accounts);
+  allAccountsRef.current = state.accounts;
 
   function handleFile(file: File) {
     if (!file.name.endsWith('.csv')) {
@@ -33,10 +50,12 @@ export function Settings() {
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
-      const parsed = parseCSV(text);
-      setPendingTxs(parsed);
-      setPreview(parsed.slice(-5));
-      setImportMsg(`Parsed ${parsed.length} transactions. Review preview below, then click Import.`);
+      const result = parseCSV(text, allCategoriesRef.current, allAccountsRef.current);
+      setPendingTxs(result.transactions);
+      setPendingNewCategories(result.newCategories);
+      setPendingNewAccounts(result.newAccounts);
+      setPreview(result.transactions.slice(-5));
+      setImportMsg(`Parsed ${result.transactions.length} transactions. Review preview below, then click Import.`);
     };
     reader.readAsText(file);
   }
@@ -55,14 +74,16 @@ export function Settings() {
 
   function handleImport() {
     if (pendingTxs.length === 0) return;
-    dispatch({ type: 'IMPORT', transactions: pendingTxs });
+    dispatch({ type: 'IMPORT', transactions: pendingTxs, newCategories: pendingNewCategories, newAccounts: pendingNewAccounts });
     setImportMsg(`Successfully imported ${pendingTxs.length} transactions!`);
     setPendingTxs([]);
+    setPendingNewCategories([]);
+    setPendingNewAccounts([]);
     setPreview([]);
   }
 
   function handleExportCSV() {
-    const csv = exportCSV(state.transactions);
+    const csv = exportCSV(state.transactions, state.categories, state.accounts);
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -81,7 +102,7 @@ export function Settings() {
     }
   }
 
-  const [pendingBackup, setPendingBackup] = useState<DatabaseBackup | null>(null);
+  const [pendingBackup, setPendingBackup] = useState<Awaited<ReturnType<typeof readBackupFile>> | null>(null);
   const [backupMsg, setBackupMsg] = useState('');
   const [isBackupDragging, setIsBackupDragging] = useState(false);
   const backupInputRef = useRef<HTMLInputElement>(null);
@@ -90,7 +111,7 @@ export function Settings() {
     try {
       const backup = await readBackupFile(file);
       setPendingBackup(backup);
-      setBackupMsg(`Đọc thành công: ${backup.transactions.length} giao dịch, ${backup.budgets.length} ngân sách, ${backup.expenseCategories.length + backup.incomeCategories.length} danh mục, ${backup.accounts.length} tài khoản.`);
+      setBackupMsg(`Đọc thành công: ${backup.transactions.length} giao dịch, ${backup.budgets.length} ngân sách, ${backup.categories.length} danh mục, ${backup.accounts.length} tài khoản.`);
     } catch (err) {
       setBackupMsg((err as Error).message);
     }
@@ -111,24 +132,33 @@ export function Settings() {
   function addCategory() {
     const val = newCategory.trim();
     if (!val) return;
-    dispatch({ type: 'ADD_CATEGORY', name: val, categoryType: newCategoryType });
+    const category: Category = { id: crypto.randomUUID(), name: val, type: newCategoryType };
+    dispatch({ type: 'ADD_CATEGORY', category });
     setNewCategory('');
   }
 
-  function removeCategory(cat: string, categoryType: 'Expense' | 'Income') {
-    dispatch({ type: 'DELETE_CATEGORY', name: cat, categoryType });
+  function removeCategory(id: string) {
+    dispatch({ type: 'DELETE_CATEGORY', id });
   }
 
   function addAccount() {
     const val = newAccount.trim();
-    if (!val || state.accounts.includes(val)) return;
-    dispatch({ type: 'SET_ACCOUNTS', accounts: [...state.accounts, val].sort() });
+    if (!val || state.accounts.some((a) => a.name === val)) return;
+    const account: Account = { id: crypto.randomUUID(), name: val };
+    dispatch({ type: 'SET_ACCOUNTS', accounts: [...state.accounts, account].sort((a, b) => a.name.localeCompare(b.name)) });
     setNewAccount('');
   }
 
-  function removeAccount(acc: string) {
-    dispatch({ type: 'SET_ACCOUNTS', accounts: state.accounts.filter((a) => a !== acc) });
+  function removeAccount(id: string) {
+    dispatch({ type: 'SET_ACCOUNTS', accounts: state.accounts.filter((a) => a.id !== id) });
   }
+
+  const expenseCategories = state.categories.filter((c) => c.type === 'Expense');
+  const incomeCategories = state.categories.filter((c) => c.type === 'Income');
+
+  // For preview: build lookup maps including pending new categories/accounts
+  const previewCatMap = new Map([...state.categories, ...pendingNewCategories].map((c) => [c.id, c.name]));
+  const previewAccMap = new Map([...state.accounts, ...pendingNewAccounts].map((a) => [a.id, a.name]));
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'data', label: 'Data Management' },
@@ -237,10 +267,10 @@ export function Settings() {
                                 'bg-slate-100 text-slate-600'
                               }`}>{row.type}</span>
                             </td>
-                            <td className="px-4 py-3">{row.category}</td>
-                            <td className="px-4 py-3 text-slate-500">{row.account}</td>
+                            <td className="px-4 py-3">{previewCatMap.get(row.categoryId) ?? row.categoryId}</td>
+                            <td className="px-4 py-3 text-slate-500">{previewAccMap.get(row.accountId) ?? row.accountId}</td>
                             <td className={`px-4 py-3 text-right font-medium ${row.amount < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                              {row.amount < 0 ? '-' : '+'}{formatVND(row.amount)}
+                              {row.amount < 0 ? '-' : '+'}{formatVND(Math.abs(row.amount))}
                             </td>
                           </tr>
                         ))}
@@ -282,12 +312,11 @@ export function Settings() {
               <p className="text-sm text-slate-500">Export toàn bộ database (giao dịch, danh mục, tài khoản, ngân sách) ra file JSON để backup hoặc chuyển thiết bị.</p>
             </div>
             <div className="p-6 space-y-6">
-              {/* Export */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <p className="text-sm font-bold text-slate-900 dark:text-slate-100">Export Database</p>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    {state.transactions.length} giao dịch · {state.expenseCategories.length + state.incomeCategories.length} danh mục · {state.accounts.length} tài khoản
+                    {state.transactions.length} giao dịch · {state.categories.length} danh mục · {state.accounts.length} tài khoản
                   </p>
                 </div>
                 <button
@@ -299,7 +328,6 @@ export function Settings() {
                 </button>
               </div>
 
-              {/* Import */}
               <div className="border-t border-slate-100 dark:border-slate-800 pt-6">
                 <p className="text-sm font-bold text-slate-900 dark:text-slate-100 mb-3">Khôi phục từ backup</p>
                 <div
@@ -385,53 +413,54 @@ export function Settings() {
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-400 mb-2">Danh mục mặc định — Chi tiêu</label>
                 <select
-                  value={defaultCategoryExpense}
+                  value={defaultCategoryExpenseId}
                   onChange={(e) => {
-                    setDefaultCategoryExpense(e.target.value);
-                    dispatch({ type: 'SET_DEFAULTS', defaultCategoryExpense: e.target.value, defaultCategoryIncome: defaultCategoryIncome, defaultAccount });
+                    setDefaultCategoryExpenseId(e.target.value);
+                    dispatch({ type: 'SET_DEFAULTS', defaultCategoryExpenseId: e.target.value, defaultCategoryIncomeId, defaultAccountId });
                   }}
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
                 >
                   <option value="">— Không có mặc định —</option>
-                  {state.expenseCategories.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
+                  {expenseCategories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
                   ))}
                 </select>
               </div>
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-400 mb-2">Danh mục mặc định — Thu nhập</label>
                 <select
-                  value={defaultCategoryIncome}
+                  value={defaultCategoryIncomeId}
                   onChange={(e) => {
-                    setDefaultCategoryIncome(e.target.value);
-                    dispatch({ type: 'SET_DEFAULTS', defaultCategoryExpense, defaultCategoryIncome: e.target.value, defaultAccount });
+                    setDefaultCategoryIncomeId(e.target.value);
+                    dispatch({ type: 'SET_DEFAULTS', defaultCategoryExpenseId, defaultCategoryIncomeId: e.target.value, defaultAccountId });
                   }}
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
                 >
                   <option value="">— Không có mặc định —</option>
-                  {state.incomeCategories.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
+                  {incomeCategories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
                   ))}
                 </select>
               </div>
               <div>
                 <label className="block text-xs font-bold uppercase text-slate-400 mb-2">Tài khoản mặc định</label>
                 <select
-                  value={defaultAccount}
+                  value={defaultAccountId}
                   onChange={(e) => {
-                    setDefaultAccount(e.target.value);
-                    dispatch({ type: 'SET_DEFAULTS', defaultCategoryExpense, defaultCategoryIncome, defaultAccount: e.target.value });
+                    setDefaultAccountId(e.target.value);
+                    dispatch({ type: 'SET_DEFAULTS', defaultCategoryExpenseId, defaultCategoryIncomeId, defaultAccountId: e.target.value });
                   }}
                   className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
                 >
                   <option value="">— Không có mặc định —</option>
                   {state.accounts.map((acc) => (
-                    <option key={acc} value={acc}>{acc}</option>
+                    <option key={acc.id} value={acc.id}>{acc.name}</option>
                   ))}
                 </select>
               </div>
             </div>
           </section>
+
           {/* Categories */}
           <section className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
             <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
@@ -439,10 +468,9 @@ export function Settings() {
                 <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">Danh mục</h3>
                 <p className="text-sm text-slate-500">Quản lý danh sách danh mục dùng trong form nhập giao dịch.</p>
               </div>
-              <span className="text-sm font-semibold text-primary">{state.expenseCategories.length + state.incomeCategories.length} danh mục</span>
+              <span className="text-sm font-semibold text-primary">{state.categories.length} danh mục</span>
             </div>
             <div className="p-6 space-y-4">
-              {/* Add new */}
               <div className="flex gap-2">
                 <select
                   value={newCategoryType}
@@ -469,19 +497,18 @@ export function Settings() {
                   Thêm
                 </button>
               </div>
-              {/* List */}
-              {state.expenseCategories.length === 0 && state.incomeCategories.length === 0 ? (
+              {state.categories.length === 0 ? (
                 <p className="text-sm text-slate-400 text-center py-4">Chưa có danh mục nào. Import CSV hoặc thêm thủ công.</p>
               ) : (
                 <div className="space-y-3">
-                  {state.expenseCategories.length > 0 && (
+                  {expenseCategories.length > 0 && (
                     <div>
                       <p className="text-xs font-bold uppercase text-rose-500 mb-1.5">Chi tiêu</p>
                       <div className="flex flex-wrap gap-2">
-                        {state.expenseCategories.map((cat) => (
-                          <span key={cat} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 dark:bg-rose-900/20 rounded-full text-sm font-medium text-slate-700 dark:text-slate-300">
-                            {cat}
-                            <button onClick={() => removeCategory(cat, 'Expense')} className="size-4 flex items-center justify-center rounded-full hover:bg-rose-100 hover:text-rose-600 transition-colors text-slate-400">
+                        {expenseCategories.map((cat) => (
+                          <span key={cat.id} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 dark:bg-rose-900/20 rounded-full text-sm font-medium text-slate-700 dark:text-slate-300">
+                            {cat.name}
+                            <button onClick={() => removeCategory(cat.id)} className="size-4 flex items-center justify-center rounded-full hover:bg-rose-100 hover:text-rose-600 transition-colors text-slate-400">
                               <span className="material-symbols-outlined text-xs">close</span>
                             </button>
                           </span>
@@ -489,14 +516,14 @@ export function Settings() {
                       </div>
                     </div>
                   )}
-                  {state.incomeCategories.length > 0 && (
+                  {incomeCategories.length > 0 && (
                     <div>
                       <p className="text-xs font-bold uppercase text-emerald-500 mb-1.5">Thu nhập</p>
                       <div className="flex flex-wrap gap-2">
-                        {state.incomeCategories.map((cat) => (
-                          <span key={cat} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-full text-sm font-medium text-slate-700 dark:text-slate-300">
-                            {cat}
-                            <button onClick={() => removeCategory(cat, 'Income')} className="size-4 flex items-center justify-center rounded-full hover:bg-emerald-100 hover:text-emerald-600 transition-colors text-slate-400">
+                        {incomeCategories.map((cat) => (
+                          <span key={cat.id} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-full text-sm font-medium text-slate-700 dark:text-slate-300">
+                            {cat.name}
+                            <button onClick={() => removeCategory(cat.id)} className="size-4 flex items-center justify-center rounded-full hover:bg-emerald-100 hover:text-emerald-600 transition-colors text-slate-400">
                               <span className="material-symbols-outlined text-xs">close</span>
                             </button>
                           </span>
@@ -519,7 +546,6 @@ export function Settings() {
               <span className="text-sm font-semibold text-primary">{state.accounts.length} tài khoản</span>
             </div>
             <div className="p-6 space-y-4">
-              {/* Add new */}
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -531,26 +557,25 @@ export function Settings() {
                 />
                 <button
                   onClick={addAccount}
-                  disabled={!newAccount.trim() || state.accounts.includes(newAccount.trim())}
+                  disabled={!newAccount.trim() || state.accounts.some((a) => a.name === newAccount.trim())}
                   className="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <span className="material-symbols-outlined text-sm">add</span>
                   Thêm
                 </button>
               </div>
-              {/* List */}
               {state.accounts.length === 0 ? (
                 <p className="text-sm text-slate-400 text-center py-4">Chưa có tài khoản nào. Import CSV hoặc thêm thủ công.</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {state.accounts.map((acc) => (
                     <span
-                      key={acc}
+                      key={acc.id}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-full text-sm font-medium text-slate-700 dark:text-slate-300"
                     >
-                      {acc}
+                      {acc.name}
                       <button
-                        onClick={() => removeAccount(acc)}
+                        onClick={() => removeAccount(acc.id)}
                         className="size-4 flex items-center justify-center rounded-full hover:bg-rose-100 hover:text-rose-600 transition-colors text-slate-400"
                       >
                         <span className="material-symbols-outlined text-xs">close</span>

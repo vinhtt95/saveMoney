@@ -37,13 +37,13 @@ function SidebarAccountCards() {
 
   const accountCards = useMemo(() => {
     return state.accounts.map((acc) => {
-      const initial = state.accountBalances[acc] ?? 0;
-      const net = netTotals[acc] ?? 0;
+      const initial = state.accountBalances[acc.id] ?? 0;
+      const net = netTotals[acc.id] ?? 0;
       const balance = initial + net;
       let spending = 0;
       let income = 0;
       state.transactions.forEach((t) => {
-        if (t.account === acc) {
+        if (t.accountId === acc.id) {
           if (t.type === 'Expense') spending += Math.abs(t.amount);
           else if (t.type === 'Income') income += t.amount;
         }
@@ -59,11 +59,11 @@ function SidebarAccountCards() {
       <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">Accounts</p>
       <div className="space-y-2">
         {accountCards.map((acc) => (
-          <div key={acc.account} className="bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+          <div key={acc.account.id} className="bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
             <div className={`px-3 py-3 ${acc.balance >= 0 ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-rose-50 dark:bg-rose-900/20'}`}>
               <div className="flex items-center gap-1.5 mb-1">
                 <span className="material-symbols-outlined text-slate-400 text-base">account_balance_wallet</span>
-                <span className="text-sm font-semibold text-slate-500 dark:text-slate-400 truncate flex-1">{acc.account}</span>
+                <span className="text-sm font-semibold text-slate-500 dark:text-slate-400 truncate flex-1">{acc.account.name}</span>
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 shrink-0">VND</span>
               </div>
               <p className={`text-lg font-bold text-right ${acc.balance >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
@@ -97,7 +97,7 @@ function SidebarBudgetCards() {
         .filter(
           (t) =>
             t.type === 'Expense' &&
-            budget.categories.includes(t.category) &&
+            budget.categoryIds.includes(t.categoryId) &&
             toYYYYMMDD(t.date) >= budget.dateStart &&
             toYYYYMMDD(t.date) <= budget.dateEnd
         )

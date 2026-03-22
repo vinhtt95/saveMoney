@@ -2,7 +2,8 @@ import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { formatVND, formatDate } from '../utils/formatters';
-import { Transaction } from '../types';
+import { accountName as resolveAccountName } from '../utils/lookup';
+import { Category, Transaction } from '../types';
 
 const fieldCls =
   'px-2 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition';
@@ -30,45 +31,48 @@ export function Categories() {
   const { state, dispatch } = useApp();
 
   const [activeTab, setActiveTab] = useState<'Expense' | 'Income'>('Expense');
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  // selectedCategory now stores Category ID
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [addError, setAddError] = useState('');
-  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
 
-  const categories = activeTab === 'Expense' ? state.expenseCategories : state.incomeCategories;
+  const categories: Category[] = state.categories.filter((c) => c.type === activeTab);
 
   const categoryData = useMemo(() => {
     return categories.map((cat) => {
       const txCount = state.transactions.filter(
-        (t) => t.category === cat && t.type === activeTab
+        (t) => t.categoryId === cat.id && t.type === activeTab
       ).length;
       const total = state.transactions
-        .filter((t) => t.category === cat && t.type === activeTab)
+        .filter((t) => t.categoryId === cat.id && t.type === activeTab)
         .reduce((sum, t) => sum + Math.abs(t.amount), 0);
-      return { name: cat, txCount, total };
+      return { id: cat.id, name: cat.name, txCount, total };
     });
   }, [categories, state.transactions, activeTab]);
 
   const selectedTxs = useMemo(() => {
-    if (!selectedCategory) return [];
+    if (!selectedCategoryId) return [];
     return state.transactions
-      .filter((t) => t.category === selectedCategory && t.type === activeTab)
+      .filter((t) => t.categoryId === selectedCategoryId && t.type === activeTab)
       .sort((a, b) => b.date.getTime() - a.date.getTime())
       .slice(0, 50);
-  }, [selectedCategory, state.transactions, activeTab]);
+  }, [selectedCategoryId, state.transactions, activeTab]);
 
   const selectedTxTotal = useMemo(() => {
-    if (!selectedCategory) return 0;
-    return state.transactions.filter((t) => t.category === selectedCategory && t.type === activeTab).length;
-  }, [selectedCategory, state.transactions, activeTab]);
+    if (!selectedCategoryId) return 0;
+    return state.transactions.filter((t) => t.categoryId === selectedCategoryId && t.type === activeTab).length;
+  }, [selectedCategoryId, state.transactions, activeTab]);
+
+  const selectedCategoryName = categories.find((c) => c.id === selectedCategoryId)?.name ?? '';
 
   function handleTabChange(tab: 'Expense' | 'Income') {
     setActiveTab(tab);
-    setSelectedCategory(null);
+    setSelectedCategoryId(null);
     setIsAdding(false);
-    setEditingCategory(null);
+    setEditingCategoryId(null);
     setAddError('');
   }
 
@@ -78,51 +82,53 @@ export function Categories() {
       setAddError('Tên danh mục không được trống');
       return;
     }
-    if (categories.includes(name)) {
+    if (categories.some((c) => c.name === name)) {
       setAddError('Danh mục đã tồn tại');
       return;
     }
-    dispatch({ type: 'ADD_CATEGORY', name, categoryType: activeTab });
+    const category = { id: crypto.randomUUID(), name, type: activeTab };
+    dispatch({ type: 'ADD_CATEGORY', category });
     setIsAdding(false);
     setNewCategoryName('');
     setAddError('');
   }
 
-  function handleRename(oldName: string) {
+  function handleRename(cat: Category) {
     const newName = editingName.trim();
-    if (!newName || newName === oldName) {
-      setEditingCategory(null);
+    if (!newName || newName === cat.name) {
+      setEditingCategoryId(null);
       return;
     }
-    if (categories.includes(newName)) {
-      setEditingCategory(null);
+    if (categories.some((c) => c.name === newName && c.id !== cat.id)) {
+      setEditingCategoryId(null);
       return;
     }
-    dispatch({ type: 'RENAME_CATEGORY', oldName, newName, categoryType: activeTab });
-    if (selectedCategory === oldName) setSelectedCategory(newName);
-    setEditingCategory(null);
+    dispatch({ type: 'RENAME_CATEGORY', id: cat.id, newName });
+    setEditingCategoryId(null);
   }
 
-  function handleDelete(name: string) {
+  function handleDelete(cat: Category) {
     const txCount = state.transactions.filter(
-      (t) => t.category === name && t.type === activeTab
+      (t) => t.categoryId === cat.id && t.type === activeTab
     ).length;
     if (txCount > 0) {
       const confirmed = window.confirm(
-        `Danh mục "${name}" có ${txCount} giao dịch. Xóa sẽ không xóa giao dịch, chỉ xóa khỏi danh sách. Tiếp tục?`
+        `Danh mục "${cat.name}" có ${txCount} giao dịch. Xóa sẽ không xóa giao dịch, chỉ xóa khỏi danh sách. Tiếp tục?`
       );
       if (!confirmed) return;
     }
-    dispatch({ type: 'DELETE_CATEGORY', name, categoryType: activeTab });
-    if (selectedCategory === name) setSelectedCategory(null);
+    dispatch({ type: 'DELETE_CATEGORY', id: cat.id });
+    if (selectedCategoryId === cat.id) setSelectedCategoryId(null);
   }
 
-  function startEdit(name: string) {
-    setEditingCategory(name);
-    setEditingName(name);
+  function startEdit(cat: Category) {
+    setEditingCategoryId(cat.id);
+    setEditingName(cat.name);
   }
 
   const isExpenseTab = activeTab === 'Expense';
+  const expenseCount = state.categories.filter((c) => c.type === 'Expense').length;
+  const incomeCount = state.categories.filter((c) => c.type === 'Income').length;
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -133,7 +139,7 @@ export function Categories() {
           <p className="text-sm text-slate-500 mt-0.5">Quản lý danh mục chi tiêu và thu nhập</p>
         </div>
         <button
-          onClick={() => { setIsAdding(true); setNewCategoryName(''); setAddError(''); setEditingCategory(null); }}
+          onClick={() => { setIsAdding(true); setNewCategoryName(''); setAddError(''); setEditingCategoryId(null); }}
           className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity shadow-sm"
         >
           <span className="material-symbols-outlined text-sm">add</span>
@@ -154,7 +160,7 @@ export function Categories() {
           <span className="material-symbols-outlined text-base">trending_down</span>
           Chi tiêu
           <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-bold ${isExpenseTab ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-600' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
-            {state.expenseCategories.length}
+            {expenseCount}
           </span>
         </button>
         <button
@@ -168,7 +174,7 @@ export function Categories() {
           <span className="material-symbols-outlined text-base">trending_up</span>
           Thu nhập
           <span className={`ml-1 px-2 py-0.5 rounded-full text-xs font-bold ${!isExpenseTab ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
-            {state.incomeCategories.length}
+            {incomeCount}
           </span>
         </button>
       </div>
@@ -226,12 +232,13 @@ export function Categories() {
           ) : (
             <div className="divide-y divide-slate-50 dark:divide-slate-800/50">
               {categoryData.map((cat) => {
-                const isSelected = selectedCategory === cat.name;
-                const isEditing = editingCategory === cat.name;
+                const isSelected = selectedCategoryId === cat.id;
+                const isEditing = editingCategoryId === cat.id;
+                const catObj = categories.find((c) => c.id === cat.id)!;
                 return (
                   <div
-                    key={cat.name}
-                    onClick={() => !isEditing && setSelectedCategory(isSelected ? null : cat.name)}
+                    key={cat.id}
+                    onClick={() => !isEditing && setSelectedCategoryId(isSelected ? null : cat.id)}
                     className={`group flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${
                       isSelected
                         ? isExpenseTab
@@ -240,7 +247,6 @@ export function Categories() {
                         : 'hover:bg-slate-50 dark:hover:bg-slate-800/50 border-l-2 border-transparent'
                     }`}
                   >
-                    {/* Icon */}
                     <div className={`size-8 rounded-lg flex items-center justify-center shrink-0 ${
                       isExpenseTab ? 'bg-rose-100 dark:bg-rose-900/30' : 'bg-emerald-100 dark:bg-emerald-900/30'
                     }`}>
@@ -249,7 +255,6 @@ export function Categories() {
                       </span>
                     </div>
 
-                    {/* Name / edit input */}
                     <div className="flex-1 min-w-0" onClick={(e) => isEditing && e.stopPropagation()}>
                       {isEditing ? (
                         <input
@@ -258,10 +263,10 @@ export function Categories() {
                           value={editingName}
                           onChange={(e) => setEditingName(e.target.value)}
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleRename(cat.name);
-                            if (e.key === 'Escape') setEditingCategory(null);
+                            if (e.key === 'Enter') handleRename(catObj);
+                            if (e.key === 'Escape') setEditingCategoryId(null);
                           }}
-                          onBlur={() => handleRename(cat.name)}
+                          onBlur={() => handleRename(catObj)}
                           onClick={(e) => e.stopPropagation()}
                         />
                       ) : (
@@ -272,21 +277,20 @@ export function Categories() {
                       )}
                     </div>
 
-                    {/* Actions */}
                     {!isEditing && (
                       <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <button
                           title="Đổi tên"
-                          onClick={(e) => { e.stopPropagation(); startEdit(cat.name); }}
+                          onClick={(e) => { e.stopPropagation(); startEdit(catObj); }}
                           className="p-1 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
                         >
                           <span className="material-symbols-outlined text-sm">edit</span>
                         </button>
                         <button
                           title="Xóa"
-                          onClick={(e) => { e.stopPropagation(); handleDelete(cat.name); }}
+                          onClick={(e) => { e.stopPropagation(); handleDelete(catObj); }}
                           className="p-1 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg transition-colors"
                         >
                           <span className="material-symbols-outlined text-sm">delete</span>
@@ -302,7 +306,7 @@ export function Categories() {
 
         {/* Right: Transaction list for selected category */}
         <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-          {!selectedCategory ? (
+          {!selectedCategoryId ? (
             <div className="px-5 py-16 text-center text-slate-400">
               <span className="material-symbols-outlined text-5xl mb-3 block">touch_app</span>
               <p className="text-base font-medium">Chọn một danh mục</p>
@@ -312,7 +316,7 @@ export function Categories() {
             <>
               <div className="px-5 py-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{selectedCategory}</p>
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{selectedCategoryName}</p>
                   <p className="text-xs text-slate-400">{selectedTxTotal} giao dịch</p>
                 </div>
                 {typeBadge(activeTab)}
@@ -330,7 +334,7 @@ export function Categories() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-xs text-slate-400 tabular-nums">{formatDate(tx.date)}</span>
-                            <span className="text-sm text-slate-600 dark:text-slate-300 truncate">{tx.account}</span>
+                            <span className="text-sm text-slate-600 dark:text-slate-300 truncate">{resolveAccountName(state.accounts, tx.accountId)}</span>
                           </div>
                         </div>
                         <span className={`text-sm font-bold tabular-nums shrink-0 ${activeTab === 'Expense' ? 'text-rose-600' : 'text-emerald-600'}`}>
