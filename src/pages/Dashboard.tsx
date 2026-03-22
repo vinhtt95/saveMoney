@@ -5,7 +5,7 @@ import { useApp } from '../context/AppContext';
 import { AddTransactionForm } from '../components/AddTransactionModal';
 import { Draft, emptyDraft } from '../components/InlineFields';
 import { InlineEditForm } from '../components/InlineEditForm';
-import { Transaction, Budget as BudgetType, GoldPriceCache } from '../types';
+import { Transaction, GoldPriceCache } from '../types';
 import {
   getExpenses,
   getTotalSpending,
@@ -29,14 +29,6 @@ import { loadCachedGoldPrices } from '../services/goldPriceService';
 
 const BUDGET_CAT_COLORS = ['#144bb8', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#ec4899'];
 
-function loadBudgets(): BudgetType[] {
-  try {
-    const raw = localStorage.getItem('savemoney_budgets');
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch { return []; }
-}
 
 function getBudgetStatus(pct: number): { label: string; badgeClass: string } {
   if (pct >= 100) return { label: 'Over budget', badgeClass: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400' };
@@ -72,7 +64,7 @@ function calcChange(current: number, previous: number): { pct: string; up: boole
 }
 
 export function Dashboard() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, actions } = useApp();
   const [showPeriodMenu, setShowPeriodMenu] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
@@ -152,8 +144,8 @@ export function Dashboard() {
   const expenseCategories = useMemo(() => categories.filter((c) => c.type === 'Expense'), [categories]);
   const incomeCategories = useMemo(() => categories.filter((c) => c.type === 'Income'), [categories]);
 
-  function handleAddConfirm(tx: Transaction) {
-    dispatch({ type: 'ADD_TRANSACTION', transaction: tx });
+  async function handleAddConfirm(tx: Transaction) {
+    await actions.addTransaction(tx);
     setShowAddForm(false);
   }
 
@@ -187,14 +179,14 @@ export function Dashboard() {
   function handleNewCategory(name: string, type: 'Expense' | 'Income'): string {
     const id = crypto.randomUUID();
     const cat: Category = { id, name, type };
-    dispatch({ type: 'ADD_CATEGORY', category: cat });
+    actions.addCategory(cat);
     return id;
   }
 
   function handleNewAccount(name: string): string {
     const id = crypto.randomUUID();
     const acc: Account = { id, name };
-    dispatch({ type: 'SET_ACCOUNTS', accounts: [...accounts, acc] });
+    actions.addAccount(acc);
     return id;
   }
 
@@ -209,10 +201,10 @@ export function Dashboard() {
     setEditError('');
   }
 
-  function confirmEdit(originalId: string) {
+  async function confirmEdit(originalId: string) {
     const tx = draftToTx(draft, originalId);
     if (!tx) { setEditError('Vui lòng điền đầy đủ thông tin hợp lệ.'); return; }
-    dispatch({ type: 'EDIT_TRANSACTION', transaction: tx });
+    await actions.editTransaction(tx);
     setEditingId(null);
     setEditError('');
   }
@@ -252,7 +244,7 @@ export function Dashboard() {
   const totalWealth = totalAccountBalance + totalGoldValue;
 
   // Budget section state
-  const [budgets] = useState<BudgetType[]>(loadBudgets);
+  const { budgets } = state;
   const [selectedBudgetId, setSelectedBudgetId] = useState<string>(() => budgets[0]?.id || '');
   const [budgetTrendCat, setBudgetTrendCat] = useState<string>('');
   const [budgetGranularity, setBudgetGranularity] = useState<'day' | 'week' | 'month'>('week');
@@ -823,9 +815,9 @@ export function Dashboard() {
                                 error={editError}
                                 onSave={() => confirmEdit(tx.id)}
                                 onCancel={() => { setExpandedRow(null); cancelEdit(); }}
-                                onDelete={() => {
+                                onDelete={async () => {
                                   if (confirm('Xóa giao dịch này?')) {
-                                    dispatch({ type: 'DELETE_TRANSACTION', id: tx.id });
+                                    await actions.deleteTransaction(tx.id);
                                     setExpandedRow(null);
                                   }
                                 }}

@@ -4,22 +4,11 @@ import { twMerge } from 'tailwind-merge';
 import { useApp } from '../context/AppContext';
 import { getAccountNetTotals } from '../utils/analytics';
 import { toYYYYMMDD, formatVNDShort } from '../utils/formatters';
-import type { Budget } from '../types';
 
 function formatNum(amount: number): string {
   return Math.abs(Math.round(amount)).toLocaleString('vi-VN');
 }
 
-function loadBudgets(): Budget[] {
-  try {
-    const raw = localStorage.getItem('savemoney_budgets');
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
 
 const navItems = [
   { name: 'Dashboard', icon: 'dashboard', path: '/' },
@@ -91,7 +80,7 @@ function SidebarAccountCards() {
 
 function SidebarBudgetCards() {
   const { state } = useApp();
-  const budgets = useMemo(() => loadBudgets(), []);
+  const { budgets } = state;
 
   const budgetStats = useMemo(() => {
     return budgets.map((budget) => {
