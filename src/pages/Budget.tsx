@@ -691,7 +691,7 @@ export function Budget() {
                                     </div>
                                   </td>
                                   <td className="px-6 py-3 text-sm text-slate-500 dark:text-slate-400">{txAccName}</td>
-                                  <td className="px-6 py-3 text-right text-sm font-bold text-rose-600 dark:text-rose-400">
+                                  <td className="px-6 py-3 text-right text-sm font-medium text-rose-400 dark:text-rose-300/60">
                                     -{formatVND(Math.abs(tx.amount))}
                                   </td>
                                 </tr>

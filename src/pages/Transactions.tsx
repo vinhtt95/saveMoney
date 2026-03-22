@@ -528,7 +528,7 @@ export function Transactions() {
                             </div>
                           </td>
                           <td className="px-6 py-3 text-sm text-slate-500 dark:text-slate-400">{accName}</td>
-                          <td className={`px-6 py-3 text-right text-sm font-bold ${isExpense ? 'text-rose-600' : 'text-emerald-600'}`}>
+                          <td className={`px-6 py-3 text-right text-sm font-medium ${isExpense ? 'text-rose-400 dark:text-rose-400' : 'text-emerald-400 dark:text-emerald-400'}`}>
                             {isExpense ? '-' : '+'}{formatVND(tx.amount)}
                           </td>
                         </tr>
