@@ -1,8 +1,12 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+import {
+  PieChart, Pie, Cell, Tooltip, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, LineChart, Line, Legend,
+} from 'recharts';
 import { useApp } from '../context/AppContext';
 import type { Budget as BudgetType } from '../types';
-import { formatVND, formatVNDShort, formatDate, toYYYYMMDD } from '../utils/formatters';
+import { formatVND, formatVNDShort, formatDate, toYYYYMM, toYYYYMMDD } from '../utils/formatters';
+import { getCategoryMonthMatrix, getCategoryMonthlyTrend, getCategoryDailyTrend, getCategoryWeeklyTrend, getAvailablePeriods } from '../utils/analytics';
 
 const CATEGORY_ICONS: Record<string, { icon: string; color: string; bg: string }> = {
   Transport: { icon: 'directions_car', color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/30' },
@@ -78,6 +82,9 @@ export function Budget() {
 
   const [budgets, setBudgets] = useState<BudgetType[]>(loadBudgets);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [analyticsOpenId, setAnalyticsOpenId] = useState<string | null>(null);
+  const [selectedCatPerBudget, setSelectedCatPerBudget] = useState<Record<string, string>>({});
+  const [trendGranularityPerBudget, setTrendGranularityPerBudget] = useState<Record<string, 'day' | 'week' | 'month'>>({});
   const [formMode, setFormMode] = useState<'none' | 'create' | 'edit'>('none');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -191,7 +198,22 @@ export function Budget() {
         g.dayTotal += Math.abs(tx.amount);
       }
 
-      return { budget, matchingTxs, spent, pct, pieData, groups };
+      // Analytics: month matrix
+      const fromPeriod = toYYYYMM(new Date(budget.dateStart + 'T00:00:00'));
+      const toPeriod = toYYYYMM(new Date(budget.dateEnd + 'T00:00:00'));
+      const matrixData = matchingTxs.length > 0 ? getCategoryMonthMatrix(matchingTxs, fromPeriod, toPeriod) : [];
+      const matrixPeriods = getAvailablePeriods(matchingTxs).filter((p) => p >= fromPeriod && p <= toPeriod).slice().reverse();
+      const matrixCats = matrixData.length > 0
+        ? (() => {
+            const cats = Object.keys(matrixData[0]).filter((k) => k !== 'month');
+            const totals: Record<string, number> = {};
+            cats.forEach((cat) => { totals[cat] = matrixData.reduce((s, row) => s + ((row[cat] as number) || 0), 0); });
+            return cats.sort((a, b) => totals[b] - totals[a]);
+          })()
+        : [];
+      const isMultiMonth = fromPeriod !== toPeriod;
+
+      return { budget, matchingTxs, spent, pct, pieData, groups, matrixData, matrixPeriods, matrixCats, isMultiMonth, fromPeriod, toPeriod };
     });
   }, [budgets, transactions]);
 
@@ -349,10 +371,20 @@ export function Budget() {
 
       {budgetsWithStats.length > 0 && (
         <div className="space-y-4">
-          {budgetsWithStats.map(({ budget, matchingTxs, spent, pct, pieData, groups }) => {
+          {budgetsWithStats.map(({ budget, matchingTxs, spent, pct, pieData, groups, matrixData, matrixPeriods, matrixCats, isMultiMonth }) => {
             const status = getBudgetStatus(pct);
             const isExpanded = expandedId === budget.id;
+            const isAnalyticsOpen = analyticsOpenId === budget.id;
             const remaining = budget.limit - spent;
+            const selectedCat = selectedCatPerBudget[budget.id] || matrixCats[0] || '';
+            const granularity = trendGranularityPerBudget[budget.id] || 'week';
+            const trendData: { label: string; amount: number }[] = selectedCat
+              ? granularity === 'day'
+                ? getCategoryDailyTrend(matchingTxs, selectedCat, budget.dateStart, budget.dateEnd).map((d) => ({ label: d.day, amount: d.amount }))
+                : granularity === 'week'
+                  ? getCategoryWeeklyTrend(matchingTxs, selectedCat, budget.dateStart, budget.dateEnd).map((d) => ({ label: d.week, amount: d.amount }))
+                  : matrixPeriods.length > 0 ? getCategoryMonthlyTrend(matchingTxs, selectedCat, matrixPeriods).map((d) => ({ label: d.month, amount: d.amount })) : []
+              : [];
 
             return (
               <div key={budget.id} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
@@ -451,15 +483,24 @@ export function Budget() {
                         </span>
                       </div>
 
-                      {/* Expand toggle */}
+                      {/* Expand toggles */}
                       {matchingTxs.length > 0 && (
-                        <button
-                          onClick={() => setExpandedId(isExpanded ? null : budget.id)}
-                          className="mt-3 flex items-center gap-1 text-xs font-semibold text-primary hover:opacity-75 transition-opacity"
-                        >
-                          <span className="material-symbols-outlined text-sm">{isExpanded ? 'expand_less' : 'expand_more'}</span>
-                          {isExpanded ? 'Ẩn giao dịch' : `Xem ${matchingTxs.length} giao dịch`}
-                        </button>
+                        <div className="mt-3 flex items-center gap-3">
+                          <button
+                            onClick={() => setExpandedId(isExpanded ? null : budget.id)}
+                            className="flex items-center gap-1 text-xs font-semibold text-primary hover:opacity-75 transition-opacity"
+                          >
+                            <span className="material-symbols-outlined text-sm">{isExpanded ? 'expand_less' : 'expand_more'}</span>
+                            {isExpanded ? 'Ẩn giao dịch' : `Xem ${matchingTxs.length} giao dịch`}
+                          </button>
+                          <button
+                            onClick={() => setAnalyticsOpenId(isAnalyticsOpen ? null : budget.id)}
+                            className="flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-primary hover:opacity-90 transition-colors"
+                          >
+                            <span className="material-symbols-outlined text-sm">{isAnalyticsOpen ? 'expand_less' : 'bar_chart'}</span>
+                            {isAnalyticsOpen ? 'Ẩn analytics' : 'Xem analytics'}
+                          </button>
+                        </div>
                       )}
                     </div>
 
@@ -483,6 +524,137 @@ export function Budget() {
                     )}
                   </div>
                 </div>
+
+                {/* Analytics Panel */}
+                {isAnalyticsOpen && matrixData.length > 0 && (
+                  <div className="border-t border-slate-200 dark:border-slate-800 p-5 space-y-6">
+                    <h4 className="text-sm font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                      <span className="material-symbols-outlined text-base text-primary">bar_chart</span>
+                      Analytics
+                    </h4>
+
+                    {/* Stacked bar chart (multi-month only) */}
+                    {isMultiMonth && matrixCats.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-3">Chi tiêu theo tháng và danh mục</p>
+                        <div className="h-56">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={matrixData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                              <XAxis dataKey="month" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                              <YAxis tickFormatter={(v) => formatVNDShort(v)} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={72} />
+                              <Tooltip
+                                formatter={(value: number, name: string) => [formatVND(value), name]}
+                                labelFormatter={(label) => `Tháng ${label}`}
+                              />
+                              <Legend />
+                              {matrixCats.map((cat, i) => (
+                                <Bar key={cat} dataKey={cat} stackId="a" fill={PIE_COLORS[i % PIE_COLORS.length]} radius={i === matrixCats.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} />
+                              ))}
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Line chart for selected category */}
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Chi tiêu theo danh mục</p>
+                          {selectedCat && (
+                            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 rounded-lg">
+                              <div className="size-2 rounded-full bg-primary" />
+                              <span className="text-xs font-bold text-primary">{selectedCat}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {(['day', 'week', 'month'] as const).map((g) => (
+                            <button
+                              key={g}
+                              onClick={() => setTrendGranularityPerBudget((prev) => ({ ...prev, [budget.id]: g }))}
+                              className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-colors ${granularity === g ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+                            >
+                              {g === 'day' ? 'Ngày' : g === 'week' ? 'Tuần' : 'Tháng'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      {trendData.length > 0 ? (
+                        <div className="h-44">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={trendData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                              <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+                              <YAxis tickFormatter={(v) => formatVNDShort(v)} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={72} />
+                              <Tooltip formatter={(value: number) => [formatVND(value), selectedCat]} />
+                              <Line type="monotone" dataKey="amount" stroke="#144bb8" strokeWidth={2} dot={{ r: 3, fill: '#144bb8' }} activeDot={{ r: 5 }} />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      ) : (
+                        <div className="h-44 flex items-center justify-center text-slate-400 text-xs">Không có dữ liệu.</div>
+                      )}
+                    </div>
+
+                    {/* Category × Month table */}
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">
+                        Bảng chi tiết · <span className="font-normal">Click vào dòng để xem biểu đồ · Đỏ = tăng, xanh = giảm</span>
+                      </p>
+                      <div className="overflow-x-auto rounded-lg border border-slate-100 dark:border-slate-800">
+                        <table className="w-full text-left text-sm">
+                          <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 text-xs font-bold uppercase tracking-wider">
+                            <tr>
+                              <th className="px-4 py-2.5 sticky left-0 bg-slate-50 dark:bg-slate-800/50 min-w-[130px]">Danh mục</th>
+                              {matrixData.map((row) => (
+                                <th key={row.month as string} className="px-4 py-2.5 text-right whitespace-nowrap">{row.month as string}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                            {matrixCats.map((cat, ci) => {
+                              const isSel = selectedCat === cat;
+                              const values = matrixData.map((row) => (row[cat] as number) || 0);
+                              return (
+                                <tr
+                                  key={cat}
+                                  onClick={() => setSelectedCatPerBudget((prev) => ({ ...prev, [budget.id]: cat }))}
+                                  className={`cursor-pointer transition-colors ${isSel ? 'bg-primary/5 dark:bg-primary/10' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
+                                >
+                                  <td className={`px-4 py-2.5 sticky left-0 font-medium ${isSel ? 'bg-primary/5 dark:bg-primary/10' : 'bg-white dark:bg-slate-900'}`}>
+                                    <div className="flex items-center gap-2">
+                                      <div className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: PIE_COLORS[ci % PIE_COLORS.length] }} />
+                                      <span className={`truncate max-w-[100px] ${isSel ? 'text-primary font-bold' : ''}`}>{cat}</span>
+                                      {isSel && <span className="material-symbols-outlined text-xs text-primary">show_chart</span>}
+                                    </div>
+                                  </td>
+                                  {values.map((val, vi) => {
+                                    const prev = vi > 0 ? values[vi - 1] : null;
+                                    const isUp = prev !== null && prev > 0 && val > prev;
+                                    const isDown = prev !== null && prev > 0 && val < prev;
+                                    return (
+                                      <td
+                                        key={vi}
+                                        className={`px-4 py-2.5 text-right font-medium whitespace-nowrap ${
+                                          val === 0 ? 'text-slate-300 dark:text-slate-700' :
+                                          isUp ? 'text-rose-600 bg-rose-50 dark:bg-rose-900/10' :
+                                          isDown ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/10' :
+                                          'text-slate-700 dark:text-slate-300'
+                                        }`}
+                                      >
+                                        {val === 0 ? '—' : formatVNDShort(val)}
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Expanded Transactions — grouped by day, table style */}
                 {isExpanded && (

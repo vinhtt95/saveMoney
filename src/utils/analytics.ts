@@ -243,6 +243,64 @@ export function getAvailablePeriods(txs: Transaction[]): string[] {
   return Array.from(set).sort().reverse();
 }
 
+/** Daily spending trend for a single category within a date range (YYYY-MM-DD) */
+export function getCategoryDailyTrend(
+  txs: Transaction[],
+  category: string,
+  dateStart: string,
+  dateEnd: string
+): { day: string; amount: number }[] {
+  const expenses = getExpenses(txs).filter(
+    (t) => t.category === category && toYYYYMMDD(t.date) >= dateStart && toYYYYMMDD(t.date) <= dateEnd
+  );
+  const map: Record<string, number> = {};
+  expenses.forEach((t) => {
+    const key = toYYYYMMDD(t.date);
+    map[key] = (map[key] || 0) + Math.abs(t.amount);
+  });
+  // Fill every day in range
+  const result: { day: string; amount: number }[] = [];
+  const cur = new Date(dateStart + 'T00:00:00');
+  const end = new Date(dateEnd + 'T00:00:00');
+  while (cur <= end) {
+    const key = toYYYYMMDD(cur);
+    const label = `${String(cur.getMonth() + 1).padStart(2, '0')}/${String(cur.getDate()).padStart(2, '0')}`;
+    result.push({ day: label, amount: map[key] || 0 });
+    cur.setDate(cur.getDate() + 1);
+  }
+  return result;
+}
+
+/** Weekly spending trend for a single category within a date range, grouped by Mon-Sun week */
+export function getCategoryWeeklyTrend(
+  txs: Transaction[],
+  category: string,
+  dateStart: string,
+  dateEnd: string
+): { week: string; amount: number }[] {
+  const expenses = getExpenses(txs).filter(
+    (t) => t.category === category && toYYYYMMDD(t.date) >= dateStart && toYYYYMMDD(t.date) <= dateEnd
+  );
+  // Group by Monday of each week
+  const map: Record<string, number> = {};
+  expenses.forEach((t) => {
+    const d = new Date(t.date);
+    const dow = d.getDay(); // 0=Sun
+    const diff = dow === 0 ? -6 : 1 - dow; // shift to Monday
+    const mon = new Date(d);
+    mon.setDate(d.getDate() + diff);
+    const key = toYYYYMMDD(mon);
+    map[key] = (map[key] || 0) + Math.abs(t.amount);
+  });
+  return Object.entries(map)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([dateKey, amount]) => {
+      const d = new Date(dateKey + 'T00:00:00');
+      const label = `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+      return { week: label, amount };
+    });
+}
+
 /** Monthly spending trend for a single category over a range of periods */
 export function getCategoryMonthlyTrend(
   txs: Transaction[],

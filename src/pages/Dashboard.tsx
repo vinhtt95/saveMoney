@@ -1,11 +1,11 @@
-import React, { useState, useMemo } from 'react';
-import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
+import React, { useState, useMemo, useEffect } from 'react';
+import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis, YAxis, LineChart, Line } from 'recharts';
 import { Link } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { AddTransactionForm } from '../components/AddTransactionModal';
 import { Draft, emptyDraft } from '../components/InlineFields';
 import { InlineEditForm } from '../components/InlineEditForm';
-import { Transaction } from '../types';
+import { Transaction, Budget as BudgetType } from '../types';
 import {
   getExpenses,
   getTotalSpending,
@@ -15,8 +15,30 @@ import {
   getDailyTrend,
   filterByPeriod,
   getAvailablePeriods,
+  getCategoryMonthMatrix,
+  getCategoryDailyTrend,
+  getCategoryWeeklyTrend,
+  getCategoryMonthlyTrend,
 } from '../utils/analytics';
-import { formatVND, formatVNDShort, formatDate, formatMonth, toYYYYMM } from '../utils/formatters';
+import { formatVND, formatVNDShort, formatDate, formatMonth, toYYYYMM, toYYYYMMDD } from '../utils/formatters';
+
+const BUDGET_CAT_COLORS = ['#144bb8', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#ec4899'];
+
+function loadBudgets(): BudgetType[] {
+  try {
+    const raw = localStorage.getItem('savemoney_budgets');
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch { return []; }
+}
+
+function getBudgetStatus(pct: number): { label: string; badgeClass: string } {
+  if (pct >= 100) return { label: 'Over budget', badgeClass: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400' };
+  if (pct >= 85) return { label: 'Critical', badgeClass: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' };
+  if (pct >= 65) return { label: 'On track', badgeClass: 'bg-primary/10 text-primary' };
+  return { label: 'Good', badgeClass: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' };
+}
 
 const CATEGORY_ICONS: Record<string, { icon: string; color: string; bg: string }> = {
   Transport: { icon: 'directions_car', color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/30' },
@@ -178,6 +200,73 @@ export function Dashboard() {
     setEditError('');
   }
 
+  // Budget section state
+  const [budgets] = useState<BudgetType[]>(loadBudgets);
+  const [selectedBudgetId, setSelectedBudgetId] = useState<string>(() => budgets[0]?.id || '');
+  const [budgetTrendCat, setBudgetTrendCat] = useState<string>('');
+  const [budgetGranularity, setBudgetGranularity] = useState<'day' | 'week' | 'month'>('week');
+
+  const selectedBudget = useMemo(
+    () => budgets.find((b) => b.id === selectedBudgetId) ?? budgets[0] ?? null,
+    [budgets, selectedBudgetId]
+  );
+
+  const budgetMatchingTxs = useMemo(() => {
+    if (!selectedBudget) return [];
+    return allTxs.filter(
+      (t) =>
+        t.type === 'Expense' &&
+        selectedBudget.categories.includes(t.category) &&
+        toYYYYMMDD(t.date) >= selectedBudget.dateStart &&
+        toYYYYMMDD(t.date) <= selectedBudget.dateEnd
+    );
+  }, [allTxs, selectedBudget]);
+
+  const budgetSpent = useMemo(() => budgetMatchingTxs.reduce((s, t) => s + Math.abs(t.amount), 0), [budgetMatchingTxs]);
+  const budgetPct = selectedBudget && selectedBudget.limit > 0 ? (budgetSpent / selectedBudget.limit) * 100 : 0;
+
+  const budgetMatrixData = useMemo(() => {
+    if (!selectedBudget || budgetMatchingTxs.length === 0) return [];
+    const from = toYYYYMM(new Date(selectedBudget.dateStart + 'T00:00:00'));
+    const to = toYYYYMM(new Date(selectedBudget.dateEnd + 'T00:00:00'));
+    return getCategoryMonthMatrix(budgetMatchingTxs, from, to);
+  }, [budgetMatchingTxs, selectedBudget]);
+
+  const budgetMatrixCats = useMemo(() => {
+    if (budgetMatrixData.length === 0) return [];
+    const cats = Object.keys(budgetMatrixData[0]).filter((k) => k !== 'month');
+    const totals: Record<string, number> = {};
+    cats.forEach((cat) => { totals[cat] = budgetMatrixData.reduce((s, row) => s + ((row[cat] as number) || 0), 0); });
+    return cats.sort((a, b) => totals[b] - totals[a]);
+  }, [budgetMatrixData]);
+
+  const budgetMatrixPeriods = useMemo(() => {
+    if (!selectedBudget) return [];
+    const from = toYYYYMM(new Date(selectedBudget.dateStart + 'T00:00:00'));
+    const to = toYYYYMM(new Date(selectedBudget.dateEnd + 'T00:00:00'));
+    return getAvailablePeriods(budgetMatchingTxs).filter((p) => p >= from && p <= to).slice().reverse();
+  }, [budgetMatchingTxs, selectedBudget]);
+
+  const budgetTrendData = useMemo((): { label: string; amount: number }[] => {
+    if (!selectedBudget || !budgetTrendCat) return [];
+    if (budgetGranularity === 'day') {
+      return getCategoryDailyTrend(budgetMatchingTxs, budgetTrendCat, selectedBudget.dateStart, selectedBudget.dateEnd)
+        .map((d) => ({ label: d.day, amount: d.amount }));
+    } else if (budgetGranularity === 'week') {
+      return getCategoryWeeklyTrend(budgetMatchingTxs, budgetTrendCat, selectedBudget.dateStart, selectedBudget.dateEnd)
+        .map((d) => ({ label: d.week, amount: d.amount }));
+    } else {
+      return budgetMatrixPeriods.length > 0
+        ? getCategoryMonthlyTrend(budgetMatchingTxs, budgetTrendCat, budgetMatrixPeriods).map((d) => ({ label: d.month, amount: d.amount }))
+        : [];
+    }
+  }, [budgetMatchingTxs, budgetTrendCat, budgetGranularity, selectedBudget, budgetMatrixPeriods]);
+
+  // Auto-select first category when budget changes
+  useEffect(() => {
+    setBudgetTrendCat(budgetMatrixCats[0] || '');
+  }, [selectedBudget?.id, budgetMatrixCats]);
+
   const hasData = allTxs.length > 0;
 
   if (!hasData) {
@@ -299,6 +388,164 @@ export function Dashboard() {
           {largestTx && <p className="text-slate-400 text-xs mt-1">Largest: {formatVNDShort(Math.abs(largestTx.amount))}</p>}
         </div>
       </div>
+
+      {/* Budget Section */}
+      {budgets.length > 0 && selectedBudget && (
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+          {/* Header: title + budget selector */}
+          <div className="p-5 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-3 flex-wrap">
+              <h3 className="font-bold text-slate-900 dark:text-white shrink-0">Budget</h3>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {budgets.map((b) => (
+                  <button
+                    key={b.id}
+                    onClick={() => setSelectedBudgetId(b.id)}
+                    className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${
+                      selectedBudget.id === b.id
+                        ? 'bg-primary text-white'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    {b.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="p-5 space-y-6">
+            {/* Budget progress overview */}
+            <div className="flex items-center gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-end justify-between mb-1.5">
+                  <div>
+                    <span className="text-lg font-bold text-slate-900 dark:text-white">{formatVND(budgetSpent)}</span>
+                    <span className="text-sm text-slate-400 ml-1.5">/ {formatVND(selectedBudget.limit)}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${getBudgetStatus(budgetPct).badgeClass}`}>
+                      {getBudgetStatus(budgetPct).label}
+                    </span>
+                    <span className={`text-sm font-bold ${budgetPct >= 100 ? 'text-rose-600' : budgetPct >= 85 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                      {budgetPct.toFixed(0)}%
+                    </span>
+                  </div>
+                </div>
+                <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden flex">
+                  {budgetMatrixCats.length > 0 ? (
+                    (() => {
+                      const catMap = new Map<string, number>();
+                      budgetMatchingTxs.forEach((t) => catMap.set(t.category, (catMap.get(t.category) ?? 0) + Math.abs(t.amount)));
+                      return [...catMap.entries()].sort((a, b) => b[1] - a[1]).map(([cat, val], i) => (
+                        <div
+                          key={cat}
+                          className="h-full"
+                          style={{ width: `${Math.min((val / selectedBudget.limit) * 100, 100)}%`, backgroundColor: BUDGET_CAT_COLORS[i % BUDGET_CAT_COLORS.length] }}
+                        />
+                      ));
+                    })()
+                  ) : (
+                    <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(budgetPct, 100)}%` }} />
+                  )}
+                </div>
+                <div className="flex justify-between mt-1.5 text-xs text-slate-400">
+                  <span>{budgetMatchingTxs.length} giao dịch · {formatDate(new Date(selectedBudget.dateStart + 'T00:00:00'))} → {formatDate(new Date(selectedBudget.dateEnd + 'T00:00:00'))}</span>
+                  <span className={(selectedBudget.limit - budgetSpent) < 0 ? 'text-rose-600 font-medium' : ''}>
+                    {(selectedBudget.limit - budgetSpent) >= 0 ? `Còn lại ${formatVND(selectedBudget.limit - budgetSpent)}` : `Vượt ${formatVND(Math.abs(selectedBudget.limit - budgetSpent))}`}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {budgetMatrixData.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 text-sm">Không có giao dịch trong budget này.</div>
+            ) : (
+              <div className="grid grid-cols-4 gap-5 items-stretch">
+                {/* Line chart — 3/4 */}
+                <div className="col-span-3 flex flex-col">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">Chi tiêu theo danh mục</p>
+                      {budgetTrendCat && (
+                        <div className="flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 rounded-lg">
+                          <div className="size-2 rounded-full bg-primary" />
+                          <span className="text-xs font-bold text-primary">{budgetTrendCat}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {(['day', 'week', 'month'] as const).map((g) => (
+                        <button
+                          key={g}
+                          onClick={() => setBudgetGranularity(g)}
+                          className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-colors ${budgetGranularity === g ? 'bg-primary text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+                        >
+                          {g === 'day' ? 'Ngày' : g === 'week' ? 'Tuần' : 'Tháng'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {budgetTrendData.length > 0 ? (
+                    <div className="flex-1 min-h-0">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={budgetTrendData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                          <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+                          <YAxis tickFormatter={(v) => formatVNDShort(v)} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={72} />
+                          <Tooltip formatter={(value: number) => [formatVND(value), budgetTrendCat]} />
+                          <Line type="monotone" dataKey="amount" stroke="#144bb8" strokeWidth={2} dot={{ r: 3, fill: '#144bb8' }} activeDot={{ r: 5 }} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">Không có dữ liệu.</div>
+                  )}
+                </div>
+
+                {/* Category table — 1/4 */}
+                <div className="col-span-1">
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">
+                    Danh mục · <span className="font-normal">Click để xem biểu đồ</span>
+                  </p>
+                  <div className="rounded-lg border border-slate-100 dark:border-slate-800 overflow-hidden">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 text-xs font-bold uppercase tracking-wider">
+                        <tr>
+                          <th className="px-3 py-2.5">Danh mục</th>
+                          <th className="px-3 py-2.5 text-right">Tổng</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {budgetMatrixCats.map((cat, ci) => {
+                          const isSel = budgetTrendCat === cat;
+                          const total = budgetMatrixData.reduce((s, row) => s + ((row[cat] as number) || 0), 0);
+                          return (
+                            <tr
+                              key={cat}
+                              onClick={() => setBudgetTrendCat(cat)}
+                              className={`cursor-pointer transition-colors ${isSel ? 'bg-primary/5 dark:bg-primary/10' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
+                            >
+                              <td className="px-3 py-2.5 font-medium">
+                                <div className="flex items-center gap-1.5">
+                                  <div className="size-2 rounded-full shrink-0" style={{ backgroundColor: BUDGET_CAT_COLORS[ci % BUDGET_CAT_COLORS.length] }} />
+                                  <span className={`truncate text-xs ${isSel ? 'text-primary font-bold' : 'text-slate-700 dark:text-slate-300'}`}>{cat}</span>
+                                </div>
+                              </td>
+                              <td className={`px-3 py-2.5 text-right text-xs font-bold whitespace-nowrap ${isSel ? 'text-primary' : 'text-slate-700 dark:text-slate-300'}`}>
+                                {formatVNDShort(total)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
