@@ -70,7 +70,7 @@ function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'HYDRATE': {
       const { data } = action;
-      const transactions = data.transactions.map((t) => ({ ...t, date: new Date(t.date) }));
+      const transactions = data.transactions.map((t) => ({ ...t, date: new Date(t.date + 'T00:00:00') }));
       const periods = getAvailablePeriods(transactions);
       const latestPeriod = periods[0] || toYYYYMM(new Date());
       return {

@@ -1,4 +1,5 @@
 import type { Account, AppInitData, Budget, Category, DatabaseBackup, GoldAsset, Transaction } from '../types/index.js';
+import { toYYYYMMDD } from '../utils/formatters.js';
 
 const BASE = '/api';
 
@@ -23,14 +24,14 @@ export async function fetchInit(): Promise<AppInitData> {
 export async function addTransaction(t: Transaction): Promise<void> {
   await request('POST', '/transactions', {
     ...t,
-    date: t.date instanceof Date ? t.date.toISOString().slice(0, 10) : t.date,
+    date: t.date instanceof Date ? toYYYYMMDD(t.date) : t.date,
   });
 }
 
 export async function editTransaction(t: Transaction): Promise<void> {
   await request('PUT', `/transactions/${t.id}`, {
     ...t,
-    date: t.date instanceof Date ? t.date.toISOString().slice(0, 10) : t.date,
+    date: t.date instanceof Date ? toYYYYMMDD(t.date) : t.date,
   });
 }
 
@@ -48,7 +49,7 @@ export async function bulkAddTransactions(
   if (transactions.length) {
     const payload = transactions.map((t) => ({
       ...t,
-      date: t.date instanceof Date ? t.date.toISOString().slice(0, 10) : t.date,
+      date: t.date instanceof Date ? toYYYYMMDD(t.date) : t.date,
     }));
     await request('POST', '/transactions/bulk', payload);
   }
