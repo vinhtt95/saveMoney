@@ -1,17 +1,8 @@
 import { AppState, Budget, DatabaseBackup, DatabaseBackupV1 } from '../types';
 import { migrateBackupV1 } from './migration';
 
-const BUDGETS_KEY = 'savemoney_budgets';
-
 export function exportDatabase(state: AppState): void {
-  const budgets: Budget[] = (() => {
-    try {
-      const raw = localStorage.getItem(BUDGETS_KEY);
-      return raw ? (JSON.parse(raw) as Budget[]) : [];
-    } catch {
-      return [];
-    }
-  })();
+  const budgets = state.budgets;
 
   const backup: DatabaseBackup = {
     version: 2,

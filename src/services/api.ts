@@ -128,7 +128,6 @@ export async function saveSettings(settings: Record<string, string>): Promise<vo
 export async function restoreBackup(backup: DatabaseBackup): Promise<void> {
   // Clear transactions first, then re-insert everything in correct FK order
   await clearAllTransactions();
-  await request('DELETE', '/transactions/all');
 
   // Wipe and re-insert categories
   for (const c of backup.categories) {
