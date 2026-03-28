@@ -19,6 +19,7 @@ export interface Transaction {
   accountId: string;
   transferToId: string;
   amount: number; // signed VND value (negative = expense)
+  note?: string;
 }
 
 export interface FilterState {

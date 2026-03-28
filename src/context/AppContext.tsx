@@ -55,9 +55,15 @@ const initialState: AppState = {
 };
 
 function mergeCategories(existing: Category[], incoming: Category[]): Category[] {
-  const map = new Map(existing.map((c) => [c.id, c]));
-  incoming.forEach((c) => { if (!map.has(c.id)) map.set(c.id, c); });
-  return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
+  const byId = new Map(existing.map((c) => [c.id, c]));
+  const byName = new Set(existing.map((c) => `${c.type}:${c.name}`));
+  incoming.forEach((c) => {
+    if (!byId.has(c.id) && !byName.has(`${c.type}:${c.name}`)) {
+      byId.set(c.id, c);
+      byName.add(`${c.type}:${c.name}`);
+    }
+  });
+  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function mergeAccounts(existing: Account[], incoming: Account[]): Account[] {

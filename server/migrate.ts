@@ -20,6 +20,7 @@ interface BackupTransaction {
   accountId: string;
   transferToId: string;
   amount: number;
+  note?: string;
 }
 
 interface Backup {
@@ -96,9 +97,10 @@ async function migrate() {
         t.accountId,
         t.transferToId || null,
         t.amount,
+        t.note || null,
       ]);
       await conn.query(
-        'INSERT IGNORE INTO transactions (id, date, type, category_id, account_id, transfer_to_id, amount) VALUES ?',
+        'INSERT IGNORE INTO transactions (id, date, type, category_id, account_id, transfer_to_id, amount, note) VALUES ?',
         [vals]
       );
     }
@@ -137,6 +139,18 @@ async function migrate() {
           'INSERT INTO user_settings (`key`, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = ?',
           [k, v, v]
         );
+      }
+    }
+
+    // Add note column to transactions if it doesn't exist (for existing databases)
+    try {
+      await conn.query('ALTER TABLE transactions ADD COLUMN note TEXT NULL');
+      console.log('Added note column to transactions table');
+    } catch (err: any) {
+      if (err.code === 'ER_DUP_FIELDNAME') {
+        console.log('note column already exists in transactions table');
+      } else {
+        throw err;
       }
     }
 

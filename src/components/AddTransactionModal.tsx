@@ -11,6 +11,7 @@ interface Draft {
   accountId: string;
   transferToId: string;
   amountStr: string;
+  note: string;
 }
 
 type Mode = 'Expense' | 'Transfer' | 'Income';
@@ -58,6 +59,7 @@ function emptyDraft(
     accountId: defaultAccountId,
     transferToId: '',
     amountStr: '',
+    note: '',
   };
 }
 
@@ -74,6 +76,7 @@ function draftToTx(draft: Draft, id: string): Transaction | null {
     accountId: draft.accountId,
     transferToId: draft.transferToId,
     amount: draft.type === 'Expense' ? -Math.abs(amt) : Math.abs(amt),
+    note: draft.note || undefined,
   };
 }
 
@@ -269,6 +272,18 @@ export function AddTransactionForm({
               accentColor={MODE_ACCENT[mode]}
             />
           </div>
+        </div>
+
+        {/* Note textarea */}
+        <div className="w-full">
+          <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Ghi chú</p>
+          <textarea
+            value={draft.note}
+            onChange={(e) => patch({ note: e.target.value })}
+            placeholder="Thêm ghi chú cho giao dịch này..."
+            rows={2}
+            className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition resize-none"
+          />
         </div>
 
         {error && (

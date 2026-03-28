@@ -35,6 +35,7 @@ function draftFromTx(tx: Transaction): Draft {
     accountId: tx.accountId,
     transferToId: tx.transferToId,
     amountStr: String(Math.abs(tx.amount)),
+    note: tx.note || '',
   };
 }
 
@@ -53,6 +54,7 @@ function draftToTx(draft: Draft, id: string): Transaction | null {
     accountId: draft.accountId,
     transferToId: draft.transferToId,
     amount: draft.type === 'Expense' ? -Math.abs(amt) : Math.abs(amt),
+    note: draft.note || undefined,
   };
 }
 
@@ -521,11 +523,16 @@ export function Transactions() {
                           }}
                         >
                           <td className="px-6 py-3">
-                            <div className="flex items-center gap-2 pl-4">
-                              <div className={`size-7 rounded ${icon.bg} ${icon.color} flex items-center justify-center`}>
-                                <span className="material-symbols-outlined text-base">{icon.icon}</span>
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-2 pl-4">
+                                <div className={`size-7 rounded ${icon.bg} ${icon.color} flex items-center justify-center`}>
+                                  <span className="material-symbols-outlined text-base">{icon.icon}</span>
+                                </div>
+                                <span className="text-sm font-medium">{catName}</span>
                               </div>
-                              <span className="text-sm font-medium">{catName}</span>
+                              {tx.note && (
+                                <p className="text-[10px] text-slate-400 italic truncate max-w-[120px] pl-10">{tx.note}</p>
+                              )}
                             </div>
                           </td>
                           <td className="px-6 py-3 text-sm text-slate-500 dark:text-slate-400">{accName}</td>

@@ -12,6 +12,7 @@ export interface Draft {
   accountId: string;
   transferToId: string;
   amountStr: string;
+  note: string;
 }
 
 export function emptyDraft(
@@ -26,6 +27,7 @@ export function emptyDraft(
     accountId: defaultAccountId,
     transferToId: '',
     amountStr: '',
+    note: '',
   };
 }
 

@@ -157,6 +157,7 @@ export function Dashboard() {
       accountId: tx.accountId,
       transferToId: tx.transferToId,
       amountStr: String(Math.abs(tx.amount)),
+      note: tx.note || '',
     };
   }
 
@@ -173,6 +174,7 @@ export function Dashboard() {
       accountId: d.accountId,
       transferToId: d.transferToId,
       amount: d.type === 'Expense' ? -Math.abs(amt) : Math.abs(amt),
+      note: d.note || undefined,
     };
   }
 

@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   account_id     VARCHAR(36)                                      NOT NULL,
   transfer_to_id VARCHAR(36)                                      NULL,
   amount         DECIMAL(18,2)                                    NOT NULL,
+  note           TEXT                                             NULL,
   FOREIGN KEY (category_id)    REFERENCES categories(id) ON DELETE SET NULL,
   FOREIGN KEY (account_id)     REFERENCES accounts(id)   ON DELETE RESTRICT,
   FOREIGN KEY (transfer_to_id) REFERENCES accounts(id)   ON DELETE SET NULL,
