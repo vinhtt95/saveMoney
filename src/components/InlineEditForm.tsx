@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Account, Category } from '../types';
 import { Combobox } from './Combobox';
+import { MiniCalendar, CalendarAccentColor } from './MiniCalendar';
 import { Draft } from './InlineFields';
 import { formatVND } from '../utils/formatters';
 
@@ -25,6 +26,12 @@ const MODE_STYLES: Record<Mode, { active: string; accent: string; label: string;
     label: 'Thu nhập',
     amountColor: 'text-emerald-500',
   },
+};
+
+const MODE_ACCENT: Record<Mode, CalendarAccentColor> = {
+  Expense: 'rose',
+  Transfer: 'blue',
+  Income: 'emerald',
 };
 
 const fieldCls =
@@ -101,9 +108,9 @@ export function InlineEditForm({
 
   return (
     <div className={`bg-white dark:bg-slate-900 rounded-xl shadow-sm ${styles.accent}`}>
-      <div className="p-5">
-        {/* Mode switcher */}
-        <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1 mb-5">
+      <div className="p-5 flex flex-col gap-4">
+        {/* Mode switcher - Full Width */}
+        <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 gap-1">
           {(['Expense', 'Transfer', 'Income'] as Mode[]).map((m) => (
             <button
               key={m}
@@ -129,71 +136,78 @@ export function InlineEditForm({
           ))}
         </div>
 
-        {/* Hero amount input */}
-        <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-5 flex flex-col items-center gap-1 mb-5">
-          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Số tiền</p>
-          <input
-            type="text"
-            inputMode="decimal"
-            value={amountFocused ? draft.amountStr : displayAmount}
-            onChange={(e) => {
-              const v = e.target.value.replace(/[^0-9.]/g, '');
-              onChange({ amountStr: v });
-            }}
-            onFocus={() => setAmountFocused(true)}
-            onBlur={() => setAmountFocused(false)}
-            onClick={(e) => e.stopPropagation()}
-            placeholder="0"
-            className={`w-full text-center text-5xl font-bold bg-transparent border-none outline-none placeholder:text-slate-200 dark:placeholder:text-slate-700 ${styles.amountColor} transition-colors`}
-          />
-          <span className="text-xs font-medium text-slate-400">₫ VND</span>
-          {draft.amountStr && !isNaN(parseFloat(draft.amountStr)) && (
-            <span className="text-xs text-slate-400">{formatVND(parseFloat(draft.amountStr))}</span>
-          )}
+        {/* 2-Column Split */}
+        <div className="flex gap-4 items-start flex-col sm:flex-row">
+          {/* LEFT: 3/5 - Amount + Secondary Fields */}
+          <div style={{ flex: 3 }} className="flex flex-col gap-4 min-w-0 w-full sm:w-auto">
+            {/* Hero amount input */}
+            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-5 flex flex-col items-center gap-1">
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Số tiền</p>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={amountFocused ? draft.amountStr : displayAmount}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/[^0-9.]/g, '');
+                  onChange({ amountStr: v });
+                }}
+                onFocus={() => setAmountFocused(true)}
+                onBlur={() => setAmountFocused(false)}
+                onClick={(e) => e.stopPropagation()}
+                placeholder="0"
+                className={`w-full text-center text-5xl font-bold bg-transparent border-none outline-none placeholder:text-slate-200 dark:placeholder:text-slate-700 ${styles.amountColor} transition-colors`}
+              />
+              <span className="text-xs font-medium text-slate-400">₫ VND</span>
+              {draft.amountStr && !isNaN(parseFloat(draft.amountStr)) && (
+                <span className="text-xs text-slate-400">{formatVND(parseFloat(draft.amountStr))}</span>
+              )}
+            </div>
+
+            {/* Secondary fields (no date) */}
+            <div className="space-y-3">
+              {draft.type === 'Transfer' ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Từ tài khoản <span className="text-rose-400">*</span></p>
+                    <Combobox value={draft.accountId} onChange={handleAccountChange} options={accountOpts} placeholder="Tài khoản nguồn..." allowCustom />
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Đến tài khoản <span className="text-rose-400">*</span></p>
+                    <Combobox value={draft.transferToId} onChange={handleTransferToChange} options={accountOpts} placeholder="Tài khoản đích..." allowCustom />
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Danh mục <span className="text-rose-400">*</span></p>
+                    <Combobox
+                      value={draft.categoryId}
+                      onChange={handleCategoryChange}
+                      options={categoryOpts}
+                      placeholder="Coffee, Transport..."
+                      allowCustom
+                    />
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Tài khoản <span className="text-rose-400">*</span></p>
+                    <Combobox value={draft.accountId} onChange={handleAccountChange} options={accountOpts} placeholder="Tiền mặt..." allowCustom />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* RIGHT: ~27% - Calendar */}
+          <div style={{ flex: 0.715 }} className="min-w-0 w-full sm:w-auto">
+            <MiniCalendar
+              value={draft.date}
+              onChange={(date) => onChange({ date })}
+              accentColor={MODE_ACCENT[mode]}
+            />
+          </div>
         </div>
 
-        {/* Secondary fields */}
-        <div className="space-y-3 mb-4">
-          {draft.type === 'Transfer' ? (
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Từ tài khoản <span className="text-rose-400">*</span></p>
-                <Combobox value={draft.accountId} onChange={handleAccountChange} options={accountOpts} placeholder="Tài khoản nguồn..." allowCustom />
-              </div>
-              <div>
-                <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Đến tài khoản <span className="text-rose-400">*</span></p>
-                <Combobox value={draft.transferToId} onChange={handleTransferToChange} options={accountOpts} placeholder="Tài khoản đích..." allowCustom />
-              </div>
-              <div>
-                <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Ngày <span className="text-rose-400">*</span></p>
-                <input type="date" value={draft.date} onChange={(e) => onChange({ date: e.target.value })} onClick={(e) => e.stopPropagation()} className={fieldCls} />
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Danh mục <span className="text-rose-400">*</span></p>
-                <Combobox
-                  value={draft.categoryId}
-                  onChange={handleCategoryChange}
-                  options={categoryOpts}
-                  placeholder="Coffee, Transport..."
-                  allowCustom
-                />
-              </div>
-              <div>
-                <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Tài khoản <span className="text-rose-400">*</span></p>
-                <Combobox value={draft.accountId} onChange={handleAccountChange} options={accountOpts} placeholder="Tiền mặt..." allowCustom />
-              </div>
-              <div>
-                <p className="text-[10px] uppercase font-bold text-slate-400 mb-1">Ngày <span className="text-rose-400">*</span></p>
-                <input type="date" value={draft.date} onChange={(e) => onChange({ date: e.target.value })} onClick={(e) => e.stopPropagation()} className={fieldCls} />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {error && <p className="text-xs text-rose-500 mb-3">{error}</p>}
+        {error && <p className="text-xs text-rose-500">{error}</p>}
 
         {/* Actions */}
         <div className="flex gap-2">
