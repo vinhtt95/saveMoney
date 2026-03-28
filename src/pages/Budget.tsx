@@ -4,8 +4,10 @@ import {
   BarChart, Bar, XAxis, YAxis, LineChart, Line, Legend,
 } from 'recharts';
 import { useApp } from '../context/AppContext';
-import type { Budget as BudgetType } from '../types';
+import type { Budget as BudgetType, Transaction, Category, Account } from '../types';
 import { categoryName as resolveCategoryName, accountName as resolveAccountName } from '../utils/lookup';
+import { Draft } from '../components/InlineFields';
+import { InlineEditForm } from '../components/InlineEditForm';
 import { formatVND, formatVNDShort, formatDate, toYYYYMM, toYYYYMMDD } from '../utils/formatters';
 import { getCategoryMonthMatrix, getCategoryMonthlyTrend, getCategoryDailyTrend, getCategoryWeeklyTrend, getAvailablePeriods } from '../utils/analytics';
 
@@ -27,6 +29,37 @@ const CATEGORY_ICONS: Record<string, { icon: string; color: string; bg: string }
 };
 function getIcon(name: string) {
   return CATEGORY_ICONS[name] || { icon: 'receipt_long', color: 'text-slate-600', bg: 'bg-slate-100 dark:bg-slate-800' };
+}
+
+function draftFromTx(tx: Transaction): Draft {
+  return {
+    date: `${tx.date.getFullYear()}-${String(tx.date.getMonth() + 1).padStart(2, '0')}-${String(tx.date.getDate()).padStart(2, '0')}`,
+    type: tx.type,
+    categoryId: tx.categoryId,
+    accountId: tx.accountId,
+    transferToId: tx.transferToId,
+    amountStr: String(Math.abs(tx.amount)),
+    note: tx.note || '',
+  };
+}
+
+function draftToTx(draft: Draft, id: string): Transaction | null {
+  const amt = parseFloat(draft.amountStr);
+  const needsCategory = draft.type !== 'Transfer';
+  if (!draft.date || (needsCategory && !draft.categoryId) || !draft.accountId || !draft.amountStr || isNaN(amt) || amt <= 0) {
+    return null;
+  }
+  if (draft.type === 'Transfer' && !draft.transferToId) return null;
+  return {
+    id,
+    date: new Date(draft.date),
+    type: draft.type,
+    categoryId: draft.categoryId,
+    accountId: draft.accountId,
+    transferToId: draft.transferToId,
+    amount: draft.type === 'Expense' ? -Math.abs(amt) : Math.abs(amt),
+    note: draft.note || undefined,
+  };
 }
 
 const PIE_COLORS = ['#144bb8', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#f97316', '#ec4899'];
@@ -62,7 +95,6 @@ const emptyForm: FormState = {
 export function Budget() {
   const { state, actions } = useApp();
   const { transactions, categories, accounts, budgets } = state;
-  const expenseCategories = categories.filter((c) => c.type === 'Expense');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [analyticsOpenId, setAnalyticsOpenId] = useState<string | null>(null);
   const [selectedCatPerBudget, setSelectedCatPerBudget] = useState<Record<string, string>>({});
@@ -71,6 +103,36 @@ export function Budget() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [expandedTxRow, setExpandedTxRow] = useState<string | null>(null);
+  const [txDraft, setTxDraft] = useState<Draft | null>(null);
+  const [txEditError, setTxEditError] = useState('');
+
+  const expenseCategories = useMemo(() => categories.filter((c) => c.type === 'Expense'), [categories]);
+  const incomeCategories = useMemo(() => categories.filter((c) => c.type === 'Income'), [categories]);
+
+  function handleNewCategory(name: string, type: 'Expense' | 'Income'): string {
+    const id = crypto.randomUUID();
+    const cat: Category = { id, name, type };
+    actions.addCategory(cat);
+    return id;
+  }
+
+  function handleNewAccount(name: string): string {
+    const id = crypto.randomUUID();
+    const acc: Account = { id, name };
+    actions.addAccount(acc);
+    return id;
+  }
+
+  async function confirmTxEdit() {
+    if (!expandedTxRow || !txDraft) return;
+    const tx = draftToTx(txDraft, expandedTxRow);
+    if (!tx) { setTxEditError('Vui lòng điền đầy đủ thông tin hợp lệ.'); return; }
+    await actions.editTransaction(tx);
+    setExpandedTxRow(null);
+    setTxDraft(null);
+    setTxEditError('');
+  }
 
   function openCreate() {
     setForm(emptyForm);
@@ -653,21 +715,66 @@ export function Budget() {
                               const txCatName = resolveCategoryName(categories, tx.categoryId);
                               const txAccName = resolveAccountName(accounts, tx.accountId);
                               const icon = getIcon(txCatName);
+                              const isTxExpanded = expandedTxRow === tx.id;
+                              const typeColor = txDraft?.type === 'Income' ? 'emerald' : txDraft?.type === 'Transfer' ? 'sky' : 'rose';
                               return (
-                                <tr key={tx.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors border-t border-slate-100 dark:border-slate-800/60">
-                                  <td className="px-6 py-3">
-                                    <div className="flex items-center gap-2 pl-4">
-                                      <div className={`size-7 rounded ${icon.bg} ${icon.color} flex items-center justify-center shrink-0`}>
-                                        <span className="material-symbols-outlined text-base">{icon.icon}</span>
+                                <React.Fragment key={tx.id}>
+                                  <tr
+                                    className={`cursor-pointer transition-colors border-t border-slate-100 dark:border-slate-800/60 ${isTxExpanded ? 'bg-slate-50 dark:bg-slate-800/40' : 'hover:bg-slate-50/50 dark:hover:bg-slate-800/50'}`}
+                                    onClick={() => {
+                                      if (isTxExpanded) {
+                                        setExpandedTxRow(null);
+                                        setTxDraft(null);
+                                        setTxEditError('');
+                                      } else {
+                                        setExpandedTxRow(tx.id);
+                                        setTxDraft(draftFromTx(tx));
+                                        setTxEditError('');
+                                      }
+                                    }}
+                                  >
+                                    <td className="px-6 py-3">
+                                      <div className="flex items-center gap-2 pl-4">
+                                        <div className={`size-7 rounded ${icon.bg} ${icon.color} flex items-center justify-center shrink-0`}>
+                                          <span className="material-symbols-outlined text-base">{icon.icon}</span>
+                                        </div>
+                                        <div className="flex flex-col">
+                                          <span className="text-sm font-medium text-slate-800 dark:text-slate-200">{txCatName}</span>
+                                          {tx.note && <span className="text-[10px] text-slate-400 italic truncate max-w-[120px]">{tx.note}</span>}
+                                        </div>
                                       </div>
-                                      <span className="text-sm font-medium text-slate-800 dark:text-slate-200">{txCatName}</span>
-                                    </div>
-                                  </td>
-                                  <td className="px-6 py-3 text-sm text-slate-500 dark:text-slate-400">{txAccName}</td>
-                                  <td className="px-6 py-3 text-right text-sm font-medium text-rose-400 dark:text-rose-300/60">
-                                    -{formatVND(Math.abs(tx.amount))}
-                                  </td>
-                                </tr>
+                                    </td>
+                                    <td className="px-6 py-3 text-sm text-slate-500 dark:text-slate-400">{txAccName}</td>
+                                    <td className="px-6 py-3 text-right text-sm font-medium text-rose-400 dark:text-rose-300/60">
+                                      -{formatVND(Math.abs(tx.amount))}
+                                    </td>
+                                  </tr>
+                                  {isTxExpanded && txDraft && (
+                                    <tr>
+                                      <td colSpan={3} className={`px-6 py-5 border-t border-primary/10 bg-${typeColor}-50 dark:bg-${typeColor}-900/20`}>
+                                        <InlineEditForm
+                                          draft={txDraft}
+                                          onChange={(patch) => setTxDraft((d) => d ? { ...d, ...patch } : d)}
+                                          expenseCategories={expenseCategories}
+                                          incomeCategories={incomeCategories}
+                                          allAccounts={accounts}
+                                          error={txEditError}
+                                          onSave={confirmTxEdit}
+                                          onCancel={() => { setExpandedTxRow(null); setTxDraft(null); setTxEditError(''); }}
+                                          onDelete={async () => {
+                                            if (confirm('Xóa giao dịch này?')) {
+                                              await actions.deleteTransaction(tx.id);
+                                              setExpandedTxRow(null);
+                                              setTxDraft(null);
+                                            }
+                                          }}
+                                          onNewCategory={handleNewCategory}
+                                          onNewAccount={handleNewAccount}
+                                        />
+                                      </td>
+                                    </tr>
+                                  )}
+                                </React.Fragment>
                               );
                             })}
                           </React.Fragment>
