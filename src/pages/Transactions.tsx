@@ -210,6 +210,7 @@ export function Transactions() {
     await actions.editTransaction(tx);
     setEditingId(null);
     setEditError('');
+    setExpandedRow(null);
   }
 
   if (transactions.length === 0) {

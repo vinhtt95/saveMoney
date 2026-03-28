@@ -207,6 +207,7 @@ export function Dashboard() {
     await actions.editTransaction(tx);
     setEditingId(null);
     setEditError('');
+    setExpandedRow(null);
   }
 
   // Wealth section
