@@ -248,7 +248,11 @@ export function Dashboard() {
 
   // Budget section state
   const { budgets } = state;
-  const [selectedBudgetId, setSelectedBudgetId] = useState<string>(() => budgets[0]?.id || '');
+  const [selectedBudgetId, setSelectedBudgetId] = useState<string>(() => {
+    const saved = localStorage.getItem('dashboard_selected_budget_id');
+    const isValid = saved && budgets.some((b) => b.id === saved);
+    return isValid ? saved : (budgets[0]?.id || '');
+  });
   const [budgetTrendCat, setBudgetTrendCat] = useState<string>('');
   const [budgetGranularity, setBudgetGranularity] = useState<'day' | 'week' | 'month'>('week');
 
@@ -486,7 +490,10 @@ export function Dashboard() {
                 {budgets.map((b) => (
                   <button
                     key={b.id}
-                    onClick={() => setSelectedBudgetId(b.id)}
+                    onClick={() => {
+                      setSelectedBudgetId(b.id);
+                      localStorage.setItem('dashboard_selected_budget_id', b.id);
+                    }}
                     className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${
                       selectedBudget.id === b.id
                         ? 'bg-primary text-white'
