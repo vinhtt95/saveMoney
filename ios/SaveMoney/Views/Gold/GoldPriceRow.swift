@@ -2,31 +2,39 @@ import SwiftUI
 
 struct GoldPriceRow: View {
     let item: GoldPriceItem
+    @Environment(\.colorScheme) var scheme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(item.name)
-                .font(.subheadline.bold())
-            HStack {
-                if let buy = item.buyPrice {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Mua").font(.caption).foregroundColor(.secondary)
-                        Text(Formatters.formatVND(buy))
-                            .font(.caption.monospacedDigit())
-                            .foregroundColor(.green)
+        GlassCard(radius: DSRadius.md, padding: 12) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(item.name)
+                    .font(.dsTitle(14))
+                    .foregroundStyle(Color.dsOnSurface(for: scheme))
+                    .lineLimit(1)
+                HStack {
+                    if let buy = item.buyPrice {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Mua")
+                                .font(.dsBody(10))
+                                .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
+                            Text(Formatters.formatVNDShort(buy))
+                                .font(.dsTitle(13))
+                                .foregroundStyle(Color.dsIncome)
+                        }
                     }
-                }
-                Spacer()
-                if let sell = item.sellPrice {
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("Bán").font(.caption).foregroundColor(.secondary)
-                        Text(Formatters.formatVND(sell))
-                            .font(.caption.monospacedDigit())
-                            .foregroundColor(.red)
+                    Spacer()
+                    if let sell = item.sellPrice {
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("Bán")
+                                .font(.dsBody(10))
+                                .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
+                            Text(Formatters.formatVNDShort(sell))
+                                .font(.dsTitle(13))
+                                .foregroundStyle(Color.dsExpense)
+                        }
                     }
                 }
             }
         }
-        .padding(.vertical, 4)
     }
 }

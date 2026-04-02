@@ -4,35 +4,55 @@ struct AccountsView: View {
     @EnvironmentObject var appVM: AppViewModel
     @StateObject private var vm = AccountViewModel()
     @State private var showAddSheet = false
+    @Environment(\.colorScheme) var scheme
 
     var body: some View {
-        NavigationView {
-            List {
-                ForEach(appVM.accounts) { account in
-                    AccountRow(account: account, vm: vm)
-                        .swipeActions(edge: .trailing) {
-                            Button(role: .destructive) {
-                                Task { await vm.delete(id: account.id, appVM: appVM) }
-                            } label: {
-                                Label("Xóa", systemImage: "trash")
-                            }
-                        }
-                }
-            }
-            .listStyle(.plain)
-            .navigationTitle("Tài khoản")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
+        ZStack {
+            DSMeshBackground().ignoresSafeArea()
+            VStack(spacing: 0) {
+                HStack {
+                    Text("Tài khoản")
+                        .font(.dsDisplay(28))
+                        .foregroundStyle(Color.dsOnSurface(for: scheme))
+                    Spacer()
                     Button { showAddSheet = true } label: {
                         Image(systemName: "plus")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(width: 36, height: 36)
+                            .background(Circle().fill(LinearGradient.dsCTAGradient(scheme: scheme)))
                     }
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .padding(.bottom, 8)
+
+                List {
+                    ForEach(appVM.accounts) { account in
+                        AccountRow(account: account, vm: vm)
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
+                            .swipeActions(edge: .trailing) {
+                                Button(role: .destructive) {
+                                    Task { await vm.delete(id: account.id, appVM: appVM) }
+                                } label: {
+                                    Label("Xóa", systemImage: "trash")
+                                }
+                            }
+                    }
+                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .refreshable { await appVM.reload() }
             }
-            .sheet(isPresented: $showAddSheet) {
-                AccountFormView(vm: vm, account: nil)
-                    .environmentObject(appVM)
-            }
-            .refreshable { await appVM.reload() }
+        }
+        .navigationTitle("Tài khoản")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+        .sheet(isPresented: $showAddSheet) {
+            AccountFormView(vm: vm, account: nil)
+                .environmentObject(appVM)
         }
     }
 }
@@ -42,19 +62,27 @@ struct AccountRow: View {
     let account: Account
     let vm: AccountViewModel
     @State private var showEdit = false
+    @Environment(\.colorScheme) var scheme
 
-    private var balance: Double {
-        appVM.balance(for: account.id)
-    }
+    private var balance: Double { appVM.balance(for: account.id) }
 
     var body: some View {
         Button { showEdit = true } label: {
-            HStack {
-                Text(account.name).font(.subheadline.bold()).foregroundColor(.primary)
-                Spacer()
-                Text(Formatters.formatVND(balance))
-                    .font(.subheadline.monospacedDigit())
-                    .foregroundColor(balance >= 0 ? .primary : .red)
+            GlassCard(radius: DSRadius.md, padding: 14) {
+                HStack(spacing: 12) {
+                    GradientCircleIcon(
+                        systemName: "creditcard.fill",
+                        colors: [Color(hex: "#60a5fa"), Color(hex: "#3b82f6")],
+                        size: 38
+                    )
+                    Text(account.name)
+                        .font(.dsBody(15, weight: .semibold))
+                        .foregroundStyle(Color.dsOnSurface(for: scheme))
+                    Spacer()
+                    Text(Formatters.formatVNDShort(balance))
+                        .font(.dsTitle(15))
+                        .foregroundStyle(balance >= 0 ? Color.dsIncome : Color.dsExpense)
+                }
             }
         }
         .sheet(isPresented: $showEdit) {

@@ -4,6 +4,7 @@ import Charts
 struct CategoryBreakdownChart: View {
     let transactions: [Transaction]
     let categories: [Category]
+    @Environment(\.colorScheme) var scheme
 
     private struct CategoryData: Identifiable {
         let id: String
@@ -23,39 +24,65 @@ struct CategoryBreakdownChart: View {
             .sorted { $0.amount > $1.amount }
     }
 
+    private let gradientColors: [[Color]] = [
+        [Color(hex: "#c799ff"), Color(hex: "#4af8e3")],
+        [Color(hex: "#ff6b8a"), Color(hex: "#fbbf24")],
+        [Color(hex: "#60a5fa"), Color(hex: "#a78bfa")],
+        [Color(hex: "#4af8e3"), Color(hex: "#059669")],
+        [Color(hex: "#fbbf24"), Color(hex: "#f97316")]
+    ]
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Chi tiêu theo danh mục")
-                .font(.headline)
-            if data.isEmpty {
-                Text("Không có dữ liệu")
-                    .foregroundColor(.secondary)
-                    .font(.subheadline)
-                    .frame(maxWidth: .infinity, minHeight: 100, alignment: .center)
-            } else {
+        if data.isEmpty {
+            Text("Không có dữ liệu chi tiêu")
+                .font(.dsBody(14))
+                .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
+                .frame(maxWidth: .infinity, minHeight: 80, alignment: .center)
+        } else {
+            VStack(spacing: 16) {
+                // Donut chart
                 Chart(data) { item in
                     SectorMark(
                         angle: .value("Chi tiêu", item.amount),
-                        innerRadius: .ratio(0.55)
+                        innerRadius: .ratio(0.55),
+                        angularInset: 2
                     )
                     .foregroundStyle(by: .value("Danh mục", item.name))
+                    .cornerRadius(4)
                 }
-                .frame(height: 200)
+                .frame(height: 180)
+                .chartLegend(.hidden)
+                .overlay {
+                    VStack(spacing: 2) {
+                        Text("Total")
+                            .font(.dsBody(11))
+                            .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
+                        Text(Formatters.formatVNDShort(data.reduce(0) { $0 + $1.amount }))
+                            .font(.dsTitle(15))
+                            .foregroundStyle(Color.dsOnSurface(for: scheme))
+                    }
+                }
 
-                ForEach(data) { item in
-                    HStack {
-                        Text(item.name).font(.subheadline)
-                        Spacer()
-                        Text(Formatters.formatVND(item.amount))
-                            .font(.subheadline.monospacedDigit())
-                            .foregroundColor(.red)
+                // Legend rows
+                VStack(spacing: 8) {
+                    ForEach(data.prefix(5)) { item in
+                        HStack(spacing: 10) {
+                            GradientCircleIcon(
+                                systemName: categorySystemIcon(for: item.name),
+                                colors: categoryIconColors(for: item.name),
+                                size: 28
+                            )
+                            Text(item.name)
+                                .font(.dsBody(13))
+                                .foregroundStyle(Color.dsOnSurface(for: scheme))
+                            Spacer()
+                            Text(Formatters.formatVNDShort(item.amount))
+                                .font(.dsTitle(13))
+                                .foregroundStyle(Color.dsExpense)
+                        }
                     }
                 }
             }
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.06), radius: 4, x: 0, y: 2)
     }
 }

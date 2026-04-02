@@ -5,6 +5,7 @@ struct AccountFormView: View {
     @ObservedObject var vm: AccountViewModel
     let account: Account?
     @Environment(\.dismiss) var dismiss
+    @Environment(\.colorScheme) var scheme
 
     @State private var name: String
     @State private var balance: String
@@ -13,31 +14,46 @@ struct AccountFormView: View {
         self.vm = vm
         self.account = account
         _name = State(initialValue: account?.name ?? "")
-        // balance comes from accountBalances — accessed via appVM, not account
         _balance = State(initialValue: "")
     }
 
     var body: some View {
         NavigationView {
-            Form {
-                Section("Thông tin tài khoản") {
-                    TextField("Tên tài khoản", text: $name)
-                    TextField("Số dư ban đầu (VND)", text: $balance)
-                        .keyboardType(.numberPad)
-                }
-                if let err = vm.submitError {
-                    Section { Text(err).foregroundColor(.red).font(.caption) }
+            ZStack {
+                DSMeshBackground().ignoresSafeArea()
+                VStack(spacing: 16) {
+                    GlassCard(radius: DSRadius.lg, padding: 16) {
+                        VStack(spacing: 14) {
+                            GlassFormField(label: "Tên tài khoản", text: $name)
+                            GlassFormField(label: "Số dư (VND)", text: $balance, keyboardType: .numberPad)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+
+                    if let err = vm.submitError {
+                        Text(err).font(.dsBody(12)).foregroundStyle(Color.dsExpense)
+                            .padding(.horizontal, 20)
+                    }
+
+                    GlassPillButton(label: vm.isSubmitting ? "Đang lưu..." : "Lưu") {
+                        save()
+                    }
+                    .disabled(vm.isSubmitting || name.isEmpty)
+                    .padding(.horizontal, 20)
+
+                    Spacer()
                 }
             }
             .navigationTitle(account == nil ? "Thêm tài khoản" : "Sửa tài khoản")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) { Button("Hủy") { dismiss() } }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Lưu") { save() }
-                        .disabled(vm.isSubmitting || name.isEmpty)
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Hủy") { dismiss() }
+                        .foregroundStyle(Color.dsPrimary(for: scheme))
                 }
             }
+            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         }
         .onAppear {
             if let acc = account {

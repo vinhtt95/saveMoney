@@ -3,94 +3,122 @@ import SwiftUI
 struct TransactionsView: View {
     @EnvironmentObject var appVM: AppViewModel
     @StateObject private var vm = TransactionViewModel()
-    @State private var showAddSheet = false
+    @Environment(\.colorScheme) var scheme
+
+    private var grouped: [(String, [Transaction])] {
+        let txs = vm.paged(appVM.transactions)
+        let dict = Dictionary(grouping: txs) { $0.date }
+        return dict.sorted { $0.key > $1.key }
+    }
 
     var body: some View {
         NavigationView {
-            VStack(spacing: 0) {
-                VStack(spacing: 8) {
-                    SearchBar(text: $vm.searchText, placeholder: "Tìm kiếm ghi chú...")
-                        .onChange(of: vm.searchText) { _ in vm.resetPaging() }
+            ZStack {
+                DSMeshBackground().ignoresSafeArea()
 
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            Picker("Danh mục", selection: $vm.selectedCategoryId) {
-                                Text("Tất cả danh mục").tag(Optional<String>(nil))
-                                ForEach(appVM.categories) { cat in
-                                    Text(cat.name).tag(Optional(cat.id))
-                                }
+                VStack(spacing: 0) {
+                    // Sticky header
+                    VStack(spacing: 10) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Lịch sử")
+                                    .font(.dsDisplay(28))
+                                    .foregroundStyle(Color.dsOnSurface(for: scheme))
+                                Text("Theo dõi dòng tiền của bạn")
+                                    .font(.dsBody(13))
+                                    .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
                             }
-                            .pickerStyle(.menu)
-                            .onChange(of: vm.selectedCategoryId) { _ in vm.resetPaging() }
-
-                            Picker("Tài khoản", selection: $vm.selectedAccountId) {
-                                Text("Tất cả tài khoản").tag(Optional<String>(nil))
-                                ForEach(appVM.accounts) { acc in
-                                    Text(acc.name).tag(Optional(acc.id))
-                                }
-                            }
-                            .pickerStyle(.menu)
-                            .onChange(of: vm.selectedAccountId) { _ in vm.resetPaging() }
+                            Spacer()
                         }
-                        .padding(.horizontal)
-                    }
-                }
-                .padding(.vertical, 8)
-                .background(Color(.systemGroupedBackground))
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
 
-                List {
-                    ForEach(vm.paged(appVM.transactions)) { tx in
-                        TransactionRowView(transaction: tx, appVM: appVM)
-                            .swipeActions(edge: .trailing) {
-                                Button(role: .destructive) {
-                                    Task { await vm.delete(id: tx.id, appVM: appVM) }
-                                } label: {
-                                    Label("Xóa", systemImage: "trash")
+                        GlassSearchBar(text: $vm.searchText, placeholder: "Tìm kiếm giao dịch...")
+                            .padding(.horizontal, 20)
+                            .onChange(of: vm.searchText) { _ in vm.resetPaging() }
+
+                        // Filter chips
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                GlassPeriodChip(label: "Tất cả", isSelected: vm.selectedCategoryId == nil && vm.selectedAccountId == nil) {
+                                    vm.selectedCategoryId = nil
+                                    vm.selectedAccountId = nil
+                                    vm.resetPaging()
+                                }
+                                ForEach(appVM.categories.prefix(8)) { cat in
+                                    GlassPeriodChip(label: cat.name, isSelected: vm.selectedCategoryId == cat.id) {
+                                        vm.selectedCategoryId = vm.selectedCategoryId == cat.id ? nil : cat.id
+                                        vm.resetPaging()
+                                    }
                                 }
                             }
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 2)
+                        }
                     }
-                    if vm.hasMore(appVM.transactions) {
-                        Button("Tải thêm") { vm.loadMore() }
-                            .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.bottom, 8)
+
+                    // Transaction list
+                    List {
+                        ForEach(grouped, id: \.0) { date, txs in
+                            Section {
+                                ForEach(txs) { tx in
+                                    TransactionRowView(transaction: tx, appVM: appVM)
+                                        .listRowBackground(Color.clear)
+                                        .listRowSeparator(.hidden)
+                                        .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
+                                        .swipeActions(edge: .trailing) {
+                                            Button(role: .destructive) {
+                                                Task { await vm.delete(id: tx.id, appVM: appVM) }
+                                            } label: {
+                                                Label("Xóa", systemImage: "trash")
+                                            }
+                                        }
+                                }
+                            } header: {
+                                Text(sectionTitle(date))
+                                    .font(.dsBody(12, weight: .semibold))
+                                    .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
+                                    .textCase(nil)
+                                    .padding(.horizontal, 20)
+                                    .padding(.vertical, 4)
+                                    .listRowInsets(EdgeInsets())
+                            }
+                        }
+
+                        if vm.hasMore(appVM.transactions) {
+                            Button {
+                                vm.loadMore()
+                            } label: {
+                                Text("Tải thêm")
+                                    .font(.dsBody(14, weight: .medium))
+                                    .foregroundStyle(Color.dsPrimary(for: scheme))
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                            }
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                        }
                     }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .background(Color.clear)
+                    .refreshable { await appVM.reload() }
                 }
-                .listStyle(.plain)
             }
-            .navigationTitle("Giao dịch")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button { showAddSheet = true } label: {
-                        Image(systemName: "plus")
-                    }
-                }
-            }
-            .sheet(isPresented: $showAddSheet) {
-                AddTransactionView(vm: vm)
-                    .environmentObject(appVM)
-            }
-            .refreshable { await appVM.reload() }
+            .navigationBarHidden(true)
+            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         }
     }
-}
 
-struct SearchBar: View {
-    @Binding var text: String
-    var placeholder: String = "Tìm kiếm..."
-
-    var body: some View {
-        HStack {
-            Image(systemName: "magnifyingglass").foregroundColor(.secondary)
-            TextField(placeholder, text: $text)
-                .textFieldStyle(.plain)
-            if !text.isEmpty {
-                Button { text = "" } label: {
-                    Image(systemName: "xmark.circle.fill").foregroundColor(.secondary)
-                }
-            }
-        }
-        .padding(8)
-        .background(Color(.systemBackground))
-        .cornerRadius(10)
-        .padding(.horizontal)
+    private func sectionTitle(_ date: String) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard let d = formatter.date(from: date) else { return date }
+        if Calendar.current.isDateInToday(d) { return "Hôm nay" }
+        if Calendar.current.isDateInYesterday(d) { return "Hôm qua" }
+        let out = DateFormatter()
+        out.dateFormat = "dd/MM/yyyy"
+        return out.string(from: d)
     }
 }
