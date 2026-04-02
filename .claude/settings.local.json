@@ -28,7 +28,9 @@
       "Bash(npm run:*)",
       "Bash(lsof -ti:3001)",
       "Bash(xargs kill:*)",
-      "Bash(lsof -ti:3000)"
+      "Bash(lsof -ti:3000)",
+      "Skill(git-commit-push)",
+      "Skill(git-commit-push:*)"
     ]
   }
 }
