@@ -1,0 +1,49 @@
+name: SaveMoney
+options:
+  bundleIdPrefix: com.savemoney
+  deploymentTarget:
+    iOS: "16.0"
+  xcodeVersion: "15"
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+    PRODUCT_BUNDLE_IDENTIFIER: com.savemoney.app
+    PRODUCT_NAME: SaveMoney
+    INFOPLIST_FILE: SaveMoney/Resources/Info.plist
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: ""
+
+targets:
+  SaveMoney:
+    type: application
+    platform: iOS
+    sources:
+      - path: SaveMoney
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.savemoney.app
+    info:
+      path: SaveMoney/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: SaveMoney
+        CFBundleName: SaveMoney
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        LSRequiresIPhoneOS: true
+        UILaunchScreen:
+          UIColorName: ""
+          UIImageName: ""
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
