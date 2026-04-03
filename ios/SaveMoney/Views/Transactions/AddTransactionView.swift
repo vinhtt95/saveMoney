@@ -362,20 +362,22 @@ struct AddTransactionView: View {
                         .foregroundStyle(Color.dsOnSurface(for: scheme))
                 }
 
-                ZStack(alignment: .topLeading) {
-                    if note.isEmpty {
-                        Text("Optional...")
-                            .font(.dsBody(14))
-                            .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme).opacity(0.6))
-                            .padding(.top, 2)
+                TextEditor(text: $note)
+                    .font(.dsBody(14))
+                    .foregroundStyle(Color.dsOnSurface(for: scheme))
+                    .scrollContentBackground(.hidden)
+                    .background(Color.clear)
+                    .frame(minHeight: 72)
+                    .overlay(alignment: .topLeading) {
+                        if note.isEmpty {
+                            Text("Optional...")
+                                .font(.dsBody(14))
+                                .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme).opacity(0.6))
+                                .padding(.top, 8)
+                                .padding(.leading, 5)
+                                .allowsHitTesting(false)
+                        }
                     }
-                    TextEditor(text: $note)
-                        .font(.dsBody(14))
-                        .foregroundStyle(Color.dsOnSurface(for: scheme))
-                        .scrollContentBackground(.hidden)
-                        .background(Color.clear)
-                        .frame(minHeight: 72)
-                }
             }
         }
     }
