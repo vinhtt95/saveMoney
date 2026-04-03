@@ -24,6 +24,7 @@ export default defineConfig(({mode}) => {
         '/api/accounts': { target: 'http://localhost:3001', changeOrigin: true },
         '/api/budgets': { target: 'http://localhost:3001', changeOrigin: true },
         '/api/gold-assets': { target: 'http://localhost:3001', changeOrigin: true },
+        '/api/gold-prices': { target: 'http://localhost:3001', changeOrigin: true },
         '/api/settings': { target: 'http://localhost:3001', changeOrigin: true },
         '/api/gold-futures': {
           target: 'https://query1.finance.yahoo.com',

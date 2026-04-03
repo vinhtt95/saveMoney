@@ -117,5 +117,59 @@ export async function fetchGoldPrices(): Promise<GoldPriceCache> {
   const cache: GoldPriceCache = { world, sjc, btmc, cachedAt: new Date().toISOString() };
   saveCachedGoldPrices(cache);
   maybeRecordTodaySnapshot(cache);
+  saveGoldPricesToBackend(cache);
   return cache;
+}
+
+/** Convert web GoldPriceCache to the unified format and save to backend for iOS to consume. Fire-and-forget. */
+function saveGoldPricesToBackend(cache: GoldPriceCache): void {
+  const items: Array<{ id: string; name: string; buy_price: number | null; sell_price: number | null; brand: string }> = [];
+
+  if (cache.sjc) {
+    cache.sjc.products.forEach((p, i) => {
+      items.push({
+        id: `sjc_${String(i + 1).padStart(3, '0')}`,
+        name: p.name,
+        buy_price: p.buyPrice,
+        sell_price: p.sellPrice,
+        brand: 'SJC',
+      });
+    });
+  }
+
+  if (cache.btmc) {
+    cache.btmc.products.forEach((p, i) => {
+      items.push({
+        id: `btmc_${String(i + 1).padStart(3, '0')}`,
+        name: p.name,
+        buy_price: p.buyPrice,
+        sell_price: p.sellPrice,
+        brand: 'BTMC',
+      });
+    });
+  }
+
+  if (cache.world) {
+    const { spotPerLuong, futuresPerLuong, usdvnd } = cache.world;
+    if (spotPerLuong) {
+      items.push({ id: 'world_spot', name: 'Vàng thế giới (Spot)', buy_price: spotPerLuong, sell_price: spotPerLuong, brand: 'world' });
+    }
+    if (futuresPerLuong) {
+      items.push({ id: 'world_futures', name: 'Vàng thế giới (Futures)', buy_price: futuresPerLuong, sell_price: futuresPerLuong, brand: 'world' });
+    }
+    fetch('/api/gold-prices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items, usd_vnd: usdvnd, fetched_at: cache.cachedAt }),
+    }).catch(() => { /* ignore network errors */ });
+    return;
+  }
+
+  if (items.length) {
+    fetch('/api/gold-prices', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items, usd_vnd: FALLBACK_USDVND, fetched_at: cache.cachedAt }),
+    }).catch(() => { /* ignore network errors */ });
+  }
 }

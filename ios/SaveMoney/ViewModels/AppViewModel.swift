@@ -52,8 +52,27 @@ class AppViewModel: ObservableObject {
         return accounts.first { $0.id == id }
     }
 
+    /// Net transaction totals per account, matching web's getAccountNetTotals() logic.
+    var accountNetTotals: [String: Double] {
+        var map: [String: Double] = [:]
+        for t in transactions {
+            guard let accountId = t.accountId else { continue }
+            if map[accountId] == nil { map[accountId] = 0 }
+            if t.type == .transfer {
+                map[accountId]! -= abs(t.amount)
+                if let dest = t.transferToId {
+                    if map[dest] == nil { map[dest] = 0 }
+                    map[dest]! += abs(t.amount)
+                }
+            } else {
+                map[accountId]! += t.amount
+            }
+        }
+        return map
+    }
+
     func balance(for accountId: String) -> Double {
-        accountBalances[accountId] ?? 0
+        (accountBalances[accountId] ?? 0) + (accountNetTotals[accountId] ?? 0)
     }
 
     var expenseCategories: [Category] {

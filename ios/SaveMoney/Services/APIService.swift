@@ -144,6 +144,12 @@ class APIService {
         try await requestVoid("/api/budgets/\(id)")
     }
 
+    // MARK: - Gold Prices
+
+    func getGoldPrices() async throws -> GoldPricesResponse {
+        try await request("/api/gold-prices")
+    }
+
     // MARK: - Gold Assets
 
     func getGoldAssets() async throws -> [GoldAsset] {

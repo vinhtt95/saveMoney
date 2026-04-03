@@ -1,8 +1,5 @@
 import Foundation
 
-// Gold unit constants (BR-08)
-// 1 lượng = 37.5g = 1.2057 troy oz
-private let LUONG_TO_TROY_OZ = 1.2057
 private let CACHE_TTL: TimeInterval = 5 * 60 // 5 minutes (BR-09)
 private let CACHE_KEY = "gold_price_cache"
 
@@ -34,96 +31,15 @@ class GoldPriceService: ObservableObject {
         defer { isFetching = false }
 
         do {
-            // Fetch USD/VND rate
-            let rate = await fetchUSDVND()
-            usdVnd = rate
-
-            // Fetch gold prices from backend proxies
-            async let sjcItems = fetchSJC()
-            async let btmcItems = fetchBTMC()
-            async let worldItems = fetchWorldGold(usdVnd: rate)
-
-            let all = try await [sjcItems, btmcItems, worldItems].flatMap { $0 }
-            prices = all
-            let cache = GoldPriceCache(items: all, fetchedAt: Date(), usdVnd: rate)
+            let resp = try await api.getGoldPrices()
+            prices = resp.items
+            usdVnd = resp.usdVnd
+            let fetchedAt = ISO8601DateFormatter().date(from: resp.fetchedAt) ?? Date()
+            let cache = GoldPriceCache(items: resp.items, fetchedAt: fetchedAt, usdVnd: resp.usdVnd)
             saveCache(cache)
-            lastFetchedAt = cache.fetchedAt
+            lastFetchedAt = fetchedAt
         } catch {
             lastFetchError = error.localizedDescription
-        }
-    }
-
-    // MARK: - Private helpers
-
-    private func fetchUSDVND() async -> Double {
-        // Try backend proxy; fallback to constant (BR-16)
-        struct FXResponse: Decodable { let rates: [String: Double] }
-        do {
-            let resp: FXResponse = try await api.request("/api/fx?base=USD")
-            return resp.rates["VND"] ?? Constants.fallbackUSDVND
-        } catch {
-            return Constants.fallbackUSDVND
-        }
-    }
-
-    private func fetchSJC() async throws -> [GoldPriceItem] {
-        struct SJCRow: Decodable {
-            let id: String
-            let name: String
-            let buy: Double?
-            let sell: Double?
-        }
-        struct SJCResp: Decodable { let data: [SJCRow] }
-        do {
-            let resp: SJCResp = try await api.request("/api/sjc")
-            return resp.data.map {
-                GoldPriceItem(id: "sjc_\($0.id)", name: $0.name, buyPrice: $0.buy, sellPrice: $0.sell, brand: .sjc)
-            }
-        } catch {
-            return []
-        }
-    }
-
-    private func fetchBTMC() async throws -> [GoldPriceItem] {
-        struct BTMCRow: Decodable {
-            let id: String
-            let name: String
-            let buy: Double?
-            let sell: Double?
-        }
-        struct BTMCResp: Decodable { let data: [BTMCRow] }
-        do {
-            let resp: BTMCResp = try await api.request("/api/btmc")
-            return resp.data.map {
-                GoldPriceItem(id: "btmc_\($0.id)", name: $0.name, buyPrice: $0.buy, sellPrice: $0.sell, brand: .btmc)
-            }
-        } catch {
-            return []
-        }
-    }
-
-    private func fetchWorldGold(usdVnd: Double) async throws -> [GoldPriceItem] {
-        struct YahooQuote: Decodable {
-            let regularMarketPrice: Double?
-        }
-        struct YahooResult: Decodable { let result: [YahooQuote]? }
-        struct YahooResp: Decodable { let quoteResponse: YahooResult }
-
-        do {
-            let resp: YahooResp = try await api.request("/api/gold-futures")
-            let pricePerOz = resp.quoteResponse.result?.first?.regularMarketPrice ?? 0
-            let pricePerLuong = pricePerOz * LUONG_TO_TROY_OZ * usdVnd
-            return [
-                GoldPriceItem(
-                    id: "world_xauusd",
-                    name: "Vàng thế giới (XAUUSD)",
-                    buyPrice: pricePerLuong,
-                    sellPrice: pricePerLuong,
-                    brand: .world
-                )
-            ]
-        } catch {
-            return []
         }
     }
 

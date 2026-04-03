@@ -5,6 +5,7 @@ import { router as accounts } from './routes/accounts.js';
 import { router as budgets } from './routes/budgets.js';
 import { router as categories } from './routes/categories.js';
 import { router as goldAssets } from './routes/goldAssets.js';
+import { router as goldPrices } from './routes/goldPrices.js';
 import { router as init } from './routes/init.js';
 import { router as settings } from './routes/settings.js';
 import { router as transactions } from './routes/transactions.js';
@@ -20,6 +21,7 @@ app.use('/api', accounts);
 app.use('/api', transactions);
 app.use('/api', budgets);
 app.use('/api', goldAssets);
+app.use('/api', goldPrices);
 app.use('/api', settings);
 
 // Global error handler
