@@ -24,6 +24,26 @@ struct AddTransactionView: View {
     init(isPresented: Binding<Bool>, transaction: Transaction? = nil) {
         self._isPresented = isPresented
         self.editingTransaction = transaction
+
+        if let tx = transaction {
+            let absAmount = abs(tx.amount)
+            let formatter = NumberFormatter()
+            formatter.maximumFractionDigits = 0
+            var amtStr = formatter.string(from: NSNumber(value: absAmount)) ?? String(Int(absAmount))
+            amtStr = amtStr.filter { $0.isNumber }
+            if amtStr.isEmpty { amtStr = "0" }
+
+            _amountString = State(initialValue: amtStr)
+            _selectedType = State(initialValue: tx.type)
+            _selectedCategoryId = State(initialValue: tx.categoryId)
+            _selectedAccountId = State(initialValue: tx.accountId)
+
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd"
+            let date = dateFormatter.date(from: tx.date) ?? Date()
+            _selectedDate = State(initialValue: date)
+            _note = State(initialValue: tx.note ?? "")
+        }
     }
 
     private var filteredCategories: [Category] {
@@ -82,9 +102,7 @@ struct AddTransactionView: View {
             }
         }
         .onAppear {
-            if let tx = editingTransaction {
-                applyFromTransaction(tx)
-            } else {
+            if editingTransaction == nil {
                 applyDefaults()
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {

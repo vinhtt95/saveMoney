@@ -5,7 +5,6 @@ struct RecentTransactionsView: View {
     let appVM: AppViewModel
     @Environment(\.colorScheme) var scheme
     @State private var selectedTransaction: Transaction? = nil
-    @State private var showEditSheet = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -24,18 +23,18 @@ struct RecentTransactionsView: View {
                         GlassCard(radius: DSRadius.md, padding: 12) {
                             TransactionRowView(transaction: tx, appVM: appVM) {
                                 selectedTransaction = tx
-                                showEditSheet = true
                             }
                         }
                     }
                 }
             }
         }
-        .sheet(isPresented: $showEditSheet) {
-            if let tx = selectedTransaction {
-                AddTransactionView(isPresented: $showEditSheet, transaction: tx)
-                    .environmentObject(appVM)
-            }
+        .sheet(item: $selectedTransaction) { tx in
+            AddTransactionView(isPresented: Binding(
+                get: { selectedTransaction != nil },
+                set: { if !$0 { selectedTransaction = nil } }
+            ), transaction: tx)
+            .environmentObject(appVM)
         }
     }
 }

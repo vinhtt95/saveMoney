@@ -5,7 +5,6 @@ struct TransactionsView: View {
     @StateObject private var vm = TransactionViewModel()
     @Environment(\.colorScheme) var scheme
     @State private var selectedTransaction: Transaction? = nil
-    @State private var showEditSheet = false
 
     private var grouped: [(String, [Transaction])] {
         let txs = vm.paged(appVM.transactions)
@@ -67,7 +66,6 @@ struct TransactionsView: View {
                                 ForEach(txs) { tx in
                                     TransactionRowView(transaction: tx, appVM: appVM) {
                                         selectedTransaction = tx
-                                        showEditSheet = true
                                     }
                                     .listRowBackground(Color.clear)
                                     .listRowSeparator(.hidden)
@@ -113,11 +111,12 @@ struct TransactionsView: View {
             }
             .navigationBarHidden(true)
             .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
-            .sheet(isPresented: $showEditSheet) {
-                if let tx = selectedTransaction {
-                    AddTransactionView(isPresented: $showEditSheet, transaction: tx)
-                        .environmentObject(appVM)
-                }
+            .sheet(item: $selectedTransaction) { tx in
+                AddTransactionView(isPresented: Binding(
+                    get: { selectedTransaction != nil },
+                    set: { if !$0 { selectedTransaction = nil } }
+                ), transaction: tx)
+                .environmentObject(appVM)
             }
         }
     }
