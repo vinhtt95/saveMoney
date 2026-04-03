@@ -235,11 +235,7 @@ struct SettingsView: View {
             DSSectionHeader(title: "Mặc định giao dịch")
             GlassCard(radius: DSRadius.lg, padding: 16) {
                 VStack(spacing: 14) {
-                    HStack {
-                        Text("Loại mặc định")
-                            .font(.dsBody(14))
-                            .foregroundStyle(Color.dsOnSurface(for: scheme))
-                        Spacer()
+                    settingsRow(label: "Loại mặc định") {
                         Picker("Loại mặc định", selection: defaultType) {
                             Text("Chi tiêu").tag("expense")
                             Text("Thu nhập").tag("income")
@@ -248,11 +244,9 @@ struct SettingsView: View {
                         .tint(Color.dsPrimary(for: scheme))
                     }
 
-                    HStack {
-                        Text("Tài khoản mặc định")
-                            .font(.dsBody(14))
-                            .foregroundStyle(Color.dsOnSurface(for: scheme))
-                        Spacer()
+                    Divider().opacity(0.3)
+
+                    settingsRow(label: "Tài khoản mặc định") {
                         Picker("Tài khoản mặc định", selection: Binding(
                             get: { appVM.settings["default_account_id"] ?? "" },
                             set: { appVM.settings["default_account_id"] = $0 }
@@ -266,12 +260,67 @@ struct SettingsView: View {
                         .tint(Color.dsPrimary(for: scheme))
                     }
 
+                    Divider().opacity(0.3)
+
+                    settingsRow(label: "Danh mục (Chi tiêu)") {
+                        Picker("Danh mục chi tiêu", selection: Binding(
+                            get: { appVM.settings["default_expense_category_id"] ?? "" },
+                            set: { appVM.settings["default_expense_category_id"] = $0 }
+                        )) {
+                            Text("Không chọn").tag("")
+                            ForEach(appVM.expenseCategories) { cat in
+                                Text(cat.name).tag(cat.id)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .tint(Color.dsPrimary(for: scheme))
+                    }
+
+                    Divider().opacity(0.3)
+
+                    settingsRow(label: "Danh mục (Thu nhập)") {
+                        Picker("Danh mục thu nhập", selection: Binding(
+                            get: { appVM.settings["default_income_category_id"] ?? "" },
+                            set: { appVM.settings["default_income_category_id"] = $0 }
+                        )) {
+                            Text("Không chọn").tag("")
+                            ForEach(appVM.incomeCategories) { cat in
+                                Text(cat.name).tag(cat.id)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .tint(Color.dsPrimary(for: scheme))
+                    }
+
+                    if vm.saveSuccess {
+                        HStack(spacing: 6) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(Color.dsIncome)
+                            Text("Đã lưu")
+                                .font(.dsBody(13))
+                                .foregroundStyle(Color.dsIncome)
+                        }
+                    }
+                    if let err = vm.saveError {
+                        Text(err).font(.dsBody(12)).foregroundStyle(Color.dsExpense)
+                    }
+
                     GlassPillButton(label: vm.isSaving ? "Đang lưu..." : "Lưu cài đặt") {
                         Task { await vm.saveDefaults(settings: appVM.settings, appVM: appVM) }
                     }
                     .disabled(vm.isSaving)
                 }
             }
+        }
+    }
+
+    private func settingsRow<Content: View>(label: String, @ViewBuilder content: () -> Content) -> some View {
+        HStack {
+            Text(label)
+                .font(.dsBody(14))
+                .foregroundStyle(Color.dsOnSurface(for: scheme))
+            Spacer()
+            content()
         }
     }
 }

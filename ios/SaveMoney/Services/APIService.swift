@@ -108,6 +108,12 @@ class APIService {
         try await request("/api/categories", method: "POST", body: body)
     }
 
+    func updateCategory(id: String, name: String) async throws {
+        struct Body: Encodable { let name: String }
+        struct OkResponse: Decodable { let ok: Bool }
+        let _: OkResponse = try await request("/api/categories/\(id)", method: "PUT", body: Body(name: name))
+    }
+
     func deleteCategory(id: String) async throws {
         try await requestVoid("/api/categories/\(id)")
     }
@@ -171,6 +177,8 @@ class APIService {
     }
 
     func updateSettings(_ body: [String: String]) async throws -> [String: String] {
-        try await request("/api/settings", method: "POST", body: body)
+        struct OkResponse: Decodable { let ok: Bool }
+        let _: OkResponse = try await request("/api/settings", method: "PUT", body: body)
+        return try await request("/api/settings")
     }
 }

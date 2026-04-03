@@ -13,6 +13,11 @@ struct AddTransactionView: View {
     @State private var selectedDate: Date = Date()
     @State private var note: String = ""
 
+    @FocusState private var amountFocused: Bool
+    @State private var showCategorySheet = false
+    @State private var showAccountSheet = false
+    @State private var showDateSheet = false
+
     private var filteredCategories: [Category] {
         switch selectedType {
         case .expense: return appVM.expenseCategories
@@ -21,41 +26,72 @@ struct AddTransactionView: View {
         }
     }
 
+    private var selectedCategoryName: String? {
+        selectedCategoryId.flatMap { appVM.category(for: $0)?.name }
+    }
+
+    private var selectedAccountName: String? {
+        selectedAccountId.flatMap { appVM.account(for: $0)?.name }
+    }
+
+    private var formattedDate: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, d MMM"
+        return formatter.string(from: selectedDate)
+    }
+
     var body: some View {
         ZStack {
             DSMeshBackground().ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // Header
                 header
                     .padding(.horizontal, 20)
                     .padding(.top, 20)
-                    .padding(.bottom, 8)
+                    .padding(.bottom, 16)
 
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: 16) {
-                        amountCard.padding(.horizontal, 20)
-                        typeSelector.padding(.horizontal, 20)
-                        categorySection.padding(.horizontal, 20)
-                        accountDateRow.padding(.horizontal, 20)
-                        GlassFormField(label: "Ghi chú", text: $note, placeholder: "Tuỳ chọn...")
+                    VStack(spacing: 12) {
+                        amountCard
+                            .padding(.horizontal, 20)
+
+                        typeSelector
+                            .padding(.horizontal, 20)
+
+                        formRows
+                            .padding(.horizontal, 20)
+
+                        noteField
                             .padding(.horizontal, 20)
                     }
-                    .padding(.bottom, 8)
+                    .padding(.bottom, 32)
                 }
-
-                if let err = vm.submitError {
-                    Text(err)
-                        .font(.dsBody(12))
-                        .foregroundStyle(Color.dsExpense)
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 4)
-                }
-
-                keypad
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 20)
             }
+        }
+        .onAppear {
+            applyDefaults()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                amountFocused = true
+            }
+        }
+        .sheet(isPresented: $showCategorySheet) {
+            CategoryPickerSheet(
+                categories: filteredCategories,
+                selectedId: $selectedCategoryId,
+                isPresented: $showCategorySheet
+            )
+            .environmentObject(appVM)
+        }
+        .sheet(isPresented: $showAccountSheet) {
+            AccountPickerSheet(
+                accounts: appVM.accounts,
+                selectedId: $selectedAccountId,
+                isPresented: $showAccountSheet
+            )
+            .environmentObject(appVM)
+        }
+        .sheet(isPresented: $showDateSheet) {
+            DatePickerSheet(selectedDate: $selectedDate, isPresented: $showDateSheet)
         }
     }
 
@@ -63,17 +99,12 @@ struct AddTransactionView: View {
 
     private var header: some View {
         HStack {
-            Button {
-                isPresented = false
-            } label: {
+            Button { isPresented = false } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
                     .frame(width: 32, height: 32)
-                    .background {
-                        Circle()
-                            .fill(.ultraThinMaterial)
-                    }
+                    .background(Circle().fill(.ultraThinMaterial))
             }
             Spacer()
             VStack(spacing: 1) {
@@ -93,254 +124,231 @@ struct AddTransactionView: View {
     // MARK: - Amount Card
 
     private var amountCard: some View {
-        GlassCard(radius: DSRadius.xl, padding: 20) {
-            VStack(spacing: 12) {
-                Text("AMOUNT")
-                    .font(.dsBody(10, weight: .semibold))
-                    .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-                    .tracking(1.5)
-
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text("₫")
-                        .font(.dsDisplay(24))
+        GlassCard(radius: DSRadius.xl, padding: 28) {
+            ZStack {
+                VStack(spacing: 6) {
+                    Text("AMOUNT")
+                        .font(.dsBody(10, weight: .semibold))
                         .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-                    Text(amountString)
-                        .font(.dsDisplay(42))
-                        .foregroundStyle(Color.dsOnSurface(for: scheme))
-                        .minimumScaleFactor(0.5)
-                        .lineLimit(1)
-                }
+                        .tracking(1.5)
 
-                HStack(spacing: 12) {
-                    // Date chip with overlay picker
-                    ZStack {
-                        HStack(spacing: 6) {
-                            Image(systemName: "calendar")
-                                .font(.system(size: 12))
-                            Text(Formatters.formatDate(Formatters.toDateString(selectedDate)))
-                                .font(.dsBody(12))
-                        }
-                        .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(Capsule().fill(.ultraThinMaterial))
-
-                        DatePicker("", selection: $selectedDate, displayedComponents: .date)
-                            .labelsHidden()
-                            .opacity(0.011)
-                            .frame(width: 110, height: 30)
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        Text("₫")
+                            .font(.dsDisplay(24))
+                            .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
+                        Text(amountString == "0" ? "0" : formattedAmount)
+                            .font(.dsDisplay(48))
+                            .foregroundStyle(Color.dsOnSurface(for: scheme))
+                            .minimumScaleFactor(0.4)
+                            .lineLimit(1)
                     }
 
-                    if let accId = selectedAccountId,
-                       let acc = appVM.account(for: accId) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "creditcard")
-                                .font(.system(size: 12))
-                            Text(acc.name)
-                                .font(.dsBody(12))
+                    if vm.submitError != nil {
+                        Text(vm.submitError!)
+                            .font(.dsBody(12))
+                            .foregroundStyle(Color.dsExpense)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+
+                // Hidden text field that drives the iOS numeric keyboard
+                TextField("", text: Binding(
+                    get: { amountString },
+                    set: { newVal in
+                        let digits = newVal.filter { $0.isNumber }
+                        if digits.isEmpty {
+                            amountString = "0"
+                        } else {
+                            // Strip leading zeros
+                            let stripped = String(digits.drop(while: { $0 == "0" }))
+                            amountString = stripped.isEmpty ? "0" : String(stripped.prefix(12))
                         }
-                        .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(Capsule().fill(.ultraThinMaterial))
+                    }
+                ))
+                .keyboardType(.numberPad)
+                .focused($amountFocused)
+                .opacity(0.01)
+                .toolbar {
+                    ToolbarItemGroup(placement: .keyboard) {
+                        Spacer()
+                        Button(action: save) {
+                            HStack(spacing: 6) {
+                                Text(vm.isSubmitting ? "Đang lưu..." : "Lưu →")
+                                    .font(.dsBody(15, weight: .semibold))
+                            }
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule()
+                                    .fill(LinearGradient.dsCTAGradient(scheme: scheme))
+                            )
+                        }
+                        .disabled(vm.isSubmitting || amountString == "0")
                     }
                 }
             }
-            .frame(maxWidth: .infinity)
         }
+        .onTapGesture {
+            amountFocused = true
+        }
+    }
+
+    private var formattedAmount: String {
+        guard let value = Double(amountString) else { return amountString }
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.groupingSeparator = "."
+        formatter.maximumFractionDigits = 0
+        return formatter.string(from: NSNumber(value: value)) ?? amountString
     }
 
     // MARK: - Type Selector
 
     private var typeSelector: some View {
-        HStack(spacing: 0) {
-            ForEach([TransactionType.expense, .income, .transfer], id: \.self) { t in
-                let isSelected = selectedType == t
-                Button {
-                    selectedType = t
-                    selectedCategoryId = nil
-                } label: {
-                    Text(t.displayName)
-                        .font(.dsBody(13, weight: isSelected ? .semibold : .regular))
-                        .foregroundStyle(isSelected ? .white : Color.dsOnSurfaceVariant(for: scheme))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background {
-                            if isSelected {
-                                RoundedRectangle(cornerRadius: DSRadius.sm, style: .continuous)
-                                    .fill(LinearGradient.dsCTAGradient(scheme: scheme))
-                            }
-                        }
-                }
+        Picker("Loại giao dịch", selection: Binding(
+            get: { selectedType },
+            set: { newType in
+                withAnimation { selectedType = newType }
+                selectedCategoryId = nil
+                // re-apply default category for new type after state updates
+                DispatchQueue.main.async { applyDefaultCategory() }
             }
+        )) {
+            Text("Chi tiêu").tag(TransactionType.expense)
+            Text("Thu nhập").tag(TransactionType.income)
+            Text("Chuyển").tag(TransactionType.transfer)
         }
-        .padding(4)
-        .background {
-            RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous)
-                .fill(.ultraThinMaterial)
-        }
+        .pickerStyle(.segmented)
     }
 
-    // MARK: - Category Section
+    // MARK: - Form Rows
 
-    private var categorySection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            DSSectionHeader(title: "Category")
-            if filteredCategories.isEmpty {
-                Text("Chưa có danh mục")
-                    .font(.dsBody(13))
-                    .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-            } else {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 76), spacing: 10)], spacing: 10) {
-                    ForEach(filteredCategories) { cat in
-                        let isSelected = selectedCategoryId == cat.id
-                        Button {
-                            selectedCategoryId = isSelected ? nil : cat.id
-                        } label: {
-                            VStack(spacing: 6) {
-                                GradientCircleIcon(
-                                    systemName: categorySystemIcon(for: cat.name),
-                                    colors: isSelected
-                                        ? categoryIconColors(for: cat.name)
-                                        : [Color.dsOnSurfaceVariant(for: scheme).opacity(0.4),
-                                           Color.dsOnSurfaceVariant(for: scheme).opacity(0.2)],
-                                    size: 36
-                                )
-                                Text(cat.name)
-                                    .font(.dsBody(11, weight: isSelected ? .semibold : .regular))
-                                    .foregroundStyle(isSelected
-                                                     ? Color.dsPrimary(for: scheme)
-                                                     : Color.dsOnSurfaceVariant(for: scheme))
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.8)
-                            }
-                            .padding(.vertical, 8)
-                            .frame(maxWidth: .infinity)
-                            .background {
-                                RoundedRectangle(cornerRadius: DSRadius.sm, style: .continuous)
-                                    .fill(isSelected
-                                          ? Color.dsPrimary(for: scheme).opacity(0.12)
-                                          : Color.clear)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: DSRadius.sm, style: .continuous)
-                                            .stroke(isSelected
-                                                    ? Color.dsPrimary(for: scheme).opacity(0.4)
-                                                    : Color.clear,
-                                                    lineWidth: 1)
-                                    )
-                            }
-                        }
-                    }
+    private var formRows: some View {
+        GlassCard(radius: DSRadius.lg, padding: 0) {
+            VStack(spacing: 0) {
+                formRow(
+                    icon: "tag.fill",
+                    iconColor: Color.dsPrimary(for: scheme),
+                    label: "Category",
+                    value: selectedCategoryName ?? "Select",
+                    hasValue: selectedCategoryId != nil
+                ) {
+                    amountFocused = false
+                    showCategorySheet = true
+                }
+
+                Divider()
+                    .padding(.horizontal, 16)
+                    .opacity(0.4)
+
+                formRow(
+                    icon: "creditcard.fill",
+                    iconColor: Color(UIColor.systemTeal),
+                    label: "Account",
+                    value: selectedAccountName ?? "Select",
+                    hasValue: selectedAccountId != nil
+                ) {
+                    amountFocused = false
+                    showAccountSheet = true
+                }
+
+                Divider()
+                    .padding(.horizontal, 16)
+                    .opacity(0.4)
+
+                formRow(
+                    icon: "calendar",
+                    iconColor: Color(UIColor.systemOrange),
+                    label: "Date",
+                    value: formattedDate,
+                    hasValue: true
+                ) {
+                    amountFocused = false
+                    showDateSheet = true
                 }
             }
         }
     }
 
-    // MARK: - Account Row
-
-    private var accountDateRow: some View {
-        GlassCard(radius: DSRadius.md, padding: 12) {
-            HStack {
-                Image(systemName: "creditcard.fill")
+    private func formRow(icon: String, iconColor: Color, label: String, value: String, hasValue: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
                     .font(.system(size: 14))
-                    .foregroundStyle(Color.dsPrimary(for: scheme))
-                Picker("Tài khoản", selection: Binding(
-                    get: { selectedAccountId ?? "" },
-                    set: { selectedAccountId = $0.isEmpty ? nil : $0 }
-                )) {
-                    Text("Chọn tài khoản").tag("")
-                    ForEach(appVM.accounts) { acc in
-                        Text(acc.name).tag(acc.id)
-                    }
-                }
-                .font(.dsBody(13))
-                .tint(Color.dsOnSurface(for: scheme))
-                .labelsHidden()
+                    .foregroundStyle(iconColor)
+                    .frame(width: 20)
+
+                Text(label)
+                    .font(.dsBody(15))
+                    .foregroundStyle(Color.dsOnSurface(for: scheme))
+
                 Spacer()
+
+                Text(value)
+                    .font(.dsBody(15, weight: hasValue ? .medium : .regular))
+                    .foregroundStyle(hasValue ? Color.dsOnSurface(for: scheme) : Color.dsOnSurfaceVariant(for: scheme))
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme).opacity(0.5))
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
         }
+        .buttonStyle(.plain)
     }
 
-    // MARK: - Keypad
+    // MARK: - Note Field
 
-    private enum KeypadKey: Equatable {
-        case digit(String), clear, backspace
-        var label: String {
-            switch self {
-            case .digit(let s): return s
-            case .clear: return "C"
-            case .backspace: return "⌫"
-            }
-        }
-    }
+    private var noteField: some View {
+        GlassCard(radius: DSRadius.lg, padding: 16) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "note.text")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
+                    Text("Note")
+                        .font(.dsBody(15))
+                        .foregroundStyle(Color.dsOnSurface(for: scheme))
+                }
 
-    private var keypad: some View {
-        let rows: [[KeypadKey]] = [
-            [.digit("1"), .digit("2"), .digit("3")],
-            [.digit("4"), .digit("5"), .digit("6")],
-            [.digit("7"), .digit("8"), .digit("9")],
-            [.clear, .digit("0"), .backspace]
-        ]
-        return VStack(spacing: 10) {
-            ForEach(rows.indices, id: \.self) { i in
-                HStack(spacing: 10) {
-                    ForEach(rows[i], id: \.label) { key in
-                        keyButton(key)
+                ZStack(alignment: .topLeading) {
+                    if note.isEmpty {
+                        Text("Optional...")
+                            .font(.dsBody(14))
+                            .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme).opacity(0.6))
+                            .padding(.top, 2)
                     }
+                    TextEditor(text: $note)
+                        .font(.dsBody(14))
+                        .foregroundStyle(Color.dsOnSurface(for: scheme))
+                        .scrollContentBackground(.hidden)
+                        .background(Color.clear)
+                        .frame(minHeight: 72)
                 }
-            }
-            GlassPillButton(label: vm.isSubmitting ? "Đang lưu..." : "Lưu giao dịch →") {
-                save()
-            }
-            .disabled(vm.isSubmitting || amountString == "0")
-            .frame(maxWidth: .infinity)
-            .padding(.top, 4)
-        }
-    }
-
-    private func keyButton(_ key: KeypadKey) -> some View {
-        Button {
-            handleKey(key)
-        } label: {
-            Group {
-                if case .backspace = key {
-                    Image(systemName: "delete.left")
-                        .font(.system(size: 18, weight: .medium))
-                } else {
-                    Text(key.label)
-                        .font(.dsDisplay(22, weight: .medium))
-                }
-            }
-            .foregroundStyle(key == .clear ? Color.dsExpense : Color.dsOnSurface(for: scheme))
-            .frame(maxWidth: .infinity)
-            .frame(height: 58)
-            .background {
-                RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous)
-                            .stroke(Color(.separator).opacity(0.5), lineWidth: 0.5)
-                    )
             }
         }
     }
 
-    private func handleKey(_ key: KeypadKey) {
-        switch key {
-        case .digit(let d):
-            if amountString == "0" {
-                amountString = d
-            } else if amountString.count < 12 {
-                amountString += d
-            }
-        case .clear:
-            amountString = "0"
-        case .backspace:
-            if amountString.count > 1 {
-                amountString.removeLast()
-            } else {
-                amountString = "0"
-            }
+    // MARK: - Defaults
+
+    private func applyDefaults() {
+        if let typeRaw = appVM.settings["default_transaction_type"],
+           let type = TransactionType(rawValue: typeRaw.capitalized) {
+            selectedType = type
+        }
+        if let accId = appVM.settings["default_account_id"], !accId.isEmpty {
+            selectedAccountId = accId
+        }
+        applyDefaultCategory()
+    }
+
+    private func applyDefaultCategory() {
+        let key = selectedType == .income ? "default_income_category_id" : "default_expense_category_id"
+        if let catId = appVM.settings[key], !catId.isEmpty,
+           appVM.category(for: catId) != nil {
+            selectedCategoryId = catId
         }
     }
 
@@ -364,5 +372,243 @@ struct AddTransactionView: View {
                 isPresented = false
             }
         }
+    }
+}
+
+// MARK: - Category Picker Sheet
+
+struct CategoryPickerSheet: View {
+    @EnvironmentObject var appVM: AppViewModel
+    @Environment(\.colorScheme) var scheme
+    let categories: [Category]
+    @Binding var selectedId: String?
+    @Binding var isPresented: Bool
+
+    var body: some View {
+        ZStack {
+            DSMeshBackground().ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                sheetHeader(title: "Category")
+
+                ScrollView(showsIndicators: false) {
+                    LazyVStack(spacing: 0) {
+                        ForEach(categories) { cat in
+                            categoryRow(cat)
+                            if cat.id != categories.last?.id {
+                                Divider().padding(.horizontal, 20).opacity(0.4)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .background {
+                        RoundedRectangle(cornerRadius: DSRadius.lg, style: .continuous)
+                            .fill(.ultraThinMaterial)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: DSRadius.lg, style: .continuous)
+                                    .stroke(Color(.separator).opacity(0.3), lineWidth: 0.5)
+                            )
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 16)
+                }
+            }
+        }
+    }
+
+    private func categoryRow(_ cat: Category) -> some View {
+        Button {
+            selectedId = cat.id
+            isPresented = false
+        } label: {
+            HStack(spacing: 14) {
+                GradientCircleIcon(
+                    systemName: categorySystemIcon(for: cat.name),
+                    colors: categoryIconColors(for: cat.name),
+                    size: 36
+                )
+                Text(cat.name)
+                    .font(.dsBody(15))
+                    .foregroundStyle(Color.dsOnSurface(for: scheme))
+                Spacer()
+                if selectedId == cat.id {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Color.dsPrimary(for: scheme))
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func sheetHeader(title: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.dsTitle(18))
+                .foregroundStyle(Color.dsOnSurface(for: scheme))
+            Spacer()
+            Button { isPresented = false } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
+                    .frame(width: 32, height: 32)
+                    .background(Circle().fill(.ultraThinMaterial))
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 20)
+        .padding(.bottom, 8)
+    }
+}
+
+// MARK: - Account Picker Sheet
+
+struct AccountPickerSheet: View {
+    @EnvironmentObject var appVM: AppViewModel
+    @Environment(\.colorScheme) var scheme
+    let accounts: [Account]
+    @Binding var selectedId: String?
+    @Binding var isPresented: Bool
+
+    var body: some View {
+        ZStack {
+            DSMeshBackground().ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                sheetHeader(title: "Account")
+
+                ScrollView(showsIndicators: false) {
+                    LazyVStack(spacing: 0) {
+                        ForEach(accounts) { acc in
+                            accountRow(acc)
+                            if acc.id != accounts.last?.id {
+                                Divider().padding(.horizontal, 20).opacity(0.4)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .background {
+                        RoundedRectangle(cornerRadius: DSRadius.lg, style: .continuous)
+                            .fill(.ultraThinMaterial)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: DSRadius.lg, style: .continuous)
+                                    .stroke(Color(.separator).opacity(0.3), lineWidth: 0.5)
+                            )
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 16)
+                }
+            }
+        }
+    }
+
+    private func accountRow(_ acc: Account) -> some View {
+        Button {
+            selectedId = acc.id
+            isPresented = false
+        } label: {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(LinearGradient(
+                            colors: [Color(UIColor.systemTeal), Color(UIColor.systemTeal).opacity(0.6)],
+                            startPoint: .topLeading, endPoint: .bottomTrailing
+                        ))
+                        .frame(width: 36, height: 36)
+                    Image(systemName: "creditcard.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(acc.name)
+                        .font(.dsBody(15))
+                        .foregroundStyle(Color.dsOnSurface(for: scheme))
+                    let balance = appVM.balance(for: acc.id)
+                    Text(Formatters.formatVND(balance))
+                        .font(.dsBody(12))
+                        .foregroundStyle(balance >= 0 ? Color.dsIncome : Color.dsExpense)
+                }
+                Spacer()
+                if selectedId == acc.id {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Color.dsPrimary(for: scheme))
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func sheetHeader(title: String) -> some View {
+        HStack {
+            Text(title)
+                .font(.dsTitle(18))
+                .foregroundStyle(Color.dsOnSurface(for: scheme))
+            Spacer()
+            Button { isPresented = false } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
+                    .frame(width: 32, height: 32)
+                    .background(Circle().fill(.ultraThinMaterial))
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 20)
+        .padding(.bottom, 8)
+    }
+}
+
+// MARK: - Date Picker Sheet
+
+struct DatePickerSheet: View {
+    @Environment(\.colorScheme) var scheme
+    @Binding var selectedDate: Date
+    @Binding var isPresented: Bool
+
+    var body: some View {
+        ZStack {
+            DSMeshBackground().ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                HStack {
+                    Text("Select Date")
+                        .font(.dsTitle(18))
+                        .foregroundStyle(Color.dsOnSurface(for: scheme))
+                    Spacer()
+                    Button { isPresented = false } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
+                            .frame(width: 32, height: 32)
+                            .background(Circle().fill(.ultraThinMaterial))
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 20)
+                .padding(.bottom, 8)
+
+                GlassCard(radius: DSRadius.xl, padding: 16) {
+                    DatePicker("", selection: $selectedDate, displayedComponents: .date)
+                        .datePickerStyle(.graphical)
+                        .labelsHidden()
+                        .tint(Color.dsPrimary(for: scheme))
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+
+                GlassPillButton(label: "Confirm") {
+                    isPresented = false
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 32)
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }
