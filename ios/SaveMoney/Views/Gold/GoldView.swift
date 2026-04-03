@@ -31,9 +31,7 @@ struct GoldView: View {
                                 .frame(width: 36, height: 36)
                                 .background {
                                     Circle()
-                                        .fill(scheme == .dark
-                                              ? AnyShapeStyle(.ultraThinMaterial)
-                                              : AnyShapeStyle(Color.dsSurfaceLight))
+                                        .fill(.ultraThinMaterial)
                                 }
                         }
                         .disabled(goldService.isFetching)

@@ -144,7 +144,7 @@ struct AnalyticsView: View {
                             .foregroundStyle(Color.dsExpense)
                     }
                     Rectangle()
-                        .fill(Color.dsGhostBorder)
+                        .fill(Color(.separator).opacity(0.5))
                         .frame(width: 1, height: 30)
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Dự báo cuối tháng")
@@ -160,7 +160,7 @@ struct AnalyticsView: View {
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .fill(Color.dsGhostBorder)
+                            .fill(Color(.separator).opacity(0.4))
                             .frame(height: 6)
                         RoundedRectangle(cornerRadius: 4, style: .continuous)
                             .fill(LinearGradient.dsCTAGradient(scheme: scheme))

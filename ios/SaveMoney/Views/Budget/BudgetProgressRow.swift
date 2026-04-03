@@ -37,7 +37,7 @@ struct BudgetProgressRow: View {
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .fill(Color.dsGhostBorder)
+                            .fill(Color(.separator).opacity(0.4))
                             .frame(height: 8)
                         RoundedRectangle(cornerRadius: 4, style: .continuous)
                             .fill(LinearGradient(

@@ -1,31 +1,28 @@
 import SwiftUI
 
-// MARK: - Color Tokens
+// MARK: - Color Tokens (iOS 26 System Semantic)
 
 extension Color {
-    // MARK: Dark Mode (Aura Liquid)
-    static let dsBackgroundDark    = Color(hex: "#0c0e17")
-    static let dsSurfaceLow        = Color(hex: "#13162a")
-    static let dsSurfaceHigh       = Color(hex: "#1e2140")
-    static let dsPrimaryDark       = Color(hex: "#c799ff")   // violet
-    static let dsSecondaryDark     = Color(hex: "#4af8e3")   // cyan
-    static let dsOnSurfaceDark     = Color(hex: "#f0f0fd")
-    static let dsOnSurfaceVarDark  = Color(hex: "#aaaab7")
-    static let dsGhostBorder       = Color(hex: "#464752").opacity(0.15)
+    // MARK: System Semantic Backgrounds (auto dark/light via UIKit)
+    static let dsBackground     = Color(.systemBackground)
+    static let dsSurfaceLow     = Color(.secondarySystemBackground)
+    static let dsSurfaceHigh    = Color(.tertiarySystemBackground)
 
-    // MARK: Light Mode (Luminous Etherealism)
-    static let dsBackgroundLight   = Color(hex: "#f5f7f9")
-    static let dsSurfaceLight      = Color(hex: "#eef1f3")
-    static let dsCardLight         = Color(hex: "#ffffff")
-    static let dsPrimaryLight      = Color(hex: "#702ae1")
-    static let dsPrimaryContainer  = Color(hex: "#b28cff")
-    static let dsOnSurfaceLight    = Color(hex: "#2c2f31")
-    static let dsOnSurfaceVarLight = Color(hex: "#6b7280")
+    // MARK: System Semantic Text
+    static let dsLabel          = Color(.label)
+    static let dsSecondaryLabel = Color(.secondaryLabel)
+    static let dsTertiaryLabel  = Color(.tertiaryLabel)
 
-    // MARK: Semantic
-    static let dsIncome  = Color(hex: "#4af8e3")
-    static let dsExpense = Color(hex: "#ff6b8a")
-    static let dsGold    = Color(hex: "#fbbf24")
+    // MARK: Separator / Ghost Border
+    static let dsSeparator      = Color(.separator)
+
+    // MARK: Brand Accent — single saturated purple, no per-scheme branching
+    static let dsBrandAccent    = Color(red: 0.486, green: 0.227, blue: 0.929) // #7C3AED
+
+    // MARK: Semantic Financial — iOS system palette, vibrant in both modes
+    static let dsIncome  = Color(UIColor.systemTeal)
+    static let dsExpense = Color(UIColor.systemRed)
+    static let dsGold    = Color(UIColor.systemOrange)
 
     // MARK: Hex initializer
     init(hex: String) {
@@ -53,24 +50,14 @@ extension Color {
     }
 }
 
-// MARK: - Adaptive Colors (auto dark/light)
+// MARK: - Adaptive Colors (preserved for call-site compatibility — scheme param no longer needed)
 
 extension Color {
-    static func dsBackground(for scheme: ColorScheme) -> Color {
-        scheme == .dark ? .dsBackgroundDark : .dsBackgroundLight
-    }
-    static func dsPrimary(for scheme: ColorScheme) -> Color {
-        scheme == .dark ? .dsPrimaryDark : .dsPrimaryLight
-    }
-    static func dsSecondary(for scheme: ColorScheme) -> Color {
-        scheme == .dark ? .dsSecondaryDark : .dsPrimaryContainer
-    }
-    static func dsOnSurface(for scheme: ColorScheme) -> Color {
-        scheme == .dark ? .dsOnSurfaceDark : .dsOnSurfaceLight
-    }
-    static func dsOnSurfaceVariant(for scheme: ColorScheme) -> Color {
-        scheme == .dark ? .dsOnSurfaceVarDark : .dsOnSurfaceVarLight
-    }
+    static func dsBackground(for scheme: ColorScheme) -> Color        { .dsBackground }
+    static func dsPrimary(for scheme: ColorScheme) -> Color           { .dsBrandAccent }
+    static func dsSecondary(for scheme: ColorScheme) -> Color         { Color(UIColor.systemTeal) }
+    static func dsOnSurface(for scheme: ColorScheme) -> Color         { .dsLabel }
+    static func dsOnSurfaceVariant(for scheme: ColorScheme) -> Color  { .dsSecondaryLabel }
 }
 
 // MARK: - Corner Radius Tokens
@@ -80,7 +67,8 @@ enum DSRadius {
     static let xl:   CGFloat = 32
     static let lg:   CGFloat = 24
     static let md:   CGFloat = 16
-    static let sm:   CGFloat = 10
+    static let sm:   CGFloat = 12
+    static let xs:   CGFloat = 8
 }
 
 // MARK: - Typography
@@ -103,30 +91,33 @@ extension Font {
 // MARK: - Gradient Helpers
 
 extension LinearGradient {
+    /// Primary CTA gradient — rich purple-indigo, works in both light and dark
     static func dsCTAGradient(scheme: ColorScheme) -> LinearGradient {
-        scheme == .dark
-        ? LinearGradient(colors: [Color(hex: "#c799ff"), Color(hex: "#4af8e3")],
-                         startPoint: .topLeading, endPoint: .bottomTrailing)
-        : LinearGradient(colors: [Color(hex: "#702ae1"), Color(hex: "#b28cff")],
-                         startPoint: .topLeading, endPoint: .bottomTrailing)
+        LinearGradient(
+            colors: [Color(hex: "#7C3AED"), Color(hex: "#5B21B6")],
+            startPoint: .topLeading, endPoint: .bottomTrailing
+        )
     }
 
     static func dsCardGradient(scheme: ColorScheme) -> LinearGradient {
-        scheme == .dark
-        ? LinearGradient(colors: [Color(hex: "#1e1040"), Color(hex: "#0c0e17")],
-                         startPoint: .topLeading, endPoint: .bottomTrailing)
-        : LinearGradient(colors: [Color(hex: "#f0eaff"), Color(hex: "#e8f4ff")],
-                         startPoint: .topLeading, endPoint: .bottomTrailing)
+        LinearGradient(
+            colors: [Color(.secondarySystemBackground), Color(.systemBackground)],
+            startPoint: .topLeading, endPoint: .bottomTrailing
+        )
     }
 
     static func dsIncomeGradient() -> LinearGradient {
-        LinearGradient(colors: [Color(hex: "#4af8e3"), Color(hex: "#36d1c4")],
-                       startPoint: .topLeading, endPoint: .bottomTrailing)
+        LinearGradient(
+            colors: [Color(UIColor.systemTeal), Color(hex: "#00968A")],
+            startPoint: .topLeading, endPoint: .bottomTrailing
+        )
     }
 
     static func dsExpenseGradient() -> LinearGradient {
-        LinearGradient(colors: [Color(hex: "#ff6b8a"), Color(hex: "#e84393")],
-                       startPoint: .topLeading, endPoint: .bottomTrailing)
+        LinearGradient(
+            colors: [Color(UIColor.systemRed), Color(hex: "#C0392B")],
+            startPoint: .topLeading, endPoint: .bottomTrailing
+        )
     }
 }
 
@@ -151,33 +142,56 @@ struct DSMeshBackground: View {
 
     var body: some View {
         ZStack {
-            if scheme == .dark {
-                darkBackground
-            } else {
-                Color.dsBackgroundLight.ignoresSafeArea()
+            // System background as the true base — auto dark/light via UIKit
+            Color(.systemBackground).ignoresSafeArea()
+
+            // Subtle ambient tints — low opacity so .ultraThinMaterial cards show real vibrancy
+            GeometryReader { geo in
+                ZStack {
+                    // Warm purple ambient (top-left)
+                    Circle()
+                        .fill(Color.dsBrandAccent.opacity(scheme == .dark ? 0.10 : 0.04))
+                        .frame(width: geo.size.width * 0.75)
+                        .blur(radius: 90)
+                        .offset(x: -geo.size.width * 0.15, y: -geo.size.height * 0.05)
+
+                    // Cool teal ambient (bottom-right)
+                    Circle()
+                        .fill(Color(UIColor.systemTeal).opacity(scheme == .dark ? 0.07 : 0.03))
+                        .frame(width: geo.size.width * 0.55)
+                        .blur(radius: 80)
+                        .offset(x: geo.size.width * 0.35, y: geo.size.height * 0.45)
+                }
             }
+            .ignoresSafeArea()
         }
     }
+}
 
+// MARK: - iOS 26 Liquid Glass Forward Compatibility
+
+extension View {
+    /// Applies liquid glass background. Ready for iOS 26's .glassBackground() when SDK ships.
     @ViewBuilder
-    private var darkBackground: some View {
-        Color.dsBackgroundDark.ignoresSafeArea()
-        // Ambient gradient blobs
-        GeometryReader { geo in
-            ZStack {
-                Circle()
-                    .fill(Color.dsPrimaryDark.opacity(0.18))
-                    .frame(width: geo.size.width * 0.8)
-                    .blur(radius: 80)
-                    .offset(x: -geo.size.width * 0.2, y: -geo.size.height * 0.1)
-
-                Circle()
-                    .fill(Color.dsSecondaryDark.opacity(0.12))
-                    .frame(width: geo.size.width * 0.6)
-                    .blur(radius: 70)
-                    .offset(x: geo.size.width * 0.3, y: geo.size.height * 0.4)
-            }
+    func liquidGlassBackground(cornerRadius: CGFloat = DSRadius.lg) -> some View {
+        // When iOS 26 SDK is available, replace with:
+        // if #available(iOS 26.0, *) {
+        //     self.glassBackground(in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        // } else { ... }
+        self.background {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .stroke(
+                            LinearGradient(
+                                colors: [.white.opacity(0.35), .white.opacity(0.0)],
+                                startPoint: .top,
+                                endPoint: UnitPoint(x: 0.5, y: 0.4)
+                            ),
+                            lineWidth: 1
+                        )
+                )
         }
-        .ignoresSafeArea()
     }
 }

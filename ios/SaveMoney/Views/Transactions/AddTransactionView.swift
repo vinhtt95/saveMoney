@@ -72,9 +72,7 @@ struct AddTransactionView: View {
                     .frame(width: 32, height: 32)
                     .background {
                         Circle()
-                            .fill(scheme == .dark
-                                  ? AnyShapeStyle(.ultraThinMaterial)
-                                  : AnyShapeStyle(Color.dsSurfaceLight))
+                            .fill(.ultraThinMaterial)
                     }
             }
             Spacer()
@@ -125,9 +123,7 @@ struct AddTransactionView: View {
                         .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
-                        .background(Capsule().fill(scheme == .dark
-                                                   ? AnyShapeStyle(.ultraThinMaterial)
-                                                   : AnyShapeStyle(Color.dsSurfaceLight)))
+                        .background(Capsule().fill(.ultraThinMaterial))
 
                         DatePicker("", selection: $selectedDate, displayedComponents: .date)
                             .labelsHidden()
@@ -146,9 +142,7 @@ struct AddTransactionView: View {
                         .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
-                        .background(Capsule().fill(scheme == .dark
-                                                   ? AnyShapeStyle(.ultraThinMaterial)
-                                                   : AnyShapeStyle(Color.dsSurfaceLight)))
+                        .background(Capsule().fill(.ultraThinMaterial))
                     }
                 }
             }
@@ -183,9 +177,7 @@ struct AddTransactionView: View {
         .padding(4)
         .background {
             RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous)
-                .fill(scheme == .dark
-                      ? AnyShapeStyle(.ultraThinMaterial)
-                      : AnyShapeStyle(Color.dsSurfaceLight))
+                .fill(.ultraThinMaterial)
         }
     }
 
@@ -324,12 +316,10 @@ struct AddTransactionView: View {
             .frame(height: 58)
             .background {
                 RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous)
-                    .fill(scheme == .dark
-                          ? AnyShapeStyle(.ultraThinMaterial)
-                          : AnyShapeStyle(Color.dsSurfaceLight))
+                    .fill(.ultraThinMaterial)
                     .overlay(
                         RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous)
-                            .stroke(Color.dsGhostBorder, lineWidth: 1)
+                            .stroke(Color(.separator).opacity(0.5), lineWidth: 0.5)
                     )
             }
         }

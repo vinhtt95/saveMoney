@@ -76,9 +76,7 @@ struct DashboardView: View {
                     .padding(10)
                     .background {
                         Circle()
-                            .fill(scheme == .dark
-                                  ? AnyShapeStyle(.ultraThinMaterial)
-                                  : AnyShapeStyle(Color.dsSurfaceLight))
+                            .fill(.ultraThinMaterial)
                     }
             }
         }

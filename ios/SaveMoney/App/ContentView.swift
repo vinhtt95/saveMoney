@@ -28,19 +28,19 @@ struct ContentView: View {
             VStack(spacing: 20) {
                 ZStack {
                     Circle()
-                        .stroke(Color.dsPrimaryDark.opacity(0.2), lineWidth: 3)
+                        .stroke(Color.dsBrandAccent.opacity(0.2), lineWidth: 3)
                         .frame(width: 56, height: 56)
                     Circle()
                         .trim(from: 0, to: 0.7)
                         .stroke(
-                            LinearGradient(colors: [Color.dsPrimaryDark, Color.dsSecondaryDark],
+                            LinearGradient(colors: [Color.dsBrandAccent, Color(UIColor.systemTeal)],
                                            startPoint: .topLeading, endPoint: .bottomTrailing),
                             style: StrokeStyle(lineWidth: 3, lineCap: .round)
                         )
                         .frame(width: 56, height: 56)
                         .rotationEffect(.degrees(-90))
                     ProgressView()
-                        .tint(Color.dsPrimaryDark)
+                        .tint(Color.dsBrandAccent)
                 }
                 Text("Đang tải dữ liệu...")
                     .font(.dsBody(15))

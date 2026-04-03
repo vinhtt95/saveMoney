@@ -102,7 +102,7 @@ struct SettingsView: View {
                 VStack(spacing: 14) {
                     HStack {
                         GradientCircleIcon(systemName: "circle.lefthalf.filled",
-                                           colors: [Color.dsPrimaryDark, Color.dsSecondaryDark],
+                                           colors: [Color.dsBrandAccent, Color(UIColor.systemTeal)],
                                            size: 34)
                         Text("Chế độ hiển thị")
                             .font(.dsBody(15))

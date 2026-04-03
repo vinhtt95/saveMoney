@@ -6,25 +6,32 @@ struct GlassCard<Content: View>: View {
     var radius: CGFloat = DSRadius.lg
     var padding: CGFloat = 16
     @ViewBuilder var content: () -> Content
-    @Environment(\.colorScheme) var scheme
 
     var body: some View {
         content()
             .padding(padding)
             .background {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(scheme == .dark ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(Color.dsCardLight))
+                    // iOS 26 liquid glass: ultraThinMaterial in BOTH light and dark
+                    .fill(.ultraThinMaterial)
+                    // Specular highlight: top-edge white gradient (simulates glass reflection)
                     .overlay(
                         RoundedRectangle(cornerRadius: radius, style: .continuous)
                             .stroke(
-                                scheme == .dark ? Color.dsGhostBorder : Color.black.opacity(0.05),
+                                LinearGradient(
+                                    colors: [.white.opacity(0.40), .white.opacity(0.0)],
+                                    startPoint: .top,
+                                    endPoint: UnitPoint(x: 0.5, y: 0.35)
+                                ),
                                 lineWidth: 1
                             )
                     )
-                    .shadow(
-                        color: scheme == .dark ? Color.clear : Color.black.opacity(0.07),
-                        radius: 12, x: 0, y: 4
+                    // Outer separator border for card definition
+                    .overlay(
+                        RoundedRectangle(cornerRadius: radius, style: .continuous)
+                            .stroke(Color(.separator).opacity(0.5), lineWidth: 0.5)
                     )
+                    .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
             }
     }
 }
@@ -35,14 +42,30 @@ struct GradientCard<Content: View>: View {
     var radius: CGFloat = DSRadius.xl
     var padding: CGFloat = 20
     @ViewBuilder var content: () -> Content
-    @Environment(\.colorScheme) var scheme
 
     var body: some View {
         content()
             .padding(padding)
             .background {
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(LinearGradient.dsCTAGradient(scheme: scheme))
+                    .fill(LinearGradient.dsCTAGradient(scheme: .dark))
+                    // Glass sheen over the gradient
+                    .overlay(
+                        RoundedRectangle(cornerRadius: radius, style: .continuous)
+                            .fill(.ultraThinMaterial.opacity(0.08))
+                    )
+                    // Specular top-edge highlight
+                    .overlay(
+                        RoundedRectangle(cornerRadius: radius, style: .continuous)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [.white.opacity(0.50), .clear],
+                                    startPoint: .top,
+                                    endPoint: UnitPoint(x: 0.5, y: 0.25)
+                                ),
+                                lineWidth: 1
+                            )
+                    )
             }
     }
 }
@@ -52,7 +75,6 @@ struct GradientCard<Content: View>: View {
 struct GlassPillButton: View {
     let label: String
     let action: () -> Void
-    @Environment(\.colorScheme) var scheme
 
     var body: some View {
         Button(action: action) {
@@ -61,8 +83,12 @@ struct GlassPillButton: View {
                 .foregroundStyle(.white)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 13)
-                .background(LinearGradient.dsCTAGradient(scheme: scheme))
-                .clipShape(Capsule())
+                .background {
+                    Capsule()
+                        .fill(Color.dsBrandAccent)
+                        .overlay(Capsule().fill(.ultraThinMaterial.opacity(0.15)))
+                        .overlay(Capsule().stroke(.white.opacity(0.30), lineWidth: 1))
+                }
         }
     }
 }
@@ -72,24 +98,23 @@ struct GlassPillButton: View {
 struct GlassSearchBar: View {
     @Binding var text: String
     var placeholder: String = "Tìm kiếm..."
-    @Environment(\.colorScheme) var scheme
 
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
+                .foregroundStyle(Color(.secondaryLabel))
                 .font(.system(size: 15, weight: .medium))
 
             TextField(placeholder, text: $text)
                 .font(.dsBody(15))
-                .foregroundStyle(Color.dsOnSurface(for: scheme))
+                .foregroundStyle(Color(.label))
 
             if !text.isEmpty {
                 Button {
                     text = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
+                        .foregroundStyle(Color(.secondaryLabel))
                 }
             }
         }
@@ -97,10 +122,10 @@ struct GlassSearchBar: View {
         .padding(.vertical, 11)
         .background {
             RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous)
-                .fill(scheme == .dark ? AnyShapeStyle(.thinMaterial) : AnyShapeStyle(Color.dsSurfaceLight))
+                .fill(.thinMaterial)
                 .overlay(
                     RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous)
-                        .stroke(Color.dsGhostBorder, lineWidth: 1)
+                        .stroke(Color(.separator).opacity(0.6), lineWidth: 0.5)
                 )
         }
     }
@@ -112,25 +137,24 @@ struct GlassPeriodChip: View {
     let label: String
     let isSelected: Bool
     let action: () -> Void
-    @Environment(\.colorScheme) var scheme
 
     var body: some View {
         Button(action: action) {
             Text(label)
                 .font(.dsBody(13, weight: isSelected ? .semibold : .regular))
-                .foregroundStyle(isSelected ? Color.white : Color.dsOnSurfaceVariant(for: scheme))
+                .foregroundStyle(isSelected ? .white : Color(.secondaryLabel))
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
                 .background {
                     if isSelected {
                         Capsule()
-                            .fill(LinearGradient.dsCTAGradient(scheme: scheme))
+                            .fill(Color.dsBrandAccent)
+                            .overlay(Capsule().fill(.ultraThinMaterial.opacity(0.10)))
+                            .overlay(Capsule().stroke(.white.opacity(0.25), lineWidth: 1))
                     } else {
                         Capsule()
-                            .fill(scheme == .dark
-                                  ? AnyShapeStyle(.ultraThinMaterial)
-                                  : AnyShapeStyle(Color.dsSurfaceLight))
-                            .overlay(Capsule().stroke(Color.dsGhostBorder, lineWidth: 1))
+                            .fill(.ultraThinMaterial)
+                            .overlay(Capsule().stroke(Color(.separator).opacity(0.5), lineWidth: 0.5))
                     }
                 }
         }
@@ -141,7 +165,7 @@ struct GlassPeriodChip: View {
 
 struct GradientCircleIcon: View {
     let systemName: String
-    var colors: [Color] = [Color(hex: "#c799ff"), Color(hex: "#4af8e3")]
+    var colors: [Color] = [Color(hex: "#7C3AED"), Color(hex: "#5B21B6")]
     var size: CGFloat = 40
 
     var body: some View {
@@ -161,26 +185,26 @@ struct GradientCircleIcon: View {
     }
 }
 
-// MARK: - Category icon color mapping
+// MARK: - Category icon color mapping (iOS system palette)
 
 func categoryIconColors(for name: String) -> [Color] {
     let lower = name.lowercased()
     if lower.contains("ăn") || lower.contains("food") || lower.contains("nhà hàng") || lower.contains("dining") {
-        return [Color(hex: "#ff6b8a"), Color(hex: "#ff9a9e")]
+        return [Color(UIColor.systemPink), Color(hex: "#FF2D55")]
     } else if lower.contains("di chuyển") || lower.contains("xăng") || lower.contains("travel") || lower.contains("transport") {
-        return [Color(hex: "#4af8e3"), Color(hex: "#36d1c4")]
+        return [Color(UIColor.systemTeal), Color(hex: "#00968A")]
     } else if lower.contains("mua sắm") || lower.contains("shop") {
-        return [Color(hex: "#a78bfa"), Color(hex: "#7c3aed")]
+        return [Color(hex: "#7C3AED"), Color(hex: "#5B21B6")]
     } else if lower.contains("giải trí") || lower.contains("cinema") || lower.contains("entertain") {
-        return [Color(hex: "#fbbf24"), Color(hex: "#f59e0b")]
+        return [Color(UIColor.systemOrange), Color(UIColor.systemYellow)]
     } else if lower.contains("sức khỏe") || lower.contains("health") || lower.contains("y tế") {
-        return [Color(hex: "#6ee7b7"), Color(hex: "#10b981")]
+        return [Color(UIColor.systemGreen), Color(hex: "#30D158")]
     } else if lower.contains("lương") || lower.contains("salary") || lower.contains("income") || lower.contains("thu nhập") {
-        return [Color(hex: "#4af8e3"), Color(hex: "#059669")]
+        return [Color(UIColor.systemTeal), Color(UIColor.systemGreen)]
     } else if lower.contains("tiết kiệm") || lower.contains("saving") {
-        return [Color(hex: "#60a5fa"), Color(hex: "#3b82f6")]
+        return [Color(UIColor.systemBlue), Color(hex: "#0A84FF")]
     }
-    return [Color(hex: "#c799ff"), Color(hex: "#4af8e3")]
+    return [Color(hex: "#7C3AED"), Color(hex: "#5B21B6")]
 }
 
 func categorySystemIcon(for name: String) -> String {
@@ -214,13 +238,12 @@ func categorySystemIcon(for name: String) -> String {
 struct DSTabBar: View {
     @Binding var selectedTab: Int
     let onAddTap: () -> Void
-    @Environment(\.colorScheme) var scheme
 
     private let tabs: [(icon: String, label: String, index: Int)] = [
-        ("house.fill",          "Flow",    0),
-        ("clock.fill",          "History", 1),
-        ("chart.bar.fill",      "Insight", 3),
-        ("gearshape.fill",      "Profile", 4)
+        ("house.fill",     "Flow",    0),
+        ("clock.fill",     "History", 1),
+        ("chart.bar.fill", "Insight", 3),
+        ("gearshape.fill", "Profile", 4)
     ]
 
     var body: some View {
@@ -228,16 +251,13 @@ struct DSTabBar: View {
             VStack(spacing: 0) {
                 Spacer()
                 HStack(alignment: .center, spacing: 0) {
-                    // First 2 tabs
                     ForEach(tabs.prefix(2), id: \.index) { tab in
                         tabButton(tab: tab)
                     }
 
-                    // Center FAB
                     centerFAB
                         .frame(maxWidth: .infinity)
 
-                    // Last 2 tabs
                     ForEach(tabs.suffix(2), id: \.index) { tab in
                         tabButton(tab: tab)
                     }
@@ -246,27 +266,15 @@ struct DSTabBar: View {
                 .padding(.bottom, geo.safeAreaInsets.bottom + 8)
                 .padding(.horizontal, 8)
                 .background {
-                    UnevenRoundedRectangle(
-                        topLeadingRadius: DSRadius.xl,
-                        bottomLeadingRadius: 0,
-                        bottomTrailingRadius: 0,
-                        topTrailingRadius: DSRadius.xl,
-                        style: .continuous
-                    )
-                    .fill(scheme == .dark
-                          ? AnyShapeStyle(.ultraThinMaterial)
-                          : AnyShapeStyle(Color.dsCardLight.opacity(0.95)))
-                    .overlay(
-                        UnevenRoundedRectangle(
-                            topLeadingRadius: DSRadius.xl,
-                            bottomLeadingRadius: 0,
-                            bottomTrailingRadius: 0,
-                            topTrailingRadius: DSRadius.xl,
-                            style: .continuous
+                    Rectangle()
+                        .fill(.ultraThinMaterial)
+                        // Single top-edge separator line — native iOS tab bar style
+                        .overlay(
+                            Rectangle()
+                                .frame(height: 0.5)
+                                .foregroundStyle(Color(.separator).opacity(0.6)),
+                            alignment: .top
                         )
-                        .stroke(Color.dsGhostBorder, lineWidth: 1)
-                    )
-                    .shadow(color: Color.black.opacity(0.15), radius: 20, x: 0, y: -5)
                 }
             }
             .ignoresSafeArea(edges: .bottom)
@@ -282,15 +290,11 @@ struct DSTabBar: View {
             VStack(spacing: 4) {
                 Image(systemName: tab.icon)
                     .font(.system(size: 20, weight: isSelected ? .semibold : .regular))
-                    .foregroundStyle(isSelected
-                                     ? Color.dsPrimary(for: scheme)
-                                     : Color.dsOnSurfaceVariant(for: scheme))
+                    .foregroundStyle(isSelected ? Color.dsBrandAccent : Color(.secondaryLabel))
 
                 Text(tab.label)
                     .font(.dsBody(10, weight: isSelected ? .semibold : .regular))
-                    .foregroundStyle(isSelected
-                                     ? Color.dsPrimary(for: scheme)
-                                     : Color.dsOnSurfaceVariant(for: scheme))
+                    .foregroundStyle(isSelected ? Color.dsBrandAccent : Color(.secondaryLabel))
             }
             .frame(maxWidth: .infinity)
         }
@@ -300,9 +304,15 @@ struct DSTabBar: View {
         Button(action: onAddTap) {
             ZStack {
                 Circle()
-                    .fill(LinearGradient.dsCTAGradient(scheme: scheme))
+                    .fill(.regularMaterial)
                     .frame(width: 56, height: 56)
-                    .shadow(color: Color.dsPrimary(for: scheme).opacity(0.4), radius: 12, x: 0, y: 4)
+                    .overlay(
+                        Circle().fill(Color.dsBrandAccent.opacity(0.88))
+                    )
+                    .overlay(
+                        Circle().stroke(.white.opacity(0.30), lineWidth: 1)
+                    )
+                    .shadow(color: Color.dsBrandAccent.opacity(0.45), radius: 12, x: 0, y: 4)
 
                 Image(systemName: "plus")
                     .font(.system(size: 22, weight: .semibold))
@@ -322,29 +332,26 @@ struct GlassFormField: View {
     var placeholder: String = ""
     var disableAutocorrect: Bool = false
     var autocapitalization: TextInputAutocapitalization = .sentences
-    @Environment(\.colorScheme) var scheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(label)
                 .font(.dsBody(12, weight: .medium))
-                .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
+                .foregroundStyle(Color(.secondaryLabel))
             TextField(placeholder.isEmpty ? label : placeholder, text: $text)
                 .keyboardType(keyboardType)
                 .autocorrectionDisabled(disableAutocorrect)
                 .textInputAutocapitalization(autocapitalization)
                 .font(.dsBody(15))
-                .foregroundStyle(Color.dsOnSurface(for: scheme))
+                .foregroundStyle(Color(.label))
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
                 .background {
                     RoundedRectangle(cornerRadius: DSRadius.sm, style: .continuous)
-                        .fill(scheme == .dark
-                              ? AnyShapeStyle(Color.dsBackgroundDark.opacity(0.6))
-                              : AnyShapeStyle(Color.dsSurfaceLight))
+                        .fill(.ultraThinMaterial)
                         .overlay(
                             RoundedRectangle(cornerRadius: DSRadius.sm, style: .continuous)
-                                .stroke(Color.dsGhostBorder, lineWidth: 1)
+                                .stroke(Color(.separator).opacity(0.6), lineWidth: 0.5)
                         )
                 }
         }
@@ -357,19 +364,18 @@ struct DSSectionHeader: View {
     let title: String
     var action: String? = nil
     var onAction: (() -> Void)? = nil
-    @Environment(\.colorScheme) var scheme
 
     var body: some View {
         HStack {
             Text(title)
                 .font(.dsTitle(16))
-                .foregroundStyle(Color.dsOnSurface(for: scheme))
+                .foregroundStyle(Color(.label))
             Spacer()
             if let action, let onAction {
                 Button(action: onAction) {
                     Text(action)
                         .font(.dsBody(13, weight: .medium))
-                        .foregroundStyle(Color.dsPrimary(for: scheme))
+                        .foregroundStyle(Color.dsBrandAccent)
                 }
             }
         }
