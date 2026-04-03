@@ -12,6 +12,7 @@ class AppViewModel: ObservableObject {
 
     @Published var isLoading = false
     @Published var loadError: String?
+    @Published var isConnected = false
 
     private let api = APIService.shared
 
@@ -27,8 +28,10 @@ class AppViewModel: ObservableObject {
             budgets = data.budgets
             goldAssets = data.goldAssets
             settings = data.settings
+            isConnected = true
         } catch {
             loadError = error.localizedDescription
+            isConnected = false
         }
         isLoading = false
     }

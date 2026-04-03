@@ -9,8 +9,6 @@ struct ContentView: View {
         Group {
             if appVM.isLoading {
                 loadingView
-            } else if let error = appVM.loadError {
-                errorView(error)
             } else {
                 MainTabView()
                     .environmentObject(themeManager)
@@ -49,29 +47,6 @@ struct ContentView: View {
         }
     }
 
-    private func errorView(_ error: String) -> some View {
-        ZStack {
-            DSMeshBackground()
-            GlassCard(radius: DSRadius.xl, padding: 32) {
-                VStack(spacing: 16) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 40))
-                        .foregroundStyle(Color(hex: "#fbbf24"))
-                    Text("Không thể kết nối")
-                        .font(.dsDisplay(20))
-                        .foregroundStyle(Color.dsOnSurface(for: scheme))
-                    Text(error)
-                        .font(.dsBody(13))
-                        .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-                        .multilineTextAlignment(.center)
-                    GlassPillButton(label: "Thử lại") {
-                        Task { await appVM.loadInitData() }
-                    }
-                }
-            }
-            .padding(.horizontal, 40)
-        }
-    }
 }
 
 // MARK: - MainTabView

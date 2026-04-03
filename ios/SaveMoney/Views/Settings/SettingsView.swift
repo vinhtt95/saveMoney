@@ -41,24 +41,6 @@ struct SettingsView: View {
                         defaultsSection
                             .padding(.horizontal, 20)
 
-                        // Status messages
-                        if vm.saveSuccess {
-                            HStack(spacing: 8) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(Color.dsIncome)
-                                Text("Đã lưu thành công")
-                                    .font(.dsBody(14))
-                                    .foregroundStyle(Color.dsOnSurface(for: scheme))
-                            }
-                            .padding(.horizontal, 20)
-                        }
-                        if let err = vm.saveError {
-                            Text(err)
-                                .font(.dsBody(12))
-                                .foregroundStyle(Color.dsExpense)
-                                .padding(.horizontal, 20)
-                        }
-
                         Spacer(minLength: 20)
                     }
                 }
@@ -180,6 +162,9 @@ struct SettingsView: View {
             DSSectionHeader(title: "Kết nối Backend")
             GlassCard(radius: DSRadius.lg, padding: 16) {
                 VStack(alignment: .leading, spacing: 12) {
+                    // Connection status badge
+                    connectionStatusBadge
+
                     GlassFormField(label: "Server URL", text: $vm.baseURL,
                                    keyboardType: .URL,
                                    placeholder: "http://localhost:3001",
@@ -190,12 +175,55 @@ struct SettingsView: View {
                         .font(.dsBody(11))
                         .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
 
-                    GlassPillButton(label: "Lưu URL") {
+                    GlassPillButton(label: appVM.isLoading ? "Đang kết nối..." : "Kết nối") {
                         vm.saveBaseURL()
                         Task { await appVM.loadInitData() }
                     }
-                    .disabled(vm.baseURL.isEmpty)
+                    .disabled(vm.baseURL.isEmpty || appVM.isLoading)
                 }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var connectionStatusBadge: some View {
+        if appVM.isLoading {
+            HStack(spacing: 6) {
+                ProgressView()
+                    .scaleEffect(0.7)
+                    .tint(Color.dsOnSurfaceVariant(for: scheme))
+                Text("Đang kết nối...")
+                    .font(.dsBody(12))
+                    .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
+            }
+        } else if appVM.isConnected {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(Color.dsIncome)
+                    .frame(width: 8, height: 8)
+                Text("Đã kết nối")
+                    .font(.dsBody(12))
+                    .foregroundStyle(Color.dsIncome)
+            }
+        } else if let err = appVM.loadError {
+            HStack(alignment: .top, spacing: 6) {
+                Circle()
+                    .fill(Color.dsExpense)
+                    .frame(width: 8, height: 8)
+                    .padding(.top, 3)
+                Text(err)
+                    .font(.dsBody(12))
+                    .foregroundStyle(Color.dsExpense)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        } else {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(Color.dsOnSurfaceVariant(for: scheme).opacity(0.5))
+                    .frame(width: 8, height: 8)
+                Text("Chưa kết nối")
+                    .font(.dsBody(12))
+                    .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
             }
         }
     }
