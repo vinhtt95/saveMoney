@@ -64,10 +64,14 @@ class APIService {
         }
     }
 
-    func requestVoid(_ path: String, method: String = "DELETE") async throws {
+    func requestVoid(_ path: String, method: String = "DELETE", body: (any Encodable)? = nil) async throws {
         guard let url = URL(string: baseURL + path) else { throw APIError.invalidURL }
         var req = URLRequest(url: url)
         req.httpMethod = method
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let body {
+            req.httpBody = try encoder.encode(body)
+        }
         let (_, response) = try await session.data(for: req)
         if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
             throw APIError.httpError(http.statusCode)
@@ -90,8 +94,8 @@ class APIService {
         try await request("/api/transactions", method: "POST", body: body)
     }
 
-    func updateTransaction(id: String, body: UpdateTransactionRequest) async throws -> Transaction {
-        try await request("/api/transactions/\(id)", method: "PUT", body: body)
+    func updateTransaction(id: String, body: UpdateTransactionRequest) async throws {
+        try await requestVoid("/api/transactions/\(id)", method: "PUT", body: body)
     }
 
     func deleteTransaction(id: String) async throws {

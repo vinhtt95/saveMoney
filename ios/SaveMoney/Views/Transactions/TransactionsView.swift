@@ -4,6 +4,8 @@ struct TransactionsView: View {
     @EnvironmentObject var appVM: AppViewModel
     @StateObject private var vm = TransactionViewModel()
     @Environment(\.colorScheme) var scheme
+    @State private var selectedTransaction: Transaction? = nil
+    @State private var showEditSheet = false
 
     private var grouped: [(String, [Transaction])] {
         let txs = vm.paged(appVM.transactions)
@@ -63,17 +65,20 @@ struct TransactionsView: View {
                         ForEach(grouped, id: \.0) { date, txs in
                             Section {
                                 ForEach(txs) { tx in
-                                    TransactionRowView(transaction: tx, appVM: appVM)
-                                        .listRowBackground(Color.clear)
-                                        .listRowSeparator(.hidden)
-                                        .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
-                                        .swipeActions(edge: .trailing) {
-                                            Button(role: .destructive) {
-                                                Task { await vm.delete(id: tx.id, appVM: appVM) }
-                                            } label: {
-                                                Label("Xóa", systemImage: "trash")
-                                            }
+                                    TransactionRowView(transaction: tx, appVM: appVM) {
+                                        selectedTransaction = tx
+                                        showEditSheet = true
+                                    }
+                                    .listRowBackground(Color.clear)
+                                    .listRowSeparator(.hidden)
+                                    .listRowInsets(EdgeInsets(top: 4, leading: 20, bottom: 4, trailing: 20))
+                                    .swipeActions(edge: .trailing) {
+                                        Button(role: .destructive) {
+                                            Task { await vm.delete(id: tx.id, appVM: appVM) }
+                                        } label: {
+                                            Label("Xóa", systemImage: "trash")
                                         }
+                                    }
                                 }
                             } header: {
                                 Text(sectionTitle(date))
@@ -108,6 +113,12 @@ struct TransactionsView: View {
             }
             .navigationBarHidden(true)
             .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+            .sheet(isPresented: $showEditSheet) {
+                if let tx = selectedTransaction {
+                    AddTransactionView(isPresented: $showEditSheet, transaction: tx)
+                        .environmentObject(appVM)
+                }
+            }
         }
     }
 

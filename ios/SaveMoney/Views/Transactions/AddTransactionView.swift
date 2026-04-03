@@ -6,6 +6,8 @@ struct AddTransactionView: View {
     @Environment(\.colorScheme) var scheme
     @StateObject private var vm = TransactionViewModel()
 
+    let editingTransaction: Transaction?
+
     @State private var amountString: String = "0"
     @State private var selectedType: TransactionType = .expense
     @State private var selectedCategoryId: String? = nil
@@ -17,6 +19,12 @@ struct AddTransactionView: View {
     @State private var showCategorySheet = false
     @State private var showAccountSheet = false
     @State private var showDateSheet = false
+    @State private var showDeleteConfirm = false
+
+    init(isPresented: Binding<Bool>, transaction: Transaction? = nil) {
+        self._isPresented = isPresented
+        self.editingTransaction = transaction
+    }
 
     private var filteredCategories: [Category] {
         switch selectedType {
@@ -63,16 +71,37 @@ struct AddTransactionView: View {
 
                         noteField
                             .padding(.horizontal, 20)
+
+                        if editingTransaction != nil {
+                            deleteButton
+                                .padding(.horizontal, 20)
+                        }
                     }
                     .padding(.bottom, 32)
                 }
             }
         }
         .onAppear {
-            applyDefaults()
+            if let tx = editingTransaction {
+                applyFromTransaction(tx)
+            } else {
+                applyDefaults()
+            }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 amountFocused = true
             }
+        }
+        .confirmationDialog("Xóa giao dịch này?", isPresented: $showDeleteConfirm, titleVisibility: .visible) {
+            Button("Xóa", role: .destructive) {
+                guard let tx = editingTransaction else { return }
+                Task {
+                    await vm.delete(id: tx.id, appVM: appVM)
+                    if vm.submitError == nil {
+                        isPresented = false
+                    }
+                }
+            }
+            Button("Hủy", role: .cancel) {}
         }
         .sheet(isPresented: $showCategorySheet) {
             CategoryPickerSheet(
@@ -112,12 +141,19 @@ struct AddTransactionView: View {
                     .font(.dsBody(10, weight: .semibold))
                     .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
                     .tracking(1)
-                Text("New Entry")
+                Text(editingTransaction != nil ? "Edit Entry" : "New Entry")
                     .font(.dsTitle(16))
                     .foregroundStyle(Color.dsOnSurface(for: scheme))
             }
             Spacer()
-            Color.clear.frame(width: 32, height: 32)
+            Button(action: save) {
+                Image(systemName: vm.isSubmitting ? "ellipsis" : "checkmark")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.dsPrimary(for: scheme))
+                    .frame(width: 32, height: 32)
+                    .background(Circle().fill(.ultraThinMaterial))
+            }
+            .disabled(vm.isSubmitting || amountString == "0")
         }
     }
 
@@ -172,17 +208,12 @@ struct AddTransactionView: View {
                     ToolbarItemGroup(placement: .keyboard) {
                         Spacer()
                         Button(action: save) {
-                            HStack(spacing: 6) {
-                                Text(vm.isSubmitting ? "Đang lưu..." : "Lưu →")
-                                    .font(.dsBody(15, weight: .semibold))
-                            }
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 8)
-                            .background(
-                                Capsule()
-                                    .fill(LinearGradient.dsCTAGradient(scheme: scheme))
-                            )
+                            Text(vm.isSubmitting ? "Đang lưu..." : (editingTransaction != nil ? "Cập nhật →" : "Lưu →"))
+                                .font(.dsBody(15, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 8)
+                                .background(Capsule().fill(LinearGradient.dsCTAGradient(scheme: scheme)))
                         }
                         .disabled(vm.isSubmitting || amountString == "0")
                     }
@@ -331,6 +362,33 @@ struct AddTransactionView: View {
         }
     }
 
+    // MARK: - Delete Button
+
+    private var deleteButton: some View {
+        Button {
+            showDeleteConfirm = true
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "trash")
+                    .font(.system(size: 14, weight: .semibold))
+                Text("Xóa giao dịch")
+                    .font(.dsBody(16, weight: .semibold))
+            }
+            .foregroundStyle(Color.dsExpense)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(
+                RoundedRectangle(cornerRadius: DSRadius.lg, style: .continuous)
+                    .fill(Color.dsExpense.opacity(0.12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: DSRadius.lg, style: .continuous)
+                            .stroke(Color.dsExpense.opacity(0.3), lineWidth: 1)
+                    )
+            )
+        }
+        .disabled(vm.isSubmitting)
+    }
+
     // MARK: - Defaults
 
     private func applyDefaults() {
@@ -352,24 +410,65 @@ struct AddTransactionView: View {
         }
     }
 
+    // MARK: - Prefill from existing transaction
+
+    private func applyFromTransaction(_ tx: Transaction) {
+        let absAmount = abs(tx.amount)
+        let formatter = NumberFormatter()
+        formatter.maximumFractionDigits = 0
+        amountString = formatter.string(from: NSNumber(value: absAmount)) ?? String(Int(absAmount))
+        // strip any group separators so it's pure digits
+        amountString = amountString.filter { $0.isNumber }
+        if amountString.isEmpty { amountString = "0" }
+
+        selectedType = tx.type
+        selectedCategoryId = tx.categoryId
+        selectedAccountId = tx.accountId
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        if let d = dateFormatter.date(from: tx.date) {
+            selectedDate = d
+        }
+        note = tx.note ?? ""
+    }
+
     // MARK: - Save
 
     private func save() {
         guard let amount = Double(amountString), amount > 0 else { return }
         let signedAmount = selectedType == .expense ? -abs(amount) : abs(amount)
-        let body = CreateTransactionRequest(
-            date: Formatters.toDateString(selectedDate),
-            type: selectedType,
-            categoryId: selectedCategoryId,
-            accountId: selectedAccountId,
-            transferToId: nil,
-            amount: signedAmount,
-            note: note.isEmpty ? nil : note
-        )
-        Task {
-            await vm.create(body, appVM: appVM)
-            if vm.submitError == nil {
-                isPresented = false
+        if let tx = editingTransaction {
+            let body = UpdateTransactionRequest(
+                date: Formatters.toDateString(selectedDate),
+                type: selectedType,
+                categoryId: selectedCategoryId,
+                accountId: selectedAccountId,
+                transferToId: nil,
+                amount: signedAmount,
+                note: note.isEmpty ? nil : note
+            )
+            Task {
+                await vm.update(id: tx.id, body: body, appVM: appVM)
+                if vm.submitError == nil {
+                    isPresented = false
+                }
+            }
+        } else {
+            let body = CreateTransactionRequest(
+                date: Formatters.toDateString(selectedDate),
+                type: selectedType,
+                categoryId: selectedCategoryId,
+                accountId: selectedAccountId,
+                transferToId: nil,
+                amount: signedAmount,
+                note: note.isEmpty ? nil : note
+            )
+            Task {
+                await vm.create(body, appVM: appVM)
+                if vm.submitError == nil {
+                    isPresented = false
+                }
             }
         }
     }

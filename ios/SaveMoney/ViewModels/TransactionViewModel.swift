@@ -51,8 +51,18 @@ class TransactionViewModel: ObservableObject {
         isSubmitting = true
         submitError = nil
         do {
-            let updated = try await api.updateTransaction(id: id, body: body)
+            try await api.updateTransaction(id: id, body: body)
             if let idx = appVM.transactions.firstIndex(where: { $0.id == id }) {
+                let updated = Transaction(
+                    id: id,
+                    date: body.date,
+                    type: body.type,
+                    categoryId: body.categoryId,
+                    accountId: body.accountId,
+                    transferToId: body.transferToId,
+                    amount: body.amount,
+                    note: body.note
+                )
                 appVM.transactions[idx] = updated
             }
         } catch {

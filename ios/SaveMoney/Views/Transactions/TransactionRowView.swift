@@ -3,6 +3,7 @@ import SwiftUI
 struct TransactionRowView: View {
     let transaction: Transaction
     let appVM: AppViewModel
+    var onTap: (() -> Void)? = nil
     @Environment(\.colorScheme) var scheme
 
     private var categoryName: String {
@@ -64,5 +65,7 @@ struct TransactionRowView: View {
             }
         }
         .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .onTapGesture { onTap?() }
     }
 }
