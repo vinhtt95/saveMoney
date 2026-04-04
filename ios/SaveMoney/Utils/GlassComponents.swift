@@ -233,11 +233,12 @@ func categorySystemIcon(for name: String) -> String {
     return "creditcard.fill"
 }
 
-// MARK: - DSTabBar
+// MARK: - DSTabBar (Split: left pill nav + right circle add)
 
 struct DSTabBar: View {
     @Binding var selectedTab: Int
     let onAddTap: () -> Void
+    @Namespace private var tabNamespace
 
     private let tabs: [(icon: String, label: String, index: Int)] = [
         ("house.fill",     "Flow",    0),
@@ -247,79 +248,175 @@ struct DSTabBar: View {
     ]
 
     var body: some View {
-        GeometryReader { geo in
-            VStack(spacing: 0) {
-                Spacer()
-                HStack(alignment: .center, spacing: 0) {
-                    ForEach(tabs.prefix(2), id: \.index) { tab in
-                        tabButton(tab: tab)
-                    }
-
-                    centerFAB
-                        .frame(maxWidth: .infinity)
-
-                    ForEach(tabs.suffix(2), id: \.index) { tab in
-                        tabButton(tab: tab)
-                    }
-                }
-                .padding(.top, 12)
-                .padding(.bottom, geo.safeAreaInsets.bottom + 8)
-                .padding(.horizontal, 8)
-                .background {
-                    Rectangle()
-                        .fill(.ultraThinMaterial)
-                        // Single top-edge separator line — native iOS tab bar style
-                        .overlay(
-                            Rectangle()
-                                .frame(height: 0.5)
-                                .foregroundStyle(Color(.separator).opacity(0.6)),
-                            alignment: .top
-                        )
-                }
-            }
-            .ignoresSafeArea(edges: .bottom)
+        if #available(iOS 26.0, *) {
+            liquidGlassBody
+        } else {
+            legacyBody
         }
-        .frame(height: 90)
     }
 
-    private func tabButton(tab: (icon: String, label: String, index: Int)) -> some View {
+    // MARK: - iOS 26 Liquid Glass
+
+    @available(iOS 26.0, *)
+    private var liquidGlassBody: some View {
+        HStack(alignment: .center, spacing: 10) {
+            // Nav pill — expands to fill remaining width
+            GlassEffectContainer {
+                HStack(spacing: 0) {
+                    ForEach(tabs, id: \.index) { tab in
+                        liquidTabButton(tab: tab)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .padding(4)
+                .glassEffect(.regular, in: .capsule)
+            }
+            .frame(maxWidth: .infinity)
+
+            // Add button — fixed size, separate glass element
+            GlassEffectContainer {
+                Button(action: onAddTap) {
+                    ZStack {
+                        Circle()
+                            .fill(Color.dsBrandAccent.opacity(0.88))
+                        Image(systemName: "plus")
+                            .font(.system(size: 19, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
+                    .frame(width: 50, height: 50)
+                }
+                .glassEffect(.regular, in: .circle)
+            }
+            .frame(width: 50, height: 50)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 2)
+    }
+
+    @available(iOS 26.0, *)
+    private func liquidTabButton(tab: (icon: String, label: String, index: Int)) -> some View {
         let isSelected = selectedTab == tab.index
         return Button {
-            selectedTab = tab.index
+            withAnimation(.spring(response: 0.38, dampingFraction: 0.42)) {
+                selectedTab = tab.index
+            }
         } label: {
-            VStack(spacing: 4) {
+            VStack(spacing: 3) {
                 Image(systemName: tab.icon)
-                    .font(.system(size: 20, weight: isSelected ? .semibold : .regular))
+                    .font(.system(size: 17, weight: isSelected ? .semibold : .regular))
                     .foregroundStyle(isSelected ? Color.dsBrandAccent : Color(.secondaryLabel))
-
                 Text(tab.label)
                     .font(.dsBody(10, weight: isSelected ? .semibold : .regular))
                     .foregroundStyle(isSelected ? Color.dsBrandAccent : Color(.secondaryLabel))
             }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
             .frame(maxWidth: .infinity)
-        }
-    }
-
-    private var centerFAB: some View {
-        Button(action: onAddTap) {
-            ZStack {
-                Circle()
-                    .fill(.regularMaterial)
-                    .frame(width: 56, height: 56)
-                    .overlay(
-                        Circle().fill(Color.dsBrandAccent.opacity(0.88))
-                    )
-                    .overlay(
-                        Circle().stroke(.white.opacity(0.30), lineWidth: 1)
-                    )
-                    .shadow(color: Color.dsBrandAccent.opacity(0.45), radius: 12, x: 0, y: 4)
-
-                Image(systemName: "plus")
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(.white)
+            .background {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(.regularMaterial)
+                        .matchedGeometryEffect(id: "tabIndicator", in: tabNamespace)
+                }
             }
         }
-        .offset(y: -16)
+        .buttonStyle(.plain)
+        .animation(.spring(response: 0.38, dampingFraction: 0.42), value: isSelected)
+    }
+
+    // MARK: - Legacy fallback (iOS < 26)
+
+    private var legacyBody: some View {
+        HStack(alignment: .center, spacing: 10) {
+            HStack(spacing: 0) {
+                ForEach(tabs, id: \.index) { tab in
+                    legacyTabButton(tab: tab)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .padding(4)
+            .background {
+                Capsule()
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        Capsule()
+                            .stroke(
+                                LinearGradient(
+                                    colors: [.white.opacity(0.45), .white.opacity(0.08)],
+                                    startPoint: .top, endPoint: .bottom
+                                ),
+                                lineWidth: 1
+                            )
+                    )
+                    .shadow(color: .black.opacity(0.20), radius: 20, x: 0, y: 6)
+            }
+
+            Button(action: onAddTap) {
+                ZStack {
+                    Circle()
+                        .fill(.ultraThinMaterial)
+                        .overlay(Circle().fill(Color.dsBrandAccent.opacity(0.88)))
+                        .overlay(
+                            Circle().stroke(
+                                LinearGradient(
+                                    colors: [.white.opacity(0.50), .white.opacity(0.10)],
+                                    startPoint: .top, endPoint: .bottom
+                                ),
+                                lineWidth: 1
+                            )
+                        )
+                        .shadow(color: Color.dsBrandAccent.opacity(0.45), radius: 14, x: 0, y: 5)
+                    Image(systemName: "plus")
+                        .font(.system(size: 19, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
+                .frame(width: 50, height: 50)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 2)
+    }
+
+    private func legacyTabButton(tab: (icon: String, label: String, index: Int)) -> some View {
+        let isSelected = selectedTab == tab.index
+        return Button {
+            withAnimation(.spring(response: 0.38, dampingFraction: 0.42)) {
+                selectedTab = tab.index
+            }
+        } label: {
+            VStack(spacing: 3) {
+                Image(systemName: tab.icon)
+                    .font(.system(size: 17, weight: isSelected ? .semibold : .regular))
+                    .foregroundStyle(isSelected ? Color.dsBrandAccent : Color(.secondaryLabel))
+                Text(tab.label)
+                    .font(.dsBody(10, weight: isSelected ? .semibold : .regular))
+                    .foregroundStyle(isSelected ? Color.dsBrandAccent : Color(.secondaryLabel))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity)
+            .background {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [.white.opacity(0.60), .white.opacity(0.05)],
+                                        startPoint: .top, endPoint: .bottom
+                                    ),
+                                    lineWidth: 1
+                                )
+                        )
+                        .matchedGeometryEffect(id: "tabIndicator", in: tabNamespace)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .animation(.spring(response: 0.38, dampingFraction: 0.42), value: isSelected)
     }
 }
 
