@@ -42,7 +42,7 @@ struct MainTabView: View {
                     .toolbar(.hidden, for: .tabBar)
             }
 
-            // Custom Glass Tab Bar
+            // Custom Glass Tab Bar với hiệu ứng Liquid
             DSTabBarView(
                 selectedTab: $selectedTab,
                 showAddTransaction: $showAddTransaction
@@ -61,6 +61,11 @@ struct MainTabView: View {
 struct DSTabBarView: View {
     @Binding var selectedTab: Int
     @Binding var showAddTransaction: Bool
+    @Namespace private var tabNamespace
+    
+    // State để bắt hiệu ứng nhấn giữ phình to giọt nước
+    @State private var isPressing: Bool = false
+    @State private var pressingIdx: Int? = nil
 
     private let tabs: [(icon: String, label: String)] = [
         ("house.fill", "Flow"),
@@ -70,48 +75,86 @@ struct DSTabBarView: View {
     ]
 
     var body: some View {
-        HStack(alignment: .center, spacing: 0) {
-            ForEach(0..<tabs.count, id: \.self) { idx in
-                if idx == 2 {
-                    // FAB center button
+        HStack(spacing: 12) {
+            // --- Left pill: 4 nav tabs (Hiệu ứng Apple Music) ---
+            HStack(spacing: 0) {
+                ForEach(0..<tabs.count, id: \.self) { idx in
+                    let isSelected = selectedTab == idx
+                    
                     Button {
-                        showAddTransaction = true
+                        // Hiệu ứng di chuyển "quánh" như chất lỏng
+                        withAnimation(.interpolatingSpring(stiffness: 350, damping: 20)) {
+                            selectedTab = idx
+                        }
                     } label: {
-                        ZStack {
-                            Circle()
-                                .fill(DSColors.accent)
-                                .frame(width: 52, height: 52)
-                                .shadow(color: DSColors.accent.opacity(0.4), radius: 8, y: 4)
-                            Image(systemName: "plus")
-                                .font(.title2.weight(.semibold))
-                                .foregroundStyle(.white)
+                        VStack(spacing: 4) {
+                            Image(systemName: tabs[idx].icon)
+                                .font(.system(size: 20))
+                                // Icon hơi thu nhỏ nhẹ khi đang nhấn giữ
+                                .scaleEffect(isPressing && pressingIdx == idx ? 0.9 : 1.0)
+                            Text(tabs[idx].label)
+                                .font(.caption2.weight(.medium))
+                        }
+                        .foregroundStyle(isSelected ? DSColors.accent : .secondary)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 60)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(LiquidButtonStyle(idx: idx, isPressing: $isPressing, pressingIdx: $pressingIdx))
+                    .background {
+                        if isSelected {
+                            // Đây là "Giọt nước" (Gooey Layer)
+                            Capsule()
+                                .fill(.thinMaterial)
+                                // Khi nhấn giữ, giọt nước phình to ra như ảnh mày gửi
+                                .scaleEffect(isPressing && pressingIdx == idx ? 1.25 : 1.0)
+                                .matchedGeometryEffect(id: "tabIndicator", in: tabNamespace)
+                                .padding(4)
                         }
                     }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 16)
                 }
-
-                Button {
-                    selectedTab = idx
-                } label: {
-                    VStack(spacing: 4) {
-                        Image(systemName: tabs[idx].icon)
-                            .font(.system(size: 22))
-                            .foregroundStyle(selectedTab == idx ? DSColors.accent : .secondary)
-                        Text(tabs[idx].label)
-                            .font(.caption2.weight(.medium))
-                            .foregroundStyle(selectedTab == idx ? DSColors.accent : .secondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                }
-                .buttonStyle(.plain)
             }
+            .padding(.horizontal, 4)
+            .glassEffect(.regular, in: .capsule)
+
+            // --- Right pill: Add button (Giữ nguyên layout của mày) ---
+            Button {
+                showAddTransaction = true
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(DSColors.accent)
+                    .frame(width: 60, height: 60)
+                    .glassEffect(.regular, in: .circle)
+            }
+            .buttonStyle(PlainButtonStyle())
         }
-        .padding(.horizontal, DSSpacing.md)
-        .padding(.bottom, 8)
-        .glassEffect(.regular, in: .rect(cornerRadius: DSRadius.xl))
         .padding(.horizontal, DSSpacing.lg)
-        .padding(.bottom, 8)
+        .padding(.bottom, 0) // Độ cao hợp lý so với cạnh dưới iPhone
+    }
+}
+
+// MARK: - Liquid Button Style
+// Helper để xử lý trạng thái nhấn giữ (Long press animation)
+struct LiquidButtonStyle: ButtonStyle {
+    let idx: Int
+    @Binding var isPressing: Bool
+    @Binding var pressingIdx: Int?
+    
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .onChange(of: configuration.isPressed) { _, newValue in
+                if newValue {
+                    pressingIdx = idx
+                    withAnimation(.interactiveSpring(response: 0.2, dampingFraction: 0.5)) {
+                        isPressing = true
+                    }
+                } else {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                        isPressing = false
+                        pressingIdx = nil
+                    }
+                }
+            }
     }
 }
