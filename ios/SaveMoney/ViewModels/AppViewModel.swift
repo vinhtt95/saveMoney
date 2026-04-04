@@ -87,6 +87,14 @@ class AppViewModel: ObservableObject {
         accounts.reduce(0) { $0 + balance(for: $1.id) }
     }
 
+    var totalGoldValue: Double {
+        goldAssets.reduce(0) { $0 + $1.quantity * ($1.currentSellPrice ?? 0) }
+    }
+
+    var totalNetWorth: Double {
+        totalBalance + totalGoldValue
+    }
+
     func monthlyStats(yyyyMM: String) -> (income: Double, expense: Double) {
         let filtered = transactions.filter { $0.date.hasPrefix(yyyyMM) }
         let income = filtered.filter { $0.type == .income }.reduce(0) { $0 + $1.amount }

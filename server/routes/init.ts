@@ -47,6 +47,17 @@ router.get('/init', async (_req, res) => {
     settings[row.key] = row.value;
   }
 
+  const priceMap: Record<string, number> = {};
+  const rawCache = settings['goldPriceCache'];
+  if (rawCache) {
+    try {
+      const cache = JSON.parse(rawCache);
+      for (const item of (cache.items ?? [])) {
+        if (item.id && item.sell_price) priceMap[item.id] = item.sell_price;
+      }
+    } catch {}
+  }
+
   res.json({
     categories,
     accounts,
@@ -65,6 +76,7 @@ router.get('/init', async (_req, res) => {
     goldAssets: goldAssets.map((a: any) => ({
       ...a,
       quantity: parseFloat(a.quantity),
+      currentSellPrice: priceMap[a.productId] ?? null,
     })),
     settings,
   });

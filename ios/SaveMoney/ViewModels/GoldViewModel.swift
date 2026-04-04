@@ -10,7 +10,7 @@ class GoldViewModel: ObservableObject {
 
     func totalValueVND(assets: [GoldAsset]) -> Double {
         assets.reduce(0) { sum, asset in
-            let price = sellPrice(for: asset)
+            let price = asset.currentSellPrice ?? sellPrice(for: asset)
             return sum + asset.quantity * (price ?? 0)
         }
     }

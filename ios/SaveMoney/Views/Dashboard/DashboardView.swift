@@ -40,6 +40,12 @@ struct DashboardView: View {
                 statsGrid
                     .padding(.horizontal, 20)
 
+                // Net worth card (shown when gold assets exist)
+                if !appVM.goldAssets.isEmpty {
+                    netWorthCard
+                        .padding(.horizontal, 20)
+                }
+
                 // Expense flow chart
                 expenseFlowChart
                     .padding(.horizontal, 20)
@@ -161,6 +167,34 @@ struct DashboardView: View {
             StatCardView(title: "Chi tiêu", amount: stats.expense, color: .red, icon: "arrow.up.circle.fill")
             StatCardView(title: "Còn lại", amount: stats.income - stats.expense, color: .blue, icon: "equal.circle.fill")
             StatCardView(title: "Tổng tài khoản", amount: appVM.totalBalance, color: .purple, icon: "creditcard.fill")
+        }
+    }
+
+    private var netWorthCard: some View {
+        GlassCard(radius: DSRadius.lg, padding: 16) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("TỔNG TÀI SẢN RÒNG")
+                        .font(.dsBody(11, weight: .semibold))
+                        .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
+                        .tracking(1)
+                    Text(Formatters.formatVND(appVM.totalNetWorth))
+                        .font(.dsTitle(22))
+                        .foregroundStyle(Color.dsOnSurface(for: scheme))
+                    HStack(spacing: 12) {
+                        Text("TK: \(Formatters.formatVNDShort(appVM.totalBalance))")
+                            .font(.dsBody(11))
+                            .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
+                        Text("Vàng: \(Formatters.formatVNDShort(appVM.totalGoldValue))")
+                            .font(.dsBody(11))
+                            .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
+                    }
+                }
+                Spacer()
+                Image(systemName: "building.columns.fill")
+                    .font(.system(size: 28))
+                    .foregroundStyle(Color(red: 0.85, green: 0.65, blue: 0.13))
+            }
         }
     }
 

@@ -22,6 +22,7 @@ struct GoldAsset: Codable, Identifiable {
     let quantity: Double
     let note: String?
     let createdAt: String?
+    let currentSellPrice: Double?
 }
 
 struct CreateGoldAssetRequest: Encodable {
