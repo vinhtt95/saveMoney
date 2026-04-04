@@ -83,7 +83,7 @@ struct DSTabBarView: View {
                     
                     Button {
                         // Hiệu ứng di chuyển "quánh" như chất lỏng
-                        withAnimation(.interpolatingSpring(stiffness: 350, damping: 20)) {
+                        withAnimation(.interpolatingSpring(stiffness: 400, damping: 18)) {
                             selectedTab = idx
                         }
                     } label: {
@@ -91,7 +91,7 @@ struct DSTabBarView: View {
                             Image(systemName: tabs[idx].icon)
                                 .font(.system(size: 20))
                                 // Icon hơi thu nhỏ nhẹ khi đang nhấn giữ
-                                .scaleEffect(isPressing && pressingIdx == idx ? 0.9 : 1.0)
+                                .scaleEffect(isPressing && pressingIdx == idx ? 1.5 : 1.0)
                             Text(tabs[idx].label)
                                 .font(.caption2.weight(.medium))
                         }
@@ -107,7 +107,7 @@ struct DSTabBarView: View {
                             Capsule()
                                 .fill(.thinMaterial)
                                 // Khi nhấn giữ, giọt nước phình to ra như ảnh mày gửi
-                                .scaleEffect(isPressing && pressingIdx == idx ? 1.25 : 1.0)
+                                .scaleEffect(isPressing && pressingIdx == idx ? 1.3 : 1.0)
                                 .matchedGeometryEffect(id: "tabIndicator", in: tabNamespace)
                                 .padding(4)
                         }
@@ -146,7 +146,7 @@ struct LiquidButtonStyle: ButtonStyle {
             .onChange(of: configuration.isPressed) { _, newValue in
                 if newValue {
                     pressingIdx = idx
-                    withAnimation(.interactiveSpring(response: 0.2, dampingFraction: 0.5)) {
+                    withAnimation(.interactiveSpring(response: 0.2, dampingFraction: 0.8)) {
                         isPressing = true
                     }
                 } else {
