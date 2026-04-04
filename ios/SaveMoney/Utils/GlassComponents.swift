@@ -10,29 +10,7 @@ struct GlassCard<Content: View>: View {
     var body: some View {
         content()
             .padding(padding)
-            .background {
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    // iOS 26 liquid glass: ultraThinMaterial in BOTH light and dark
-                    .fill(.ultraThinMaterial)
-                    // Specular highlight: top-edge white gradient (simulates glass reflection)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: radius, style: .continuous)
-                            .stroke(
-                                LinearGradient(
-                                    colors: [.white.opacity(0.40), .white.opacity(0.0)],
-                                    startPoint: .top,
-                                    endPoint: UnitPoint(x: 0.5, y: 0.35)
-                                ),
-                                lineWidth: 1
-                            )
-                    )
-                    // Outer separator border for card definition
-                    .overlay(
-                        RoundedRectangle(cornerRadius: radius, style: .continuous)
-                            .stroke(Color(.separator).opacity(0.5), lineWidth: 0.5)
-                    )
-                    .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
-            }
+            .glassEffect(.regular, in: .rect(cornerRadius: radius, style: .continuous))
     }
 }
 
@@ -84,12 +62,10 @@ struct GlassPillButton: View {
                 .padding(.horizontal, 24)
                 .padding(.vertical, 13)
                 .background {
-                    Capsule()
-                        .fill(Color.dsBrandAccent)
-                        .overlay(Capsule().fill(.ultraThinMaterial.opacity(0.15)))
-                        .overlay(Capsule().stroke(.white.opacity(0.30), lineWidth: 1))
+                    Capsule().fill(Color.dsBrandAccent)
                 }
         }
+        .glassEffect(.regular, in: .capsule)
     }
 }
 
@@ -120,14 +96,7 @@ struct GlassSearchBar: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
-        .background {
-            RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous)
-                .fill(.thinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: DSRadius.md, style: .continuous)
-                        .stroke(Color(.separator).opacity(0.6), lineWidth: 0.5)
-                )
-        }
+        .glassEffect(.regular, in: .rect(cornerRadius: DSRadius.md, style: .continuous))
     }
 }
 
@@ -145,19 +114,9 @@ struct GlassPeriodChip: View {
                 .foregroundStyle(isSelected ? .white : Color(.secondaryLabel))
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
-                .background {
-                    if isSelected {
-                        Capsule()
-                            .fill(Color.dsBrandAccent)
-                            .overlay(Capsule().fill(.ultraThinMaterial.opacity(0.10)))
-                            .overlay(Capsule().stroke(.white.opacity(0.25), lineWidth: 1))
-                    } else {
-                        Capsule()
-                            .fill(.ultraThinMaterial)
-                            .overlay(Capsule().stroke(Color(.separator).opacity(0.5), lineWidth: 0.5))
-                    }
-                }
         }
+        .glassEffect(.regular, in: .capsule)
+        .tint(isSelected ? Color.dsBrandAccent : Color(.secondaryLabel))
     }
 }
 
@@ -233,7 +192,7 @@ func categorySystemIcon(for name: String) -> String {
     return "creditcard.fill"
 }
 
-// MARK: - DSTabBar (Split: left pill nav + right circle add)
+// MARK: - DSTabBar (iOS 26 Liquid Glass: left pill nav + right circle add)
 
 struct DSTabBar: View {
     @Binding var selectedTab: Int
@@ -248,175 +207,81 @@ struct DSTabBar: View {
     ]
 
     var body: some View {
-        if #available(iOS 26.0, *) {
-            liquidGlassBody
-        } else {
-            legacyBody
-        }
-    }
+        GlassEffectContainer {
+            HStack(alignment: .center, spacing: 10) {
+                // Left nav pill — tab buttons with sliding indicator overlay
+                pillNav
+                    .glassEffect(.regular, in: .capsule)
 
-    // MARK: - iOS 26 Liquid Glass
-
-    @available(iOS 26.0, *)
-    private var liquidGlassBody: some View {
-        HStack(alignment: .center, spacing: 10) {
-            // Nav pill — expands to fill remaining width
-            GlassEffectContainer {
-                HStack(spacing: 0) {
-                    ForEach(tabs, id: \.index) { tab in
-                        liquidTabButton(tab: tab)
-                            .frame(maxWidth: .infinity)
-                    }
-                }
-                .padding(4)
-                .glassEffect(.regular, in: .capsule)
-            }
-            .frame(maxWidth: .infinity)
-
-            // Add button — fixed size, separate glass element
-            GlassEffectContainer {
+                // Right add button
                 Button(action: onAddTap) {
                     ZStack {
-                        Circle()
-                            .fill(Color.dsBrandAccent.opacity(0.88))
+                        Circle().fill(Color.dsBrandAccent)
                         Image(systemName: "plus")
-                            .font(.system(size: 19, weight: .semibold))
+                            .font(.system(size: 20, weight: .semibold))
                             .foregroundStyle(.white)
                     }
-                    .frame(width: 50, height: 50)
+                    .frame(width: 52, height: 52)
                 }
                 .glassEffect(.regular, in: .circle)
+                .frame(width: 52, height: 52)
             }
-            .frame(width: 50, height: 50)
+            .padding(.horizontal, 16)
+            .padding(.top, 6)
+            .padding(.bottom, 4)
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .padding(.bottom, 2)
+        .contentShape(Rectangle())
     }
 
-    @available(iOS 26.0, *)
-    private func liquidTabButton(tab: (icon: String, label: String, index: Int)) -> some View {
-        let isSelected = selectedTab == tab.index
-        return Button {
-            withAnimation(.spring(response: 0.38, dampingFraction: 0.42)) {
-                selectedTab = tab.index
-            }
-        } label: {
-            VStack(spacing: 3) {
-                Image(systemName: tab.icon)
-                    .font(.system(size: 17, weight: isSelected ? .semibold : .regular))
-                    .foregroundStyle(isSelected ? Color.dsBrandAccent : Color(.secondaryLabel))
-                Text(tab.label)
-                    .font(.dsBody(10, weight: isSelected ? .semibold : .regular))
-                    .foregroundStyle(isSelected ? Color.dsBrandAccent : Color(.secondaryLabel))
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity)
-            .background {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(.regularMaterial)
-                        .matchedGeometryEffect(id: "tabIndicator", in: tabNamespace)
-                }
+    // The pill nav is a separate computed property so matchedGeometryEffect
+    // can use the namespace cleanly outside GlassEffectContainer internals
+    private var pillNav: some View {
+        HStack(spacing: 0) {
+            ForEach(tabs, id: \.index) { tab in
+                tabButton(tab: tab)
+                    .frame(maxWidth: .infinity)
             }
         }
-        .buttonStyle(.plain)
-        .animation(.spring(response: 0.38, dampingFraction: 0.42), value: isSelected)
-    }
-
-    // MARK: - Legacy fallback (iOS < 26)
-
-    private var legacyBody: some View {
-        HStack(alignment: .center, spacing: 10) {
-            HStack(spacing: 0) {
-                ForEach(tabs, id: \.index) { tab in
-                    legacyTabButton(tab: tab)
-                        .frame(maxWidth: .infinity)
-                }
-            }
-            .padding(4)
-            .background {
+        .padding(4)
+        // Sliding highlight — rendered as overlay on the pill, driven by geometry reader
+        .overlay(alignment: .leading) {
+            GeometryReader { geo in
+                let count = CGFloat(tabs.count)
+                let index = CGFloat(tabs.firstIndex(where: { $0.index == selectedTab }) ?? 0)
+                let w = geo.size.width / count
                 Capsule()
-                    .fill(.ultraThinMaterial)
-                    .overlay(
-                        Capsule()
-                            .stroke(
-                                LinearGradient(
-                                    colors: [.white.opacity(0.45), .white.opacity(0.08)],
-                                    startPoint: .top, endPoint: .bottom
-                                ),
-                                lineWidth: 1
-                            )
-                    )
-                    .shadow(color: .black.opacity(0.20), radius: 20, x: 0, y: 6)
-            }
-
-            Button(action: onAddTap) {
-                ZStack {
-                    Circle()
-                        .fill(.ultraThinMaterial)
-                        .overlay(Circle().fill(Color.dsBrandAccent.opacity(0.88)))
-                        .overlay(
-                            Circle().stroke(
-                                LinearGradient(
-                                    colors: [.white.opacity(0.50), .white.opacity(0.10)],
-                                    startPoint: .top, endPoint: .bottom
-                                ),
-                                lineWidth: 1
-                            )
-                        )
-                        .shadow(color: Color.dsBrandAccent.opacity(0.45), radius: 14, x: 0, y: 5)
-                    Image(systemName: "plus")
-                        .font(.system(size: 19, weight: .semibold))
-                        .foregroundStyle(.white)
-                }
-                .frame(width: 50, height: 50)
+                    .fill(.regularMaterial)
+                    .frame(width: w, height: geo.size.height)
+                    .offset(x: index * w)
+                    .animation(.spring(response: 0.35, dampingFraction: 0.8), value: selectedTab)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 8)
-        .padding(.bottom, 2)
     }
 
-    private func legacyTabButton(tab: (icon: String, label: String, index: Int)) -> some View {
+    private func tabButton(tab: (icon: String, label: String, index: Int)) -> some View {
         let isSelected = selectedTab == tab.index
         return Button {
-            withAnimation(.spring(response: 0.38, dampingFraction: 0.42)) {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                 selectedTab = tab.index
             }
         } label: {
-            VStack(spacing: 3) {
+            VStack(spacing: 2) {
                 Image(systemName: tab.icon)
-                    .font(.system(size: 17, weight: isSelected ? .semibold : .regular))
-                    .foregroundStyle(isSelected ? Color.dsBrandAccent : Color(.secondaryLabel))
+                    .font(.system(size: 18, weight: isSelected ? .semibold : .regular))
+                    .foregroundStyle(isSelected ? Color.dsBrandAccent : Color(.tertiaryLabel))
+                    .scaleEffect(isSelected ? 1.08 : 1.0)
+                    .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isSelected)
                 Text(tab.label)
-                    .font(.dsBody(10, weight: isSelected ? .semibold : .regular))
-                    .foregroundStyle(isSelected ? Color.dsBrandAccent : Color(.secondaryLabel))
+                    .font(.dsBody(10, weight: isSelected ? .semibold : .medium))
+                    .foregroundStyle(isSelected ? Color.dsBrandAccent : Color(.tertiaryLabel))
+                    .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isSelected)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 10)
             .frame(maxWidth: .infinity)
-            .background {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .stroke(
-                                    LinearGradient(
-                                        colors: [.white.opacity(0.60), .white.opacity(0.05)],
-                                        startPoint: .top, endPoint: .bottom
-                                    ),
-                                    lineWidth: 1
-                                )
-                        )
-                        .matchedGeometryEffect(id: "tabIndicator", in: tabNamespace)
-                }
-            }
+            // No background here — indicator is drawn as overlay on the whole pill
         }
         .buttonStyle(.plain)
-        .animation(.spring(response: 0.38, dampingFraction: 0.42), value: isSelected)
     }
 }
 
@@ -443,14 +308,7 @@ struct GlassFormField: View {
                 .foregroundStyle(Color(.label))
                 .padding(.horizontal, 14)
                 .padding(.vertical, 12)
-                .background {
-                    RoundedRectangle(cornerRadius: DSRadius.sm, style: .continuous)
-                        .fill(.ultraThinMaterial)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: DSRadius.sm, style: .continuous)
-                                .stroke(Color(.separator).opacity(0.6), lineWidth: 0.5)
-                        )
-                }
+                .glassEffect(.regular, in: .rect(cornerRadius: DSRadius.sm, style: .continuous))
         }
     }
 }

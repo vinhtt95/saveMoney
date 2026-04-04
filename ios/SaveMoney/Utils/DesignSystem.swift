@@ -168,30 +168,3 @@ struct DSMeshBackground: View {
     }
 }
 
-// MARK: - iOS 26 Liquid Glass Forward Compatibility
-
-extension View {
-    /// Applies liquid glass background. Ready for iOS 26's .glassBackground() when SDK ships.
-    @ViewBuilder
-    func liquidGlassBackground(cornerRadius: CGFloat = DSRadius.lg) -> some View {
-        // When iOS 26 SDK is available, replace with:
-        // if #available(iOS 26.0, *) {
-        //     self.glassBackground(in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        // } else { ... }
-        self.background {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .stroke(
-                            LinearGradient(
-                                colors: [.white.opacity(0.35), .white.opacity(0.0)],
-                                startPoint: .top,
-                                endPoint: UnitPoint(x: 0.5, y: 0.4)
-                            ),
-                            lineWidth: 1
-                        )
-                )
-        }
-    }
-}

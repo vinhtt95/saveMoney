@@ -44,14 +44,10 @@ struct DashboardView: View {
                     } label: {
                         Image(systemName: "arrow.clockwise")
                             .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(Color.dsPrimary(for: scheme))
+                            .foregroundStyle(Color.dsBrandAccent)
                             .frame(width: 36, height: 36)
-                            .background {
-                                Circle()
-                                    .fill(.ultraThinMaterial)
-                                    .overlay(Circle().stroke(Color(.separator).opacity(0.5), lineWidth: 0.5))
-                            }
                     }
+                    .glassEffect(.regular, in: .circle)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 12)

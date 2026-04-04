@@ -151,12 +151,8 @@ struct AddTransactionView: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
                     .frame(width: 36, height: 36)
-                    .background {
-                        Circle()
-                            .fill(.ultraThinMaterial)
-                            .overlay(Circle().stroke(Color(.separator).opacity(0.5), lineWidth: 0.5))
-                    }
             }
+            .glassEffect(.regular, in: .circle)
 
             Spacer()
 
@@ -165,12 +161,9 @@ struct AddTransactionView: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 36, height: 36)
-                    .background {
-                        Circle()
-                            .fill(LinearGradient.dsCTAGradient(scheme: scheme))
-                            .overlay(Circle().stroke(.white.opacity(0.25), lineWidth: 1))
-                    }
+                    .background(Circle().fill(Color.dsBrandAccent))
             }
+            .glassEffect(.regular, in: .circle)
             .disabled(vm.isSubmitting || amountString == "0")
         }
     }
@@ -573,8 +566,8 @@ struct CategoryPickerSheet: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
                     .frame(width: 32, height: 32)
-                    .background(Circle().fill(.ultraThinMaterial))
             }
+            .glassEffect(.regular, in: .circle)
         }
         .padding(.horizontal, 24)
         .padding(.top, 20)
@@ -673,8 +666,8 @@ struct AccountPickerSheet: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
                     .frame(width: 32, height: 32)
-                    .background(Circle().fill(.ultraThinMaterial))
             }
+            .glassEffect(.regular, in: .circle)
         }
         .padding(.horizontal, 24)
         .padding(.top, 20)
@@ -704,8 +697,8 @@ struct DatePickerSheet: View {
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
                             .frame(width: 32, height: 32)
-                            .background(Circle().fill(.ultraThinMaterial))
                     }
+                    .glassEffect(.regular, in: .circle)
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 20)
