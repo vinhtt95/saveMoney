@@ -89,7 +89,7 @@ struct DashboardView: View {
                 .padding(.top, DSSpacing.md)
             }
             .navigationTitle("Flow")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {

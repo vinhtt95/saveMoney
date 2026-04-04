@@ -112,7 +112,7 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Profile")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
         }
         .onAppear {
             if settingsVM == nil {

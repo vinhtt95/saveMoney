@@ -124,7 +124,7 @@ struct TransactionsView: View {
                 }
             }
             .navigationTitle("History")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {

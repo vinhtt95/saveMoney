@@ -42,11 +42,13 @@ struct MainTabView: View {
                     .toolbar(.hidden, for: .tabBar)
             }
 
-            // Custom Glass Tab Bar với hiệu ứng Liquid
+            // Custom Glass Tab Bar với hiệu ứng Liquid nảy mềm mại
             DSTabBarView(
                 selectedTab: $selectedTab,
                 showAddTransaction: $showAddTransaction
             )
+            // Ép thanh Nav Bar bỏ qua khoảng trống Safe Area của thanh Home
+            .ignoresSafeArea(edges: .bottom)
         }
         .sheet(isPresented: $showAddTransaction) {
             AddTransactionView(transaction: nil) {
@@ -76,26 +78,28 @@ struct DSTabBarView: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            // --- Left pill: 4 nav tabs (Hiệu ứng Apple Music) ---
+            // --- Left pill: 4 nav tabs ---
             HStack(spacing: 0) {
                 ForEach(0..<tabs.count, id: \.self) { idx in
                     let isSelected = selectedTab == idx
                     
                     Button {
-                        // Hiệu ứng di chuyển "quánh" như chất lỏng
-                        withAnimation(.interpolatingSpring(stiffness: 400, damping: 18)) {
+                        // Hiệu ứng giật nảy sang tab mới (giống video thạch)
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.55)) {
                             selectedTab = idx
                         }
                     } label: {
                         VStack(spacing: 4) {
                             Image(systemName: tabs[idx].icon)
                                 .font(.system(size: 20))
-                                // Icon hơi thu nhỏ nhẹ khi đang nhấn giữ
-                                .scaleEffect(isPressing && pressingIdx == idx ? 1.5 : 1.0)
+                                // Icon hơi lún xuống khi nhấn
+                                .scaleEffect(isPressing && pressingIdx == idx ? 0.85 : 1.0)
+                                .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressing)
+                            
                             Text(tabs[idx].label)
                                 .font(.caption2.weight(.medium))
                         }
-                        .foregroundStyle(isSelected ? DSColors.accent : .secondary)
+                        .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
                         .frame(maxWidth: .infinity)
                         .frame(height: 60)
                         .contentShape(Rectangle())
@@ -103,11 +107,17 @@ struct DSTabBarView: View {
                     .buttonStyle(LiquidButtonStyle(idx: idx, isPressing: $isPressing, pressingIdx: $pressingIdx))
                     .background {
                         if isSelected {
-                            // Đây là "Giọt nước" (Gooey Layer)
+                            // Giọt nước (Gooey Layer) mờ ảo không có viền sắc nét
                             Capsule()
-                                .fill(.thinMaterial)
-                                // Khi nhấn giữ, giọt nước phình to ra như ảnh mày gửi
-                                .scaleEffect(isPressing && pressingIdx == idx ? 1.3 : 1.0)
+                                .fill(.ultraThinMaterial)
+                                // Lớp glow phát sáng phía sau thay vì viền cứng
+                                .background(
+                                    Capsule()
+                                        .fill(Color.accentColor.opacity(0.25))
+                                        .blur(radius: 10)
+                                )
+                                // Khi nhấn giữ, giọt nước phình to ra
+                                .scaleEffect(isPressing && pressingIdx == idx ? 1.15 : 1.0)
                                 .matchedGeometryEffect(id: "tabIndicator", in: tabNamespace)
                                 .padding(4)
                         }
@@ -115,27 +125,39 @@ struct DSTabBarView: View {
                 }
             }
             .padding(.horizontal, 4)
-            .glassEffect(.regular, in: .capsule)
+            // Lớp vỏ kính bên ngoài cho toàn bộ cụm Tab bên trái
+            .background {
+                Capsule()
+                    .fill(.ultraThinMaterial)
+                    .overlay(Capsule().stroke(Color.white.opacity(0.3), lineWidth: 0.5))
+                    .overlay(Capsule().stroke(Color(.separator).opacity(0.2), lineWidth: 0.5))
+                    .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 4)
+            }
 
-            // --- Right pill: Add button (Giữ nguyên layout của mày) ---
+            // --- Right pill: Add button ---
             Button {
                 showAddTransaction = true
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(DSColors.accent)
+                    .foregroundStyle(Color.accentColor)
                     .frame(width: 60, height: 60)
-                    .glassEffect(.regular, in: .circle)
             }
             .buttonStyle(PlainButtonStyle())
+            .background {
+                Circle()
+                    .fill(.ultraThinMaterial)
+                    .overlay(Circle().stroke(Color.white.opacity(0.4), lineWidth: 0.5))
+                    .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 4)
+            }
         }
-        .padding(.horizontal, DSSpacing.lg)
-        .padding(.bottom, 0) // Độ cao hợp lý so với cạnh dưới iPhone
+        .padding(.horizontal, 16) 
+        // Đặt khoảng cách tĩnh chính xác là 10px so với mép dưới màn hình
+        .padding(.bottom, 10) 
     }
 }
 
 // MARK: - Liquid Button Style
-// Helper để xử lý trạng thái nhấn giữ (Long press animation)
 struct LiquidButtonStyle: ButtonStyle {
     let idx: Int
     @Binding var isPressing: Bool
@@ -146,10 +168,12 @@ struct LiquidButtonStyle: ButtonStyle {
             .onChange(of: configuration.isPressed) { _, newValue in
                 if newValue {
                     pressingIdx = idx
-                    withAnimation(.interactiveSpring(response: 0.2, dampingFraction: 0.8)) {
+                    // Tốc độ phình to ra khi chạm vào
+                    withAnimation(.interactiveSpring(response: 0.25, dampingFraction: 0.7)) {
                         isPressing = true
                     }
                 } else {
+                    // Tốc độ thu nhỏ lại khi nhả ra
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                         isPressing = false
                         pressingIdx = nil
