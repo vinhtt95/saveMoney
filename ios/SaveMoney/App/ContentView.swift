@@ -1,120 +1,117 @@
 import SwiftUI
 
 struct ContentView: View {
-    @EnvironmentObject var appVM: AppViewModel
-    @StateObject private var themeManager = ThemeManager()
-    @Environment(\.colorScheme) var scheme
+    @Environment(AppViewModel.self) private var app
+    @Environment(ThemeManager.self) private var theme
 
     var body: some View {
         Group {
-            if appVM.isLoading {
-                loadingView
+            if app.isLoading {
+                LoadingView()
             } else {
                 MainTabView()
-                    .environmentObject(themeManager)
             }
         }
-        .preferredColorScheme(themeManager.colorScheme)
-        .task {
-            await appVM.loadInitData()
-        }
+        .task { await app.loadInitData() }
     }
-
-    private var loadingView: some View {
-        ZStack {
-            DSMeshBackground()
-            VStack(spacing: 20) {
-                ZStack {
-                    Circle()
-                        .stroke(Color.dsBrandAccent.opacity(0.2), lineWidth: 3)
-                        .frame(width: 56, height: 56)
-                    Circle()
-                        .trim(from: 0, to: 0.7)
-                        .stroke(
-                            LinearGradient(colors: [Color.dsBrandAccent, Color(UIColor.systemTeal)],
-                                           startPoint: .topLeading, endPoint: .bottomTrailing),
-                            style: StrokeStyle(lineWidth: 3, lineCap: .round)
-                        )
-                        .frame(width: 56, height: 56)
-                        .rotationEffect(.degrees(-90))
-                    ProgressView()
-                        .tint(Color.dsBrandAccent)
-                }
-                Text("Đang tải dữ liệu...")
-                    .font(.dsBody(15))
-                    .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-            }
-        }
-    }
-
 }
 
-// MARK: - MainTabView
-
+// MARK: - Main Tab View
 struct MainTabView: View {
-    @EnvironmentObject var appVM: AppViewModel
-    @EnvironmentObject var themeManager: ThemeManager
-    @Environment(\.colorScheme) var scheme
+    @Environment(AppViewModel.self) private var app
     @State private var selectedTab = 0
-    @State private var visitedTabs: Set<Int> = [0]
-    @State private var showAddSheet = false
+    @State private var showAddTransaction = false
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            DSMeshBackground().ignoresSafeArea()
+            TabView(selection: $selectedTab) {
+                DashboardView()
+                    .tag(0)
+                    .toolbar(.hidden, for: .tabBar)
 
-            // Tab content — ZStack with crossfade; views stay alive after first visit (no re-init)
-            ZStack {
-                if visitedTabs.contains(0) {
-                    DashboardView()
-                        .opacity(selectedTab == 0 ? 1 : 0)
-                        .allowsHitTesting(selectedTab == 0)
-                }
-                if visitedTabs.contains(1) {
-                    TransactionsView()
-                        .opacity(selectedTab == 1 ? 1 : 0)
-                        .allowsHitTesting(selectedTab == 1)
-                }
-                if visitedTabs.contains(3) {
-                    AnalyticsView()
-                        .opacity(selectedTab == 3 ? 1 : 0)
-                        .allowsHitTesting(selectedTab == 3)
-                }
-                if visitedTabs.contains(4) {
-                    SettingsView()
-                        .opacity(selectedTab == 4 ? 1 : 0)
-                        .allowsHitTesting(selectedTab == 4)
-                }
-            }
-            .animation(.easeInOut(duration: 0.22), value: selectedTab)
-            .onChange(of: selectedTab) { _, tab in visitedTabs.insert(tab) }
-            // Reserve space at bottom for tab bar
-            .safeAreaInset(edge: .bottom) {
-                Color.clear.frame(height: tabBarHeight)
-            }
-            .ignoresSafeArea(edges: .top)
+                TransactionsView()
+                    .tag(1)
+                    .toolbar(.hidden, for: .tabBar)
 
-            // Tab bar floats on top, fully blocks touches in its area
-            VStack(spacing: 0) {
-                Spacer(minLength: 0)
-                DSTabBar(selectedTab: $selectedTab, onAddTap: { showAddSheet = true })
-                    .padding(.bottom, max(safeAreaBottom - 4, 0))
+                AnalyticsView()
+                    .tag(2)
+                    .toolbar(.hidden, for: .tabBar)
+
+                SettingsView()
+                    .tag(3)
+                    .toolbar(.hidden, for: .tabBar)
             }
-            .ignoresSafeArea(edges: .bottom)
+
+            // Custom Glass Tab Bar
+            DSTabBarView(
+                selectedTab: $selectedTab,
+                showAddTransaction: $showAddTransaction
+            )
         }
-        .sheet(isPresented: $showAddSheet) {
-            AddTransactionView(isPresented: $showAddSheet)
-                .environmentObject(appVM)
+        .sheet(isPresented: $showAddTransaction) {
+            AddTransactionView(transaction: nil) {
+                showAddTransaction = false
+            }
         }
-        // Force the entire ZStack (including tab bar layer) to honour the chosen scheme
-        .preferredColorScheme(themeManager.colorScheme)
+        .ignoresSafeArea(.keyboard)
     }
+}
 
-    private var tabBarHeight: CGFloat { 80 }
+// MARK: - DSTabBar View
+struct DSTabBarView: View {
+    @Binding var selectedTab: Int
+    @Binding var showAddTransaction: Bool
 
-    private var safeAreaBottom: CGFloat {
-        (UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .first?.windows.first?.safeAreaInsets.bottom) ?? 0
+    private let tabs: [(icon: String, label: String)] = [
+        ("house.fill", "Flow"),
+        ("list.bullet", "History"),
+        ("chart.bar.fill", "Insight"),
+        ("person.fill", "Profile")
+    ]
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 0) {
+            ForEach(0..<tabs.count, id: \.self) { idx in
+                if idx == 2 {
+                    // FAB center button
+                    Button {
+                        showAddTransaction = true
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(DSColors.accent)
+                                .frame(width: 52, height: 52)
+                                .shadow(color: DSColors.accent.opacity(0.4), radius: 8, y: 4)
+                            Image(systemName: "plus")
+                                .font(.title2.weight(.semibold))
+                                .foregroundStyle(.white)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 16)
+                }
+
+                Button {
+                    selectedTab = idx
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: tabs[idx].icon)
+                            .font(.system(size: 22))
+                            .foregroundStyle(selectedTab == idx ? DSColors.accent : .secondary)
+                        Text(tabs[idx].label)
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(selectedTab == idx ? DSColors.accent : .secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, DSSpacing.md)
+        .padding(.bottom, 8)
+        .glassEffect(.regular, in: .rect(cornerRadius: DSRadius.xl))
+        .padding(.horizontal, DSSpacing.lg)
+        .padding(.bottom, 8)
     }
 }

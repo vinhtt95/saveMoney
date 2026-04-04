@@ -1,40 +1,20 @@
 import Foundation
 
-struct GoldPriceItem: Codable, Identifiable {
-    let id: String
-    let name: String
-    let buyPrice: Double?
-    let sellPrice: Double?
-    let brand: GoldBrand
+struct GoldPriceItem: Identifiable, Codable, Hashable {
+    var id: String
+    var name: String
+    var buyPrice: Double?
+    var sellPrice: Double?
+    var brand: GoldBrand
+}
 
-    enum CodingKeys: String, CodingKey {
-        case id, name, brand
-        case buyPrice = "buy_price"
-        case sellPrice = "sell_price"
-    }
+struct GoldPricesResponse: Codable {
+    var items: [GoldPriceItem]
+    var usdVnd: Double
+    var fetchedAt: String
 }
 
 struct GoldPriceCache: Codable {
-    let items: [GoldPriceItem]
-    let fetchedAt: Date
-    let usdVnd: Double
-}
-
-/// Response from GET /api/gold-prices (backend-stored cache saved by the web app).
-struct GoldPricesResponse: Decodable {
-    let items: [GoldPriceItem]
-    let usdVnd: Double
-    let fetchedAt: String   // ISO 8601 string
-
-    enum CodingKeys: String, CodingKey {
-        case items
-        case usdVnd = "usd_vnd"
-        case fetchedAt = "fetched_at"
-    }
-}
-
-struct GoldHistoryPoint: Codable, Identifiable {
-    let id: String    // "YYYY-MM-DD"
-    let price: Double // VND per luong
-    let brand: GoldBrand
+    var response: GoldPricesResponse
+    var cachedAt: Date
 }

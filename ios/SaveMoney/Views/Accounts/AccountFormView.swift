@@ -1,76 +1,70 @@
 import SwiftUI
 
 struct AccountFormView: View {
-    @EnvironmentObject var appVM: AppViewModel
-    @ObservedObject var vm: AccountViewModel
+    @Environment(AppViewModel.self) private var app
     let account: Account?
-    @Environment(\.dismiss) var dismiss
-    @Environment(\.colorScheme) var scheme
+    let onDismiss: () -> Void
 
-    @State private var name: String
-    @State private var balance: String
+    @State private var name = ""
+    @State private var balanceText = ""
+    @State private var vm: AccountViewModel?
+    @State private var errorMessage: String?
 
-    init(vm: AccountViewModel, account: Account?) {
-        self.vm = vm
-        self.account = account
-        _name = State(initialValue: account?.name ?? "")
-        _balance = State(initialValue: "")
-    }
+    private var isEditMode: Bool { account != nil }
 
     var body: some View {
-        NavigationView {
-            ZStack {
-                DSMeshBackground().ignoresSafeArea()
-                VStack(spacing: 16) {
-                    GlassCard(radius: DSRadius.lg, padding: 16) {
-                        VStack(spacing: 14) {
-                            GlassFormField(label: "Tên tài khoản", text: $name)
-                            GlassFormField(label: "Số dư (VND)", text: $balance, keyboardType: .numberPad)
+        NavigationStack {
+            Form {
+                Section("Thông tin") {
+                    TextField("Tên tài khoản", text: $name)
+                    if !isEditMode {
+                        HStack {
+                            TextField("Số dư ban đầu (0)", text: $balanceText)
+                                .keyboardType(.numberPad)
+                            Text("₫").foregroundStyle(.secondary)
                         }
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 12)
-
-                    if let err = vm.submitError {
-                        Text(err).font(.dsBody(12)).foregroundStyle(Color.dsExpense)
-                            .padding(.horizontal, 20)
-                    }
-
-                    GlassPillButton(label: vm.isSubmitting ? "Đang lưu..." : "Lưu") {
-                        save()
-                    }
-                    .disabled(vm.isSubmitting || name.isEmpty)
-                    .padding(.horizontal, 20)
-
-                    Spacer()
+                }
+                if let errorMessage {
+                    Section { ErrorBanner(message: errorMessage) }
                 }
             }
-            .navigationTitle(account == nil ? "Thêm tài khoản" : "Sửa tài khoản")
+            .navigationTitle(isEditMode ? "Sửa tài khoản" : "Thêm tài khoản")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Hủy") { dismiss() }
-                        .foregroundStyle(Color.dsPrimary(for: scheme))
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Hủy") { onDismiss() }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(isEditMode ? "Lưu" : "Thêm") {
+                        Task { await handleSubmit() }
+                    }
+                    .fontWeight(.semibold)
+                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
-            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         }
         .onAppear {
-            if let acc = account {
-                balance = String(appVM.balance(for: acc.id))
-            }
+            vm = AccountViewModel(app: app)
+            name = account?.name ?? ""
         }
     }
 
-    private func save() {
-        let bal = Double(balance.replacingOccurrences(of: ",", with: ""))
-        Task {
-            if let acc = account {
-                await vm.update(id: acc.id, body: UpdateAccountRequest(name: name, balance: bal), appVM: appVM)
-            } else {
-                await vm.create(CreateAccountRequest(name: name, balance: bal), appVM: appVM)
-            }
-            if vm.submitError == nil { dismiss() }
+    private func handleSubmit() async {
+        guard let vm else { return }
+        let trimmedName = name.trimmingCharacters(in: .whitespaces)
+        let balance = Double(balanceText.replacingOccurrences(of: ",", with: "").replacingOccurrences(of: ".", with: ""))
+
+        if let account {
+            await vm.updateAccount(id: account.id, name: trimmedName, balance: nil)
+        } else {
+            await vm.addAccount(name: trimmedName, initialBalance: balance)
+        }
+
+        if let err = vm.errorMessage {
+            errorMessage = err
+        } else {
+            onDismiss()
         }
     }
 }

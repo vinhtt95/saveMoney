@@ -1,17 +1,16 @@
 import Foundation
 
-struct Account: Codable, Identifiable {
-    let id: String
-    let name: String
-    // balance comes from accountBalances map in /api/init, not embedded
+struct Account: Identifiable, Codable, Equatable {
+    var id: String
+    var name: String
 }
 
-struct CreateAccountRequest: Encodable {
-    let name: String
-    let balance: Double?
+struct AccountCreateDTO: Encodable {
+    var name: String
+    var initialBalance: Double?
 }
 
-struct UpdateAccountRequest: Encodable {
-    let name: String
-    let balance: Double?
+struct AccountUpdateDTO: Encodable {
+    var name: String
+    var balance: Double?
 }

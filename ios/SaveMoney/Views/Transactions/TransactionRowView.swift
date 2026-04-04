@@ -1,71 +1,43 @@
 import SwiftUI
 
 struct TransactionRowView: View {
-    let transaction: Transaction
-    let appVM: AppViewModel
-    var onTap: (() -> Void)? = nil
-    @Environment(\.colorScheme) var scheme
+    let tx: Transaction
+    let app: AppViewModel
 
-    private var categoryName: String {
-        appVM.category(for: transaction.categoryId)?.name ?? "—"
-    }
-
-    private var accountName: String {
-        appVM.account(for: transaction.accountId)?.name ?? "—"
-    }
-
-    private var amountColor: Color {
-        switch transaction.type {
-        case .income:   return Color.dsIncome
-        case .expense:  return Color.dsExpense
-        default:        return Color.dsOnSurfaceVariant(for: scheme)
-        }
-    }
-
-    private var amountPrefix: String {
-        switch transaction.type {
-        case .income:  return "+"
-        case .expense: return "-"
-        default:       return ""
-        }
-    }
+    private var categoryName: String { app.category(for: tx.categoryId)?.name ?? "—" }
+    private var accountName: String { app.account(for: tx.accountId)?.name ?? "—" }
 
     var body: some View {
-        HStack(spacing: 12) {
-            GradientCircleIcon(
-                systemName: categorySystemIcon(for: categoryName),
-                colors: categoryIconColors(for: categoryName),
-                size: 42
-            )
+        HStack(spacing: DSSpacing.md) {
+            CategoryIconView(name: categoryName, size: 40)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(categoryName)
-                    .font(.dsBody(15, weight: .semibold))
-                    .foregroundStyle(Color.dsOnSurface(for: scheme))
-                Text(accountName)
-                    .font(.dsBody(12))
-                    .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-                if let note = transaction.note, !note.isEmpty {
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+
+                HStack(spacing: DSSpacing.xs) {
+                    Image(systemName: "creditcard")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Text(accountName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                if let note = tx.note, !note.isEmpty {
                     Text(note)
-                        .font(.dsBody(12))
-                        .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
                         .lineLimit(1)
                 }
             }
 
             Spacer()
 
-            VStack(alignment: .trailing, spacing: 3) {
-                Text("\(amountPrefix)\(Formatters.formatVNDShort(abs(transaction.amount)))")
-                    .font(.dsTitle(15))
-                    .foregroundStyle(amountColor)
-                Text(Formatters.formatDate(transaction.date))
-                    .font(.dsBody(11))
-                    .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-            }
+            AmountText(amount: tx.amount, type: tx.type, font: .subheadline.weight(.bold).monospacedDigit())
         }
-        .padding(.vertical, 4)
-        .contentShape(Rectangle())
-        .onTapGesture { onTap?() }
+        .padding(.vertical, DSSpacing.sm)
     }
 }

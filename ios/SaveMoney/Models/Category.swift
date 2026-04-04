@@ -4,21 +4,25 @@ enum CategoryType: String, Codable, CaseIterable {
     case expense = "Expense"
     case income = "Income"
 
-    var displayName: String {
+    var label: String {
         switch self {
-        case .expense: return "Chi tiêu"
-        case .income: return "Thu nhập"
+        case .expense: "Chi tiêu"
+        case .income: "Thu nhập"
         }
     }
 }
 
-struct Category: Codable, Identifiable {
-    let id: String
-    let name: String
-    let type: CategoryType
+struct Category: Identifiable, Codable, Equatable {
+    var id: String
+    var name: String
+    var type: CategoryType
 }
 
-struct CreateCategoryRequest: Encodable {
-    let name: String
-    let type: CategoryType
+struct CategoryCreateDTO: Encodable {
+    var name: String
+    var type: String
+}
+
+struct CategoryUpdateDTO: Encodable {
+    var name: String
 }

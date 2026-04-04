@@ -6,44 +6,38 @@ enum TransactionType: String, Codable, CaseIterable {
     case account = "Account"
     case transfer = "Transfer"
 
-    var displayName: String {
+    var label: String {
         switch self {
-        case .expense: return "Chi tiêu"
-        case .income: return "Thu nhập"
-        case .account: return "Cập nhật số dư"
-        case .transfer: return "Chuyển khoản"
+        case .expense: "Chi tiêu"
+        case .income: "Thu nhập"
+        case .account: "Tài khoản"
+        case .transfer: "Chuyển khoản"
         }
     }
 }
 
-struct Transaction: Codable, Identifiable {
-    let id: String
-    let date: String          // "YYYY-MM-DD"
-    let type: TransactionType
-    let categoryId: String?
-    let accountId: String?
-    let transferToId: String?
-    let amount: Double
-    let note: String?
-    // CodingKeys not needed: server already sends camelCase aliases
+struct Transaction: Identifiable, Codable, Equatable {
+    var id: String
+    var date: String
+    var type: TransactionType
+    var categoryId: String?
+    var accountId: String?
+    var transferToId: String?
+    var amount: Double
+    var note: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, date, type, categoryId, accountId, transferToId, amount, note
+    }
 }
 
-struct CreateTransactionRequest: Encodable {
-    let date: String
-    let type: TransactionType
-    let categoryId: String?
-    let accountId: String?
-    let transferToId: String?
-    let amount: Double
-    let note: String?
-}
-
-struct UpdateTransactionRequest: Encodable {
-    let date: String
-    let type: TransactionType
-    let categoryId: String?
-    let accountId: String?
-    let transferToId: String?
-    let amount: Double
-    let note: String?
+// MARK: - DTOs
+struct TransactionCreateDTO: Encodable {
+    var date: String
+    var type: String
+    var categoryId: String?
+    var accountId: String?
+    var transferToId: String?
+    var amount: Double
+    var note: String?
 }

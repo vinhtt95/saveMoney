@@ -1,72 +1,70 @@
 import SwiftUI
 
 struct CategoryFormView: View {
-    @EnvironmentObject var appVM: AppViewModel
-    @Environment(\.dismiss) var dismiss
-    @Environment(\.colorScheme) var scheme
-    private let api = APIService.shared
+    @Environment(AppViewModel.self) private var app
+    let category: Category?
+    let onDismiss: () -> Void
 
     @State private var name = ""
     @State private var type: CategoryType = .expense
+    @State private var errorMessage: String?
     @State private var isSubmitting = false
-    @State private var error: String?
+
+    private var isEditMode: Bool { category != nil }
 
     var body: some View {
-        NavigationView {
-            ZStack {
-                DSMeshBackground().ignoresSafeArea()
-                VStack(spacing: 16) {
-                    GlassCard(radius: DSRadius.lg, padding: 16) {
-                        VStack(spacing: 14) {
-                            GlassFormField(label: "Tên danh mục", text: $name)
-                            Picker("Loại", selection: $type) {
-                                ForEach(CategoryType.allCases, id: \.self) {
-                                    Text($0.displayName).tag($0)
-                                }
+        NavigationStack {
+            Form {
+                Section("Thông tin") {
+                    TextField("Tên danh mục", text: $name)
+                    if !isEditMode {
+                        Picker("Loại", selection: $type) {
+                            ForEach(CategoryType.allCases, id: \.self) { t in
+                                Text(t.label).tag(t)
                             }
-                            .pickerStyle(.segmented)
                         }
+                        .pickerStyle(.segmented)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 12)
-
-                    if let err = error {
-                        Text(err).font(.dsBody(12)).foregroundStyle(Color.dsExpense)
-                            .padding(.horizontal, 20)
-                    }
-
-                    GlassPillButton(label: isSubmitting ? "Đang lưu..." : "Lưu") {
-                        save()
-                    }
-                    .disabled(isSubmitting || name.isEmpty)
-                    .padding(.horizontal, 20)
-
-                    Spacer()
+                }
+                if let errorMessage {
+                    Section { ErrorBanner(message: errorMessage) }
                 }
             }
-            .navigationTitle("Thêm danh mục")
+            .navigationTitle(isEditMode ? "Sửa danh mục" : "Thêm danh mục")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Hủy") { dismiss() }
-                        .foregroundStyle(Color.dsPrimary(for: scheme))
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Hủy") { onDismiss() }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(isEditMode ? "Lưu" : "Thêm") {
+                        Task { await handleSubmit() }
+                    }
+                    .fontWeight(.semibold)
+                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || isSubmitting)
                 }
             }
-            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+        }
+        .onAppear {
+            name = category?.name ?? ""
+            type = category?.type ?? .expense
         }
     }
 
-    private func save() {
+    private func handleSubmit() async {
         isSubmitting = true
-        Task {
-            do {
-                let cat = try await api.createCategory(CreateCategoryRequest(name: name, type: type))
-                appVM.categories.append(cat)
-                dismiss()
-            } catch {
-                self.error = error.localizedDescription
+        errorMessage = nil
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        do {
+            if let cat = category {
+                try await app.updateCategory(cat.id, CategoryUpdateDTO(name: trimmed))
+            } else {
+                try await app.addCategory(CategoryCreateDTO(name: trimmed, type: type.rawValue))
             }
-            isSubmitting = false
+            onDismiss()
+        } catch {
+            errorMessage = error.localizedDescription
         }
+        isSubmitting = false
     }
 }

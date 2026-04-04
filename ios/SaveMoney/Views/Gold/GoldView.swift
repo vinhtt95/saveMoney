@@ -1,105 +1,140 @@
 import SwiftUI
 
 struct GoldView: View {
-    @StateObject private var goldService = GoldPriceService.shared
-    @Environment(\.colorScheme) var scheme
+    @Environment(AppViewModel.self) private var app
+    @State private var goldVM: GoldViewModel?
+    @State private var isRefreshing = false
+
+    private var vm: GoldViewModel { goldVM ?? GoldViewModel(app: app) }
+    private var service: GoldPriceService { GoldPriceService.shared }
 
     var body: some View {
-        ZStack {
-            DSMeshBackground().ignoresSafeArea()
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 20) {
-                    if goldService.isFetching {
-                        GlassCard(radius: DSRadius.md, padding: 20) {
-                            HStack(spacing: 10) {
-                                ProgressView().tint(Color.dsPrimary(for: scheme))
-                                Text("Đang tải giá vàng...")
-                                    .font(.dsBody(14))
-                                    .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-                            }
-                        }
-                        .padding(.horizontal, 20)
-                    } else if let err = goldService.lastFetchError {
-                        GlassCard(radius: DSRadius.md, padding: 16) {
-                            Text("Lỗi: \(err)")
-                                .font(.dsBody(12))
-                                .foregroundStyle(Color.dsExpense)
-                        }
-                        .padding(.horizontal, 20)
+        ScrollView {
+            LazyVStack(spacing: DSSpacing.lg) {
+                if vm.goldService.isLoading && vm.goldService.prices == nil {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, minHeight: 200)
+                } else if let prices = vm.goldService.prices {
+                    // USD/VND Rate
+                    HStack {
+                        Text("USD/VND")
+                            .font(.subheadline.weight(.semibold))
+                        Spacer()
+                        Text(formatVND(prices.usdVnd))
+                            .font(.subheadline.monospacedDigit())
+                            .foregroundStyle(DSColors.gold)
+                    }
+                    .padding(DSSpacing.md)
+                    .glassEffect(.regular, in: .rect(cornerRadius: DSRadius.md))
+
+                    // SJC Section
+                    let sjcItems = service.items(for: .sjc)
+                    if !sjcItems.isEmpty {
+                        GoldPriceSection(title: "SJC", items: sjcItems)
                     }
 
-                    // USD/VND rate
-                    GlassCard(radius: DSRadius.lg, padding: 14) {
-                        HStack {
-                            GradientCircleIcon(systemName: "dollarsign.circle.fill",
-                                               colors: [Color(hex: "#60a5fa"), Color(hex: "#3b82f6")],
-                                               size: 36)
-                            Text("Tỷ giá USD/VND")
-                                .font(.dsBody(14))
-                                .foregroundStyle(Color.dsOnSurface(for: scheme))
-                            Spacer()
-                            Text(Formatters.formatVNDShort(goldService.usdVnd))
-                                .font(.dsTitle(15))
-                                .foregroundStyle(Color.dsPrimary(for: scheme))
-                        }
+                    // BTMC Section
+                    let btmcItems = service.items(for: .btmc)
+                    if !btmcItems.isEmpty {
+                        GoldPriceSection(title: "BTMC", items: btmcItems)
                     }
-                    .padding(.horizontal, 20)
 
-                    goldSection("SJC", brand: .sjc,
-                                colors: [Color(hex: "#fbbf24"), Color(hex: "#f97316")])
-                    goldSection("BTMC", brand: .btmc,
-                                colors: [Color(hex: "#fbbf24"), Color(hex: "#f59e0b")])
-                    goldSection("Vàng thế giới", brand: .world,
-                                colors: [Color(hex: "#c799ff"), Color(hex: "#4af8e3")])
+                    // World Section
+                    let worldItems = service.items(for: .world)
+                    if !worldItems.isEmpty {
+                        GoldPriceSection(title: "Vàng thế giới", items: worldItems)
+                    }
 
-                    Spacer(minLength: 20)
+                    Text("Cập nhật: \(prices.fetchedAt)")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                } else if let error = vm.goldService.error {
+                    ErrorBanner(message: error)
+                } else {
+                    EmptyStateView(
+                        icon: "sun.max",
+                        title: "Không có dữ liệu",
+                        message: "Kiểm tra kết nối máy chủ"
+                    )
                 }
+
+                Spacer(minLength: 80)
             }
+            .padding(DSSpacing.lg)
         }
         .navigationTitle("Giá vàng")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItem(placement: .topBarTrailing) {
                 Button {
-                    Task { await goldService.fetchFresh() }
+                    Task {
+                        isRefreshing = true
+                        await vm.loadPrices(forceRefresh: true)
+                        isRefreshing = false
+                    }
                 } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(Color.dsPrimary(for: scheme))
-                        .frame(width: 32, height: 32)
-                        .background {
-                            Circle()
-                                .fill(.ultraThinMaterial)
-                                .overlay(Circle().stroke(Color(.separator).opacity(0.5), lineWidth: 0.5))
-                        }
+                    if isRefreshing {
+                        ProgressView().scaleEffect(0.8)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                    }
                 }
-                .disabled(goldService.isFetching)
             }
         }
-        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
-        .task { await goldService.fetchIfNeeded() }
+        .task { await vm.loadPrices() }
+        .onAppear {
+            if goldVM == nil { goldVM = GoldViewModel(app: app) }
+        }
     }
+}
 
-    private func goldSection(_ title: String, brand: GoldBrand, colors: [Color]) -> some View {
-        let items = goldService.prices.filter { $0.brand == brand }
-        return VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                GradientCircleIcon(systemName: "circle.fill", colors: colors, size: 28)
-                Text(title)
-                    .font(.dsTitle(16))
-                    .foregroundStyle(Color.dsOnSurface(for: scheme))
-            }
-            .padding(.horizontal, 20)
+private struct GoldPriceSection: View {
+    let title: String
+    let items: [GoldPriceItem]
 
-            if items.isEmpty {
-                Text("Không có dữ liệu")
-                    .font(.dsBody(13))
-                    .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-                    .padding(.horizontal, 20)
-            } else {
+    var body: some View {
+        VStack(alignment: .leading, spacing: DSSpacing.sm) {
+            Text(title)
+                .font(.headline)
+                .padding(.horizontal, DSSpacing.xs)
+
+            VStack(spacing: 1) {
+                // Header
+                HStack {
+                    Text("Sản phẩm")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text("Mua")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 100, alignment: .trailing)
+                    Text("Bán")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 100, alignment: .trailing)
+                }
+                .padding(.horizontal, DSSpacing.md)
+                .padding(.bottom, DSSpacing.xs)
+
                 ForEach(items) { item in
-                    GoldPriceRow(item: item)
-                        .padding(.horizontal, 20)
+                    HStack {
+                        Text(item.name)
+                            .font(.subheadline)
+                            .lineLimit(2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Text(item.buyPrice.map { formatVNDShort($0) } ?? "—")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .frame(width: 100, alignment: .trailing)
+                        Text(item.sellPrice.map { formatVNDShort($0) } ?? "—")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(DSColors.gold)
+                            .frame(width: 100, alignment: .trailing)
+                    }
+                    .padding(DSSpacing.md)
+                    .glassEffect(.regular, in: .rect(cornerRadius: DSRadius.sm))
                 }
             }
         }

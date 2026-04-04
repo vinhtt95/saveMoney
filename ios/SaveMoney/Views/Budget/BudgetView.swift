@@ -1,189 +1,157 @@
 import SwiftUI
 
 struct BudgetView: View {
-    @EnvironmentObject var appVM: AppViewModel
-    @StateObject private var vm = BudgetViewModel()
-    @State private var showAddSheet = false
-    @Environment(\.colorScheme) var scheme
+    @Environment(AppViewModel.self) private var app
+    @State private var budgetVM: BudgetViewModel?
+    @State private var showAddForm = false
+
+    private var vm: BudgetViewModel {
+        budgetVM ?? BudgetViewModel(app: app)
+    }
 
     var body: some View {
-        ZStack {
-            DSMeshBackground().ignoresSafeArea()
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 16) {
-                    if appVM.budgets.isEmpty {
-                        GlassCard(radius: DSRadius.lg, padding: 24) {
-                            Text("Chưa có ngân sách nào")
-                                .font(.dsBody(14))
-                                .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-                                .frame(maxWidth: .infinity, alignment: .center)
-                        }
-                        .padding(.horizontal, 20)
-                    } else {
-                        VStack(spacing: 12) {
-                            ForEach(appVM.budgets) { budget in
-                                BudgetProgressRow(budget: budget, vm: vm)
-                                    .swipeActions(edge: .trailing) {
-                                        Button(role: .destructive) {
-                                            Task { await vm.delete(id: budget.id, appVM: appVM) }
-                                        } label: {
-                                            Label("Xóa", systemImage: "trash")
-                                        }
-                                    }
-                                    .padding(.horizontal, 20)
-                            }
+        List {
+            if app.budgets.isEmpty {
+                EmptyStateView(
+                    icon: "chart.bar.doc.horizontal",
+                    title: "Chưa có ngân sách",
+                    message: "Thêm ngân sách để theo dõi chi tiêu"
+                )
+                .listRowBackground(Color.clear)
+            } else {
+                ForEach(app.budgets) { budget in
+                    Section {
+                        BudgetProgressRow(budget: budget, vm: vm, app: app)
+                    }
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) {
+                            Task { await vm.deleteBudget(budget.id) }
+                        } label: {
+                            Label("Xóa", systemImage: "trash")
                         }
                     }
-                    Spacer(minLength: 20)
                 }
             }
-            .refreshable { await appVM.reload() }
         }
         .navigationTitle("Ngân sách")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button { showAddSheet = true } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 32, height: 32)
-                        .background(Circle().fill(LinearGradient.dsCTAGradient(scheme: scheme)))
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showAddForm = true
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .foregroundStyle(DSColors.accent)
                 }
             }
         }
-        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
-        .sheet(isPresented: $showAddSheet) {
-            AddBudgetView(vm: vm)
-                .environmentObject(appVM)
+        .sheet(isPresented: $showAddForm) {
+            AddBudgetView { showAddForm = false }
+        }
+        .onAppear {
+            if budgetVM == nil { budgetVM = BudgetViewModel(app: app) }
         }
     }
 }
 
+// MARK: - Add Budget Sheet
 struct AddBudgetView: View {
-    @EnvironmentObject var appVM: AppViewModel
-    @ObservedObject var vm: BudgetViewModel
-    @Environment(\.dismiss) var dismiss
-    @Environment(\.colorScheme) var scheme
+    @Environment(AppViewModel.self) private var app
+    let onDismiss: () -> Void
 
     @State private var name = ""
-    @State private var limitAmount = ""
+    @State private var limitText = ""
     @State private var dateStart = Date()
-    @State private var dateEnd = Date().addingTimeInterval(30 * 86400)
+    @State private var dateEnd = Calendar.current.date(byAdding: .month, value: 1, to: Date()) ?? Date()
     @State private var selectedCategoryIds: Set<String> = []
+    @State private var isSubmitting = false
+    @State private var errorMessage: String?
+
+    private func storageDate(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: date)
+    }
 
     var body: some View {
-        NavigationView {
-            ZStack {
-                DSMeshBackground().ignoresSafeArea()
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 16) {
-                        GlassCard(radius: DSRadius.lg, padding: 16) {
-                            VStack(spacing: 14) {
-                                GlassFormField(label: "Tên ngân sách", text: $name)
-                                GlassFormField(label: "Giới hạn chi tiêu (VND)", text: $limitAmount,
-                                               keyboardType: .numberPad)
-                            }
-                        }
-                        .padding(.horizontal, 20)
-
-                        GlassCard(radius: DSRadius.lg, padding: 16) {
-                            VStack(spacing: 12) {
-                                HStack {
-                                    Text("Từ ngày")
-                                        .font(.dsBody(14))
-                                        .foregroundStyle(Color.dsOnSurface(for: scheme))
-                                    Spacer()
-                                    DatePicker("", selection: $dateStart, displayedComponents: .date)
-                                        .labelsHidden()
-                                        .tint(Color.dsPrimary(for: scheme))
-                                }
-                                Divider().opacity(0.15)
-                                HStack {
-                                    Text("Đến ngày")
-                                        .font(.dsBody(14))
-                                        .foregroundStyle(Color.dsOnSurface(for: scheme))
-                                    Spacer()
-                                    DatePicker("", selection: $dateEnd, displayedComponents: .date)
-                                        .labelsHidden()
-                                        .tint(Color.dsPrimary(for: scheme))
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 20)
-
-                        GlassCard(radius: DSRadius.lg, padding: 16) {
-                            VStack(alignment: .leading, spacing: 10) {
-                                Text("Danh mục chi tiêu")
-                                    .font(.dsTitle(14))
-                                    .foregroundStyle(Color.dsOnSurface(for: scheme))
-                                ForEach(appVM.expenseCategories) { cat in
-                                    Button {
-                                        if selectedCategoryIds.contains(cat.id) {
-                                            selectedCategoryIds.remove(cat.id)
-                                        } else {
-                                            selectedCategoryIds.insert(cat.id)
-                                        }
-                                    } label: {
-                                        HStack {
-                                            GradientCircleIcon(systemName: categorySystemIcon(for: cat.name),
-                                                               colors: categoryIconColors(for: cat.name),
-                                                               size: 30)
-                                            Text(cat.name)
-                                                .font(.dsBody(14))
-                                                .foregroundStyle(Color.dsOnSurface(for: scheme))
-                                            Spacer()
-                                            if selectedCategoryIds.contains(cat.id) {
-                                                Image(systemName: "checkmark.circle.fill")
-                                                    .foregroundStyle(Color.dsPrimary(for: scheme))
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 20)
-
-                        if let err = vm.submitError {
-                            Text(err).font(.dsBody(12)).foregroundStyle(Color.dsExpense)
-                                .padding(.horizontal, 20)
-                        }
-
-                        GlassPillButton(label: vm.isSubmitting ? "Đang lưu..." : "Tạo ngân sách") {
-                            save()
-                        }
-                        .disabled(vm.isSubmitting || name.isEmpty || limitAmount.isEmpty)
-                        .padding(.horizontal, 20)
-
-                        Spacer(minLength: 20)
+        NavigationStack {
+            Form {
+                Section("Thông tin ngân sách") {
+                    TextField("Tên ngân sách", text: $name)
+                    HStack {
+                        TextField("Hạn mức (VNĐ)", text: $limitText)
+                            .keyboardType(.numberPad)
+                        Text("₫").foregroundStyle(.secondary)
                     }
-                    .padding(.top, 12)
+                }
+
+                Section("Thời gian") {
+                    DatePicker("Từ ngày", selection: $dateStart, displayedComponents: .date)
+                        .environment(\.locale, Locale(identifier: "vi_VN"))
+                    DatePicker("Đến ngày", selection: $dateEnd, in: dateStart..., displayedComponents: .date)
+                        .environment(\.locale, Locale(identifier: "vi_VN"))
+                }
+
+                Section("Danh mục áp dụng") {
+                    ForEach(app.expenseCategories) { cat in
+                        HStack {
+                            CategoryIconView(name: cat.name, size: 24)
+                            Text(cat.name)
+                            Spacer()
+                            if selectedCategoryIds.contains(cat.id) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(DSColors.accent)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            if selectedCategoryIds.contains(cat.id) {
+                                selectedCategoryIds.remove(cat.id)
+                            } else {
+                                selectedCategoryIds.insert(cat.id)
+                            }
+                        }
+                    }
+                }
+
+                if let errorMessage {
+                    Section { ErrorBanner(message: errorMessage) }
                 }
             }
-            .navigationTitle("Tạo ngân sách")
+            .navigationTitle("Thêm ngân sách")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Hủy") { dismiss() }
-                        .foregroundStyle(Color.dsPrimary(for: scheme))
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Hủy") { onDismiss() }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Thêm") {
+                        Task { await handleSubmit() }
+                    }
+                    .fontWeight(.semibold)
+                    .disabled(name.isEmpty || limitText.isEmpty || isSubmitting)
                 }
             }
-            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         }
     }
 
-    private func save() {
-        let limit = Double(limitAmount.replacingOccurrences(of: ",", with: "")) ?? 0
-        let body = CreateBudgetRequest(
-            name: name,
-            limitAmount: limit,
-            dateStart: Formatters.toDateString(dateStart),
-            dateEnd: Formatters.toDateString(dateEnd),
+    private func handleSubmit() async {
+        isSubmitting = true
+        errorMessage = nil
+        let limit = Double(limitText.replacingOccurrences(of: ",", with: "").replacingOccurrences(of: ".", with: "")) ?? 0
+        let vm = BudgetViewModel(app: app)
+        await vm.addBudget(
+            name: name.trimmingCharacters(in: .whitespaces),
+            limit: limit,
+            dateStart: storageDate(dateStart),
+            dateEnd: storageDate(dateEnd),
             categoryIds: Array(selectedCategoryIds)
         )
-        Task {
-            await vm.create(body, appVM: appVM)
-            if vm.submitError == nil { dismiss() }
+        if let err = vm.errorMessage {
+            errorMessage = err
+        } else {
+            onDismiss()
         }
+        isSubmitting = false
     }
 }

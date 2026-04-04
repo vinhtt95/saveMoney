@@ -1,82 +1,115 @@
 import Foundation
 
-enum Formatters {
-    // MARK: - VND
+// MARK: - Currency
+func formatVND(_ amount: Double) -> String {
+    let absAmount = abs(amount)
+    let formatter = NumberFormatter()
+    formatter.numberStyle = .decimal
+    formatter.groupingSeparator = "."
+    formatter.maximumFractionDigits = 0
+    let formatted = formatter.string(from: NSNumber(value: absAmount)) ?? "0"
+    return "\(formatted)₫"
+}
 
-    static func formatVND(_ amount: Double) -> String {
-        let absAmount = abs(amount)
-        let formatted = Int(absAmount)
-        let numStr = String(formatted)
-        var result = ""
-        let chars = Array(numStr)
-        for (i, c) in chars.enumerated() {
-            if i > 0 && (chars.count - i) % 3 == 0 { result += "." }
-            result.append(c)
-        }
-        let prefix = amount < 0 ? "-" : ""
-        return "\(prefix)\(result) ₫"
+func formatVNDShort(_ amount: Double) -> String {
+    let absAmount = abs(amount)
+    switch absAmount {
+    case 1_000_000_000...:
+        return String(format: "%.1fT₫", absAmount / 1_000_000_000)
+    case 1_000_000...:
+        return String(format: "%.1ftr₫", absAmount / 1_000_000)
+    case 1_000...:
+        return String(format: "%.0fK₫", absAmount / 1_000)
+    default:
+        return formatVND(absAmount)
     }
+}
 
-    static func formatVNDShort(_ amount: Double) -> String {
-        let abs = Swift.abs(amount)
-        switch abs {
-        case 1_000_000_000...: return String(format: "%.1fT", abs / 1_000_000_000)
-        case 1_000_000...: return String(format: "%.1fTr", abs / 1_000_000)
-        case 1_000...: return String(format: "%.0fK", abs / 1_000)
-        default: return String(format: "%.0f", abs)
-        }
+func formatVNDSigned(_ amount: Double) -> String {
+    let prefix = amount >= 0 ? "+" : "-"
+    return "\(prefix)\(formatVND(amount))"
+}
+
+// MARK: - Dates
+private let storageFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "yyyy-MM-dd"
+    f.locale = Locale(identifier: "vi_VN")
+    return f
+}()
+
+private let displayFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "dd/MM/yyyy"
+    f.locale = Locale(identifier: "vi_VN")
+    return f
+}()
+
+private let periodFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "yyyy-MM"
+    f.locale = Locale(identifier: "vi_VN")
+    return f
+}()
+
+func parseStorageDate(_ string: String) -> Date? {
+    storageFormatter.date(from: string)
+}
+
+func formatDate(_ dateString: String) -> String {
+    guard let date = parseStorageDate(dateString) else { return dateString }
+    return displayFormatter.string(from: date)
+}
+
+func toYYYYMM(_ date: Date) -> String {
+    periodFormatter.string(from: date)
+}
+
+func dateLabel(_ dateString: String) -> String {
+    guard let date = parseStorageDate(dateString) else { return dateString }
+    let calendar = Calendar.current
+    if calendar.isDateInToday(date) { return "Hôm nay" }
+    if calendar.isDateInYesterday(date) { return "Hôm qua" }
+    return displayFormatter.string(from: date)
+}
+
+func availablePeriods(count: Int = 6) -> [String] {
+    var periods: [String] = []
+    let calendar = Calendar.current
+    var date = Date()
+    for _ in 0..<count {
+        periods.append(toYYYYMM(date))
+        date = calendar.date(byAdding: .month, value: -1, to: date) ?? date
     }
+    return periods
+}
 
-    // MARK: - Date
+func periodLabel(_ period: String) -> String {
+    let parts = period.split(separator: "-")
+    guard parts.count == 2,
+          let month = Int(parts[1]),
+          let year = Int(parts[0]) else { return period }
+    let currentPeriod = toYYYYMM(Date())
+    if period == currentPeriod { return "Tháng này" }
+    return "Th\(month)/\(year)"
+}
 
-    private static let dateFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        f.locale = Locale(identifier: "vi_VN")
-        return f
-    }()
+func daysInMonth(period: String) -> Int {
+    let parts = period.split(separator: "-")
+    guard parts.count == 2,
+          let month = Int(parts[1]),
+          let year = Int(parts[0]) else { return 30 }
+    var components = DateComponents()
+    components.year = year
+    components.month = month
+    let calendar = Calendar.current
+    guard let firstDay = calendar.date(from: components),
+          let range = calendar.range(of: .day, in: .month, for: firstDay) else { return 30 }
+    return range.count
+}
 
-    private static let displayFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "dd/MM/yyyy"
-        f.locale = Locale(identifier: "vi_VN")
-        return f
-    }()
-
-    private static let dateTimeFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm dd/MM/yyyy"
-        f.locale = Locale(identifier: "vi_VN")
-        return f
-    }()
-
-    static func toDateString(_ date: Date) -> String {
-        dateFormatter.string(from: date)
-    }
-
-    static func parseDate(_ string: String) -> Date? {
-        dateFormatter.date(from: string)
-    }
-
-    static func formatDate(_ string: String) -> String {
-        guard let d = parseDate(string) else { return string }
-        return displayFormatter.string(from: d)
-    }
-
-    static func formatDateTime(_ date: Date) -> String {
-        dateTimeFormatter.string(from: date)
-    }
-
-    // MARK: - Period
-
-    static func toYYYYMM(_ date: Date) -> String {
-        let cal = Calendar.current
-        let year = cal.component(.year, from: date)
-        let month = cal.component(.month, from: date)
-        return String(format: "%04d-%02d", year, month)
-    }
-
-    static func currentYYYYMM() -> String {
-        toYYYYMM(Date())
-    }
+func elapsedDaysInMonth(period: String) -> Int {
+    let currentPeriod = toYYYYMM(Date())
+    if period != currentPeriod { return daysInMonth(period: period) }
+    return Calendar.current.component(.day, from: Date())
 }

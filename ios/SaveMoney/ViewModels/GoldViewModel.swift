@@ -1,44 +1,59 @@
 import Foundation
 
+@Observable
 @MainActor
-class GoldViewModel: ObservableObject {
-    @Published var isSubmitting = false
-    @Published var submitError: String?
+final class GoldViewModel {
+    var isSubmitting = false
+    var errorMessage: String?
 
-    let goldPriceService = GoldPriceService.shared
-    private let api = APIService.shared
+    private let app: AppViewModel
+    let goldService = GoldPriceService.shared
 
-    func totalValueVND(assets: [GoldAsset]) -> Double {
-        assets.reduce(0) { sum, asset in
-            let price = asset.currentSellPrice ?? sellPrice(for: asset)
-            return sum + asset.quantity * (price ?? 0)
+    init(app: AppViewModel) {
+        self.app = app
+    }
+
+    func loadPrices(forceRefresh: Bool = false) async {
+        await goldService.fetchPrices(forceRefresh: forceRefresh, api: app.api)
+    }
+
+    func totalGoldValue() -> Double {
+        guard let prices = goldService.prices else { return 0 }
+        return app.goldAssets.reduce(0) { sum, asset in
+            let price = prices.items.first { $0.id == asset.productId }?.sellPrice ?? asset.currentSellPrice ?? 0
+            return sum + price * asset.quantity
         }
     }
 
-    func sellPrice(for asset: GoldAsset) -> Double? {
-        goldPriceService.prices
-            .first { $0.brand == asset.brand && $0.id.contains(asset.productId) }?
-            .sellPrice
+    func currentValue(asset: GoldAsset) -> Double {
+        let price = goldService.prices?.items.first { $0.id == asset.productId }?.sellPrice
+            ?? asset.currentSellPrice ?? 0
+        return price * asset.quantity
     }
 
-    func createAsset(_ body: CreateGoldAssetRequest, appVM: AppViewModel) async {
+    func addGoldAsset(brand: GoldBrand, productId: String, productName: String, quantity: Double, note: String?) async {
         isSubmitting = true
-        submitError = nil
+        errorMessage = nil
+        let dto = GoldAssetCreateDTO(
+            brand: brand.rawValue,
+            productId: productId,
+            productName: productName,
+            quantity: quantity,
+            note: note?.isEmpty == true ? nil : note
+        )
         do {
-            let asset = try await api.createGoldAsset(body)
-            appVM.goldAssets.append(asset)
+            try await app.addGoldAsset(dto)
         } catch {
-            submitError = error.localizedDescription
+            errorMessage = error.localizedDescription
         }
         isSubmitting = false
     }
 
-    func deleteAsset(id: String, appVM: AppViewModel) async {
+    func deleteGoldAsset(_ id: String) async {
         do {
-            try await api.deleteGoldAsset(id: id)
-            appVM.goldAssets.removeAll { $0.id == id }
+            try await app.deleteGoldAsset(id)
         } catch {
-            submitError = error.localizedDescription
+            errorMessage = error.localizedDescription
         }
     }
 }

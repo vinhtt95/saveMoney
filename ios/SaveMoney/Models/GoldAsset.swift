@@ -3,32 +3,32 @@ import Foundation
 enum GoldBrand: String, Codable, CaseIterable {
     case sjc = "SJC"
     case btmc = "BTMC"
-    case world = "world"
+    case world = "World"
 
-    var displayName: String {
+    var label: String {
         switch self {
-        case .sjc: return "SJC"
-        case .btmc: return "BTMC"
-        case .world: return "Vàng thế giới"
+        case .sjc: "SJC"
+        case .btmc: "BTMC"
+        case .world: "Thế giới"
         }
     }
 }
 
-struct GoldAsset: Codable, Identifiable {
-    let id: String
-    let brand: GoldBrand
-    let productId: String
-    let productName: String
-    let quantity: Double
-    let note: String?
-    let createdAt: String?
-    let currentSellPrice: Double?
+struct GoldAsset: Identifiable, Codable, Equatable {
+    var id: String
+    var brand: GoldBrand
+    var productId: String
+    var productName: String
+    var quantity: Double
+    var note: String?
+    var createdAt: String?
+    var currentSellPrice: Double?
 }
 
-struct CreateGoldAssetRequest: Encodable {
-    let brand: GoldBrand
-    let productId: String
-    let productName: String
-    let quantity: Double
-    let note: String?
+struct GoldAssetCreateDTO: Encodable {
+    var brand: String
+    var productId: String
+    var productName: String
+    var quantity: Double
+    var note: String?
 }

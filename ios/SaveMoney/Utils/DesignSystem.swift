@@ -1,170 +1,121 @@
 import SwiftUI
 
-// MARK: - Color Tokens (iOS 26 System Semantic)
-
-extension Color {
-    // MARK: System Semantic Backgrounds (auto dark/light via UIKit)
-    static let dsBackground     = Color(.systemBackground)
-    static let dsSurfaceLow     = Color(.secondarySystemBackground)
-    static let dsSurfaceHigh    = Color(.tertiarySystemBackground)
-
-    // MARK: System Semantic Text
-    static let dsLabel          = Color(.label)
-    static let dsSecondaryLabel = Color(.secondaryLabel)
-    static let dsTertiaryLabel  = Color(.tertiaryLabel)
-
-    // MARK: Separator / Ghost Border
-    static let dsSeparator      = Color(.separator)
-
-    // MARK: Brand Accent — single saturated purple, no per-scheme branching
-    static let dsBrandAccent    = Color(red: 0.486, green: 0.227, blue: 0.929) // #7C3AED
-
-    // MARK: Semantic Financial — iOS system palette, vibrant in both modes
-    static let dsIncome  = Color(UIColor.systemTeal)
-    static let dsExpense = Color(UIColor.systemRed)
-    static let dsGold    = Color(UIColor.systemOrange)
-
-    // MARK: Hex initializer
-    init(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
-        let a, r, g, b: UInt64
-        switch hex.count {
-        case 3:
-            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6:
-            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8:
-            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
-        default:
-            (a, r, g, b) = (255, 0, 0, 0)
-        }
-        self.init(
-            .sRGB,
-            red:   Double(r) / 255,
-            green: Double(g) / 255,
-            blue:  Double(b) / 255,
-            opacity: Double(a) / 255
-        )
-    }
+// MARK: - Colors
+enum DSColors {
+    static let accent = Color(red: 0.49, green: 0.23, blue: 0.93)
+    static let income = Color.teal
+    static let expense = Color.red
+    static let gold = Color.orange
+    static let transfer = Color.blue
+    static let positive = Color.green
+    static let negative = Color.red
 }
 
-// MARK: - Adaptive Colors (preserved for call-site compatibility — scheme param no longer needed)
-
-extension Color {
-    static func dsBackground(for scheme: ColorScheme) -> Color        { .dsBackground }
-    static func dsPrimary(for scheme: ColorScheme) -> Color           { .dsBrandAccent }
-    static func dsSecondary(for scheme: ColorScheme) -> Color         { Color(UIColor.systemTeal) }
-    static func dsOnSurface(for scheme: ColorScheme) -> Color         { .dsLabel }
-    static func dsOnSurfaceVariant(for scheme: ColorScheme) -> Color  { .dsSecondaryLabel }
-}
-
-// MARK: - Corner Radius Tokens
-
+// MARK: - Radius
 enum DSRadius {
-    static let full: CGFloat = 9999
-    static let xl:   CGFloat = 32
-    static let lg:   CGFloat = 24
-    static let md:   CGFloat = 16
-    static let sm:   CGFloat = 12
-    static let xs:   CGFloat = 8
+    static let full: CGFloat = 36
+    static let xl: CGFloat = 24
+    static let lg: CGFloat = 16
+    static let md: CGFloat = 12
+    static let sm: CGFloat = 8
+    static let xs: CGFloat = 4
 }
 
-// MARK: - Typography
-
-extension Font {
-    static func dsDisplay(_ size: CGFloat, weight: Font.Weight = .bold) -> Font {
-        .system(size: size, weight: weight, design: .rounded)
-    }
-    static func dsTitle(_ size: CGFloat, weight: Font.Weight = .semibold) -> Font {
-        .system(size: size, weight: weight, design: .rounded)
-    }
-    static func dsBody(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        .system(size: size, weight: weight, design: .default)
-    }
-    static func dsMono(_ size: CGFloat) -> Font {
-        .system(size: size, weight: .medium, design: .monospaced)
-    }
+// MARK: - Spacing
+enum DSSpacing {
+    static let xl: CGFloat = 24
+    static let lg: CGFloat = 16
+    static let md: CGFloat = 12
+    static let sm: CGFloat = 8
+    static let xs: CGFloat = 4
 }
 
-// MARK: - Gradient Helpers
+// MARK: - Theme Manager
+enum AppTheme: String, CaseIterable {
+    case system = "system"
+    case light = "light"
+    case dark = "dark"
 
-extension LinearGradient {
-    /// Primary CTA gradient — rich purple-indigo, works in both light and dark
-    static func dsCTAGradient(scheme: ColorScheme) -> LinearGradient {
-        LinearGradient(
-            colors: [Color(hex: "#7C3AED"), Color(hex: "#5B21B6")],
-            startPoint: .topLeading, endPoint: .bottomTrailing
-        )
+    var label: String {
+        switch self {
+        case .system: "Tự động"
+        case .light: "Sáng"
+        case .dark: "Tối"
+        }
     }
-
-    static func dsCardGradient(scheme: ColorScheme) -> LinearGradient {
-        LinearGradient(
-            colors: [Color(.secondarySystemBackground), Color(.systemBackground)],
-            startPoint: .topLeading, endPoint: .bottomTrailing
-        )
-    }
-
-    static func dsIncomeGradient() -> LinearGradient {
-        LinearGradient(
-            colors: [Color(UIColor.systemTeal), Color(hex: "#00968A")],
-            startPoint: .topLeading, endPoint: .bottomTrailing
-        )
-    }
-
-    static func dsExpenseGradient() -> LinearGradient {
-        LinearGradient(
-            colors: [Color(UIColor.systemRed), Color(hex: "#C0392B")],
-            startPoint: .topLeading, endPoint: .bottomTrailing
-        )
-    }
-}
-
-// MARK: - ThemeManager
-
-class ThemeManager: ObservableObject {
-    @AppStorage("colorSchemePreference") var preference: String = "system"
 
     var colorScheme: ColorScheme? {
-        switch preference {
-        case "light": return .light
-        case "dark":  return .dark
-        default:      return nil
+        switch self {
+        case .system: nil
+        case .light: .light
+        case .dark: .dark
         }
     }
 }
 
-// MARK: - DSMeshBackground
+@Observable
+final class ThemeManager {
+    var theme: AppTheme {
+        didSet { UserDefaults.standard.set(theme.rawValue, forKey: Constants.themePreferenceKey) }
+    }
 
-struct DSMeshBackground: View {
-    @Environment(\.colorScheme) var scheme
+    var colorScheme: ColorScheme? { theme.colorScheme }
 
-    var body: some View {
-        ZStack {
-            // System background as the true base — auto dark/light via UIKit
-            Color(.systemBackground).ignoresSafeArea()
+    init() {
+        let stored = UserDefaults.standard.string(forKey: Constants.themePreferenceKey) ?? "system"
+        self.theme = AppTheme(rawValue: stored) ?? .system
+    }
+}
 
-            // Subtle ambient tints — low opacity so .ultraThinMaterial cards show real vibrancy
-            GeometryReader { geo in
-                ZStack {
-                    // Warm purple ambient (top-left)
-                    Circle()
-                        .fill(Color.dsBrandAccent.opacity(scheme == .dark ? 0.10 : 0.04))
-                        .frame(width: geo.size.width * 0.75)
-                        .blur(radius: 90)
-                        .offset(x: -geo.size.width * 0.15, y: -geo.size.height * 0.05)
+// MARK: - Connection State
+enum ConnectionState {
+    case loading, connected, disconnected
 
-                    // Cool teal ambient (bottom-right)
-                    Circle()
-                        .fill(Color(UIColor.systemTeal).opacity(scheme == .dark ? 0.07 : 0.03))
-                        .frame(width: geo.size.width * 0.55)
-                        .blur(radius: 80)
-                        .offset(x: geo.size.width * 0.35, y: geo.size.height * 0.45)
-                }
-            }
-            .ignoresSafeArea()
+    var label: String {
+        switch self {
+        case .loading: "Đang kết nối"
+        case .connected: "Đã kết nối"
+        case .disconnected: "Mất kết nối"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .loading: Color(red: 0.5, green: 0.9, blue: 0.5)
+        case .connected: .green
+        case .disconnected: .red
         }
     }
 }
 
+// MARK: - Category Color Mapping
+func categoryColor(_ name: String) -> Color {
+    let lower = name.lowercased()
+    if lower.contains("ăn") || lower.contains("food") || lower.contains("nhà hàng") { return .orange }
+    if lower.contains("di chuyển") || lower.contains("xăng") || lower.contains("xe") { return .blue }
+    if lower.contains("mua sắm") || lower.contains("quần áo") { return .pink }
+    if lower.contains("giải trí") || lower.contains("du lịch") { return .purple }
+    if lower.contains("sức khỏe") || lower.contains("y tế") { return .red }
+    if lower.contains("giáo dục") || lower.contains("học") { return .indigo }
+    if lower.contains("tiết kiệm") || lower.contains("đầu tư") { return .green }
+    if lower.contains("lương") || lower.contains("thu nhập") { return .teal }
+    if lower.contains("điện") || lower.contains("nước") || lower.contains("internet") { return .yellow }
+    return DSColors.accent
+}
+
+func categorySystemImage(_ name: String) -> String {
+    let lower = name.lowercased()
+    if lower.contains("ăn") || lower.contains("food") || lower.contains("nhà hàng") { return "fork.knife" }
+    if lower.contains("di chuyển") || lower.contains("xăng") || lower.contains("xe") { return "car.fill" }
+    if lower.contains("mua sắm") || lower.contains("quần áo") { return "bag.fill" }
+    if lower.contains("giải trí") { return "gamecontroller.fill" }
+    if lower.contains("du lịch") { return "airplane" }
+    if lower.contains("sức khỏe") || lower.contains("y tế") { return "heart.fill" }
+    if lower.contains("giáo dục") || lower.contains("học") { return "book.fill" }
+    if lower.contains("tiết kiệm") || lower.contains("đầu tư") { return "chart.line.uptrend.xyaxis" }
+    if lower.contains("lương") { return "banknote.fill" }
+    if lower.contains("điện") { return "bolt.fill" }
+    if lower.contains("nước") { return "drop.fill" }
+    if lower.contains("internet") { return "wifi" }
+    return "tag.fill"
+}

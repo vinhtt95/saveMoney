@@ -1,9 +1,6 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(git push:*)",
       "Bash(npx tsc:*)",
       "Bash(npx vite build:*)",
       "Bash(git fetch origin master)",
@@ -30,7 +27,17 @@
       "Bash(xargs kill:*)",
       "Bash(lsof -ti:3000)",
       "Skill(git-commit-push)",
-      "Skill(git-commit-push:*)"
+      "Skill(git-commit-push:*)",
+      "Bash(find /Users/vinhtt/Projects/BA/saveMoney/src -type f \\\\\\(-name *.ts -o -name *.tsx \\\\\\))",
+      "Bash(node cleanup-duplicates.js)",
+      "Bash(node add-unique-constraint.js)",
+      "Bash(grep -E \"\\\\.tsx$\")",
+      "WebFetch(domain:localhost)",
+      "Bash(pkill -f \"vite --port\")",
+      "Bash(git pull:*)",
+      "Bash(git restore:*)",
+      "Bash(grep -E \"\\\\.\\(swift\\)$\")",
+      "Bash(xcodebuild -project SaveMoney.xcodeproj -scheme SaveMoney -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4' build)"
     ]
   }
 }

@@ -1,82 +1,132 @@
 import Foundation
 
+@Observable
 @MainActor
-class TransactionViewModel: ObservableObject {
-    @Published var searchText = ""
-    @Published var selectedCategoryId: String? = nil
-    @Published var selectedAccountId: String? = nil
-    @Published var selectedPeriod: String = ""
-    @Published var currentPage = 1
-    @Published var isSubmitting = false
-    @Published var submitError: String?
+final class TransactionViewModel {
+    var searchText = ""
+    var selectedCategoryId: String? = nil
+    var selectedPeriod: String = toYYYYMM(Date())
+    var page = 1
+    var isSubmitting = false
+    var errorMessage: String?
 
-    let pageSize = 20
+    private let app: AppViewModel
 
-    private let api = APIService.shared
+    init(app: AppViewModel) {
+        self.app = app
+    }
 
-    func filtered(_ transactions: [Transaction]) -> [Transaction] {
-        transactions.filter { tx in
-            (searchText.isEmpty || (tx.note?.localizedCaseInsensitiveContains(searchText) ?? false))
-            && (selectedCategoryId == nil || tx.categoryId == selectedCategoryId)
-            && (selectedAccountId == nil || tx.accountId == selectedAccountId)
-            && (selectedPeriod.isEmpty || tx.date.hasPrefix(selectedPeriod))
+    var filteredTransactions: [Transaction] {
+        app.transactions.filter { tx in
+            let periodMatch = tx.date.hasPrefix(selectedPeriod)
+            let categoryMatch = selectedCategoryId == nil || tx.categoryId == selectedCategoryId
+            let searchMatch = searchText.isEmpty ||
+                (tx.note?.localizedCaseInsensitiveContains(searchText) ?? false)
+            return periodMatch && categoryMatch && searchMatch
         }
     }
 
-    func paged(_ transactions: [Transaction]) -> [Transaction] {
-        let f = filtered(transactions)
-        return Array(f.prefix(currentPage * pageSize))
+    var paginatedTransactions: [Transaction] {
+        Array(filteredTransactions.prefix(page * Constants.pageSize))
     }
 
-    func hasMore(_ transactions: [Transaction]) -> Bool {
-        filtered(transactions).count > currentPage * pageSize
+    var hasMore: Bool { filteredTransactions.count > page * Constants.pageSize }
+
+    var groupedTransactions: [(String, [Transaction])] {
+        let grouped = Dictionary(grouping: paginatedTransactions) { dateLabel($0.date) }
+        let order = ["Hôm nay", "Hôm qua"]
+        let sortedKeys = grouped.keys.sorted { a, b in
+            let ai = order.firstIndex(of: a)
+            let bi = order.firstIndex(of: b)
+            if let ai, let bi { return ai < bi }
+            if ai != nil { return true }
+            if bi != nil { return false }
+            // Both are date strings, sort descending
+            return a > b
+        }
+        return sortedKeys.compactMap { key in
+            guard let txs = grouped[key] else { return nil }
+            return (key, txs)
+        }
     }
 
-    func loadMore() { currentPage += 1 }
-    func resetPaging() { currentPage = 1 }
+    func loadMore() { page += 1 }
 
-    func create(_ body: CreateTransactionRequest, appVM: AppViewModel) async {
+    func resetPage() { page = 1 }
+
+    // MARK: - Top categories for filter chips
+    var topCategories: [Category] {
+        let counts = Dictionary(
+            grouping: app.transactions.filter { $0.categoryId != nil },
+            by: { $0.categoryId! }
+        ).mapValues { $0.count }
+        let sorted = counts.sorted { $0.value > $1.value }
+        return sorted.prefix(8).compactMap { app.category(for: $0.key) }
+    }
+
+    // MARK: - CRUD
+    func addTransaction(
+        date: String,
+        type: TransactionType,
+        categoryId: String?,
+        accountId: String?,
+        transferToId: String?,
+        amount: Double,
+        note: String?
+    ) async {
         isSubmitting = true
-        submitError = nil
+        errorMessage = nil
+        let dto = TransactionCreateDTO(
+            date: date,
+            type: type.rawValue,
+            categoryId: categoryId,
+            accountId: accountId,
+            transferToId: transferToId,
+            amount: type == .expense ? -abs(amount) : abs(amount),
+            note: note?.isEmpty == true ? nil : note
+        )
         do {
-            let tx = try await api.createTransaction(body)
-            appVM.transactions.insert(tx, at: 0)
+            try await app.addTransaction(dto)
         } catch {
-            submitError = error.localizedDescription
+            errorMessage = error.localizedDescription
         }
         isSubmitting = false
     }
 
-    func update(id: String, body: UpdateTransactionRequest, appVM: AppViewModel) async {
+    func updateTransaction(
+        id: String,
+        date: String,
+        type: TransactionType,
+        categoryId: String?,
+        accountId: String?,
+        transferToId: String?,
+        amount: Double,
+        note: String?
+    ) async {
         isSubmitting = true
-        submitError = nil
+        errorMessage = nil
+        let dto = TransactionCreateDTO(
+            date: date,
+            type: type.rawValue,
+            categoryId: categoryId,
+            accountId: accountId,
+            transferToId: transferToId,
+            amount: type == .expense ? -abs(amount) : abs(amount),
+            note: note?.isEmpty == true ? nil : note
+        )
         do {
-            try await api.updateTransaction(id: id, body: body)
-            if let idx = appVM.transactions.firstIndex(where: { $0.id == id }) {
-                let updated = Transaction(
-                    id: id,
-                    date: body.date,
-                    type: body.type,
-                    categoryId: body.categoryId,
-                    accountId: body.accountId,
-                    transferToId: body.transferToId,
-                    amount: body.amount,
-                    note: body.note
-                )
-                appVM.transactions[idx] = updated
-            }
+            try await app.updateTransaction(id, dto)
         } catch {
-            submitError = error.localizedDescription
+            errorMessage = error.localizedDescription
         }
         isSubmitting = false
     }
 
-    func delete(id: String, appVM: AppViewModel) async {
+    func deleteTransaction(_ id: String) async {
         do {
-            try await api.deleteTransaction(id: id)
-            appVM.transactions.removeAll { $0.id == id }
+            try await app.deleteTransaction(id)
         } catch {
-            submitError = error.localizedDescription
+            errorMessage = error.localizedDescription
         }
     }
 }

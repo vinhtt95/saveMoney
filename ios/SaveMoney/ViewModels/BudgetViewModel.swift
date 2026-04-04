@@ -1,46 +1,70 @@
 import Foundation
+import SwiftUI
 
+@Observable
 @MainActor
-class BudgetViewModel: ObservableObject {
-    @Published var isSubmitting = false
-    @Published var submitError: String?
+final class BudgetViewModel {
+    var isSubmitting = false
+    var errorMessage: String?
 
-    private let api = APIService.shared
+    private let app: AppViewModel
 
-    func spentAmount(for budget: Budget, transactions: [Transaction]) -> Double {
-        transactions
+    init(app: AppViewModel) {
+        self.app = app
+    }
+
+    func spentAmount(budget: Budget) -> Double {
+        app.transactions
             .filter { tx in
-                tx.type == .expense
-                && budget.categoryIds.contains(tx.categoryId ?? "")
-                && tx.date >= budget.dateStart
-                && tx.date <= budget.dateEnd
+                guard tx.type == .expense,
+                      let catId = tx.categoryId,
+                      budget.categoryIds.contains(catId) else { return false }
+                return tx.date >= budget.dateStart && tx.date <= budget.dateEnd
             }
             .reduce(0) { $0 + abs($1.amount) }
     }
 
-    func progress(for budget: Budget, transactions: [Transaction]) -> Double {
-        guard budget.limitAmount > 0 else { return 0 }
-        return min(spentAmount(for: budget, transactions: transactions) / budget.limitAmount, 1.0)
+    func progress(budget: Budget) -> Double {
+        guard budget.limit > 0 else { return 0 }
+        return spentAmount(budget: budget) / budget.limit
     }
 
-    func create(_ body: CreateBudgetRequest, appVM: AppViewModel) async {
+    func progressColor(budget: Budget) -> some ShapeStyle {
+        let p = progress(budget: budget)
+        if p >= 1.0 { return AnyShapeStyle(Color.red) }
+        if p >= 0.8 { return AnyShapeStyle(Color.orange) }
+        return AnyShapeStyle(Color.green)
+    }
+
+    func addBudget(
+        name: String,
+        limit: Double,
+        dateStart: String,
+        dateEnd: String,
+        categoryIds: [String]
+    ) async {
         isSubmitting = true
-        submitError = nil
+        errorMessage = nil
+        let dto = BudgetCreateDTO(
+            name: name,
+            limitAmount: limit,
+            dateStart: dateStart,
+            dateEnd: dateEnd,
+            categoryIds: categoryIds
+        )
         do {
-            let budget = try await api.createBudget(body)
-            appVM.budgets.append(budget)
+            try await app.addBudget(dto)
         } catch {
-            submitError = error.localizedDescription
+            errorMessage = error.localizedDescription
         }
         isSubmitting = false
     }
 
-    func delete(id: String, appVM: AppViewModel) async {
+    func deleteBudget(_ id: String) async {
         do {
-            try await api.deleteBudget(id: id)
-            appVM.budgets.removeAll { $0.id == id }
+            try await app.deleteBudget(id)
         } catch {
-            submitError = error.localizedDescription
+            errorMessage = error.localizedDescription
         }
     }
 }

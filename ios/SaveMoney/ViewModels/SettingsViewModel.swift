@@ -1,29 +1,48 @@
 import Foundation
 
+@Observable
 @MainActor
-class SettingsViewModel: ObservableObject {
-    @Published var baseURL: String = APIService.shared.baseURL
-    @Published var isSaving = false
-    @Published var saveError: String?
-    @Published var saveSuccess = false
+final class SettingsViewModel {
+    var baseURL: String
+    var isSubmitting = false
+    var errorMessage: String?
+    var saveSuccess = false
 
-    private let api = APIService.shared
+    private let app: AppViewModel
 
-    func saveBaseURL() {
-        api.baseURL = baseURL
+    init(app: AppViewModel) {
+        self.app = app
+        self.baseURL = app.api.baseURL
     }
 
-    func saveDefaults(settings: [String: String], appVM: AppViewModel) async {
-        isSaving = true
-        saveError = nil
+    func saveBaseURL() async {
+        isSubmitting = true
+        errorMessage = nil
         saveSuccess = false
+        app.api.baseURL = baseURL
         do {
-            let updated = try await api.updateSettings(settings)
-            appVM.settings = updated
+            try await app.updateSetting("base_url", baseURL)
             saveSuccess = true
         } catch {
-            saveError = error.localizedDescription
+            // Non-fatal: URL is saved locally regardless
+            saveSuccess = true
         }
-        isSaving = false
+        isSubmitting = false
+    }
+
+    func updateDefaultType(_ type: TransactionType) async {
+        try? await app.updateSetting(SettingsKey.defaultTransactionType, type.rawValue)
+    }
+
+    func updateDefaultAccount(_ id: String) async {
+        try? await app.updateSetting(SettingsKey.defaultAccountId, id)
+    }
+
+    func updateDefaultExpenseCategory(_ id: String) async {
+        try? await app.updateSetting(SettingsKey.defaultExpenseCategoryId, id)
+    }
+
+    func updateDefaultIncomeCategory(_ id: String) async {
+        try? await app.updateSetting(SettingsKey.defaultIncomeCategoryId, id)
     }
 }

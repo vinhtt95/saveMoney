@@ -2,39 +2,74 @@ import SwiftUI
 
 struct RecentTransactionsView: View {
     let transactions: [Transaction]
-    let appVM: AppViewModel
-    @Environment(\.colorScheme) var scheme
-    @State private var selectedTransaction: Transaction? = nil
+    let app: AppViewModel
+    @State private var editingTransaction: Transaction?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            DSSectionHeader(title: "Giao dịch gần đây")
+        VStack(alignment: .leading, spacing: DSSpacing.sm) {
+            Text("Giao dịch gần đây")
+                .font(.headline)
+                .padding(.horizontal, DSSpacing.xs)
 
             if transactions.isEmpty {
-                GlassCard(radius: DSRadius.md, padding: 20) {
-                    Text("Chưa có giao dịch nào")
-                        .font(.dsBody(14))
-                        .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-                        .frame(maxWidth: .infinity)
-                }
+                EmptyStateView(
+                    icon: "tray",
+                    title: "Chưa có giao dịch",
+                    message: "Nhấn + để thêm giao dịch mới"
+                )
             } else {
-                VStack(spacing: 8) {
+                VStack(spacing: DSSpacing.xs) {
                     ForEach(transactions) { tx in
-                        GlassCard(radius: DSRadius.md, padding: 12) {
-                            TransactionRowView(transaction: tx, appVM: appVM) {
-                                selectedTransaction = tx
-                            }
-                        }
+                        RecentTransactionRow(tx: tx, app: app)
+                            .onTapGesture { editingTransaction = tx }
                     }
                 }
             }
         }
-        .sheet(item: $selectedTransaction) { tx in
-            AddTransactionView(isPresented: Binding(
-                get: { selectedTransaction != nil },
-                set: { if !$0 { selectedTransaction = nil } }
-            ), transaction: tx)
-            .environmentObject(appVM)
+        .sheet(item: $editingTransaction) { tx in
+            AddTransactionView(transaction: tx) {
+                editingTransaction = nil
+            }
         }
+    }
+}
+
+private struct RecentTransactionRow: View {
+    let tx: Transaction
+    let app: AppViewModel
+
+    private var categoryName: String {
+        app.category(for: tx.categoryId)?.name ?? "—"
+    }
+
+    private var accountName: String {
+        app.account(for: tx.accountId)?.name ?? "—"
+    }
+
+    var body: some View {
+        HStack(spacing: DSSpacing.md) {
+            CategoryIconView(name: categoryName, size: 36)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(categoryName)
+                    .font(.subheadline.weight(.medium))
+                    .lineLimit(1)
+                Text(tx.note?.isEmpty == false ? tx.note! : accountName)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 2) {
+                AmountText(amount: tx.amount, type: tx.type, font: .subheadline.weight(.semibold).monospacedDigit())
+                Text(formatDate(tx.date))
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .padding(DSSpacing.md)
+        .glassEffect(.regular, in: .rect(cornerRadius: DSRadius.md))
     }
 }

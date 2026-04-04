@@ -1,57 +1,54 @@
 import Foundation
 
-private let CACHE_TTL: TimeInterval = 5 * 60 // 5 minutes (BR-09)
-private let CACHE_KEY = "gold_price_cache"
-
+@Observable
 @MainActor
-class GoldPriceService: ObservableObject {
+final class GoldPriceService {
     static let shared = GoldPriceService()
 
-    @Published var prices: [GoldPriceItem] = []
-    @Published var usdVnd: Double = Constants.fallbackUSDVND
-    @Published var isFetching = false
-    @Published var lastFetchError: String?
-    @Published var lastFetchedAt: Date?
+    private(set) var prices: GoldPricesResponse?
+    private(set) var isLoading = false
+    private(set) var error: String?
 
-    private let api = APIService.shared
+    private init() { loadCache() }
 
-    func fetchIfNeeded() async {
-        if let cached = loadCache(), Date().timeIntervalSince(cached.fetchedAt) < CACHE_TTL {
-            prices = cached.items
-            usdVnd = cached.usdVnd
-            lastFetchedAt = cached.fetchedAt
+    private func loadCache() {
+        guard let data = UserDefaults.standard.data(forKey: Constants.goldPriceCacheKey),
+              let cache = try? JSONDecoder().decode(GoldPriceCache.self, from: data),
+              Date().timeIntervalSince(cache.cachedAt) < Constants.goldCacheTTL else { return }
+        prices = cache.response
+    }
+
+    func fetchPrices(forceRefresh: Bool = false, api: APIService) async {
+        if !forceRefresh, let prices, isCacheValid() {
+            _ = prices
             return
         }
-        await fetchFresh()
+        isLoading = true
+        error = nil
+        do {
+            let result = try await api.fetchGoldPrices()
+            prices = result
+            saveCache(result)
+        } catch {
+            self.error = error.localizedDescription
+        }
+        isLoading = false
     }
 
-    func fetchFresh() async {
-        isFetching = true
-        lastFetchError = nil
-        defer { isFetching = false }
+    private func isCacheValid() -> Bool {
+        guard let data = UserDefaults.standard.data(forKey: Constants.goldPriceCacheKey),
+              let cache = try? JSONDecoder().decode(GoldPriceCache.self, from: data) else { return false }
+        return Date().timeIntervalSince(cache.cachedAt) < Constants.goldCacheTTL
+    }
 
-        do {
-            let resp = try await api.getGoldPrices()
-            prices = resp.items
-            usdVnd = resp.usdVnd
-            let fetchedAt = ISO8601DateFormatter().date(from: resp.fetchedAt) ?? Date()
-            let cache = GoldPriceCache(items: resp.items, fetchedAt: fetchedAt, usdVnd: resp.usdVnd)
-            saveCache(cache)
-            lastFetchedAt = fetchedAt
-        } catch {
-            lastFetchError = error.localizedDescription
+    private func saveCache(_ response: GoldPricesResponse) {
+        let cache = GoldPriceCache(response: response, cachedAt: Date())
+        if let data = try? JSONEncoder().encode(cache) {
+            UserDefaults.standard.set(data, forKey: Constants.goldPriceCacheKey)
         }
     }
 
-    // MARK: - Cache
-
-    private func loadCache() -> GoldPriceCache? {
-        guard let data = UserDefaults.standard.data(forKey: CACHE_KEY) else { return nil }
-        return try? JSONDecoder().decode(GoldPriceCache.self, from: data)
-    }
-
-    private func saveCache(_ cache: GoldPriceCache) {
-        let data = try? JSONEncoder().encode(cache)
-        UserDefaults.standard.set(data, forKey: CACHE_KEY)
+    func items(for brand: GoldBrand) -> [GoldPriceItem] {
+        prices?.items.filter { $0.brand == brand } ?? []
     }
 }

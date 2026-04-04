@@ -1,51 +1,46 @@
 import Foundation
 
+@Observable
 @MainActor
-class AccountViewModel: ObservableObject {
-    @Published var isSubmitting = false
-    @Published var submitError: String?
+final class AccountViewModel {
+    var isSubmitting = false
+    var errorMessage: String?
 
-    private let api = APIService.shared
+    private let app: AppViewModel
 
-    func create(_ body: CreateAccountRequest, appVM: AppViewModel) async {
+    init(app: AppViewModel) {
+        self.app = app
+    }
+
+    func addAccount(name: String, initialBalance: Double?) async {
         isSubmitting = true
-        submitError = nil
+        errorMessage = nil
+        let dto = AccountCreateDTO(name: name, initialBalance: initialBalance)
         do {
-            let account = try await api.createAccount(body)
-            appVM.accounts.append(account)
-            if let bal = body.balance {
-                appVM.accountBalances[account.id] = bal
-            }
+            try await app.addAccount(dto)
         } catch {
-            submitError = error.localizedDescription
+            errorMessage = error.localizedDescription
         }
         isSubmitting = false
     }
 
-    func update(id: String, body: UpdateAccountRequest, appVM: AppViewModel) async {
+    func updateAccount(id: String, name: String, balance: Double?) async {
         isSubmitting = true
-        submitError = nil
+        errorMessage = nil
+        let dto = AccountUpdateDTO(name: name, balance: balance)
         do {
-            let updated = try await api.updateAccount(id: id, body: body)
-            if let idx = appVM.accounts.firstIndex(where: { $0.id == id }) {
-                appVM.accounts[idx] = updated
-            }
-            if let bal = body.balance {
-                appVM.accountBalances[id] = bal
-            }
+            try await app.updateAccount(id, dto)
         } catch {
-            submitError = error.localizedDescription
+            errorMessage = error.localizedDescription
         }
         isSubmitting = false
     }
 
-    func delete(id: String, appVM: AppViewModel) async {
+    func deleteAccount(_ id: String) async {
         do {
-            try await api.deleteAccount(id: id)
-            appVM.accounts.removeAll { $0.id == id }
-            appVM.accountBalances.removeValue(forKey: id)
+            try await app.deleteAccount(id)
         } catch {
-            submitError = error.localizedDescription
+            errorMessage = error.localizedDescription
         }
     }
 }

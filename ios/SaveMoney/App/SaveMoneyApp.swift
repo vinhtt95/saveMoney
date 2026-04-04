@@ -2,12 +2,15 @@ import SwiftUI
 
 @main
 struct SaveMoneyApp: App {
-    @StateObject private var appViewModel = AppViewModel()
+    @State private var appViewModel = AppViewModel()
+    @State private var themeManager = ThemeManager()
 
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .environmentObject(appViewModel)
+                .environment(appViewModel)
+                .environment(themeManager)
+                .preferredColorScheme(themeManager.colorScheme)
         }
     }
 }

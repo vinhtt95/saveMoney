@@ -1,88 +1,105 @@
 import SwiftUI
 import Charts
 
+struct CategoryBreakdownData: Identifiable {
+    let id = UUID()
+    let name: String
+    let amount: Double
+    let color: Color
+}
+
 struct CategoryBreakdownChart: View {
-    let transactions: [Transaction]
-    let categories: [Category]
-    @Environment(\.colorScheme) var scheme
+    let data: [CategoryBreakdownData]
 
-    private struct CategoryData: Identifiable {
-        let id: String
-        let name: String
-        let amount: Double
-    }
-
-    private var data: [CategoryData] {
-        let expenses = transactions.filter { $0.type == .expense }
-        let grouped = Dictionary(grouping: expenses, by: { $0.categoryId })
-        return categories
-            .filter { $0.type == .expense }
-            .compactMap { cat -> CategoryData? in
-                let total = grouped[Optional(cat.id)]?.reduce(0) { $0 + abs($1.amount) } ?? 0
-                return total > 0 ? CategoryData(id: cat.id, name: cat.name, amount: total) : nil
-            }
-            .sorted { $0.amount > $1.amount }
-    }
-
-    private let gradientColors: [[Color]] = [
-        [Color(hex: "#c799ff"), Color(hex: "#4af8e3")],
-        [Color(hex: "#ff6b8a"), Color(hex: "#fbbf24")],
-        [Color(hex: "#60a5fa"), Color(hex: "#a78bfa")],
-        [Color(hex: "#4af8e3"), Color(hex: "#059669")],
-        [Color(hex: "#fbbf24"), Color(hex: "#f97316")]
-    ]
+    var total: Double { data.reduce(0) { $0 + $1.amount } }
 
     var body: some View {
-        if data.isEmpty {
-            Text("Không có dữ liệu chi tiêu")
-                .font(.dsBody(14))
-                .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-                .frame(maxWidth: .infinity, minHeight: 80, alignment: .center)
-        } else {
-            VStack(spacing: 16) {
-                // Donut chart
-                Chart(data) { item in
-                    SectorMark(
-                        angle: .value("Chi tiêu", item.amount),
-                        innerRadius: .ratio(0.55),
-                        angularInset: 2
-                    )
-                    .foregroundStyle(by: .value("Danh mục", item.name))
-                    .cornerRadius(4)
-                }
-                .frame(height: 180)
-                .chartLegend(.hidden)
-                .overlay {
-                    VStack(spacing: 2) {
-                        Text("Total")
-                            .font(.dsBody(11))
-                            .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-                        Text(Formatters.formatVNDShort(data.reduce(0) { $0 + $1.amount }))
-                            .font(.dsTitle(15))
-                            .foregroundStyle(Color.dsOnSurface(for: scheme))
+        VStack(alignment: .leading, spacing: DSSpacing.md) {
+            if data.isEmpty {
+                EmptyStateView(icon: "chart.pie", title: "Chưa có dữ liệu", message: "Thêm giao dịch chi tiêu để xem phân tích")
+            } else {
+                // Donut Chart
+                HStack(spacing: DSSpacing.xl) {
+                    Chart(data) { item in
+                        SectorMark(
+                            angle: .value("Số tiền", item.amount),
+                            innerRadius: .ratio(0.55),
+                            angularInset: 2
+                        )
+                        .foregroundStyle(item.color)
+                        .cornerRadius(4)
                     }
-                }
+                    .frame(width: 140, height: 140)
+                    .overlay {
+                        VStack(spacing: 2) {
+                            Text(formatVNDShort(total))
+                                .font(.caption.weight(.bold).monospacedDigit())
+                                .foregroundStyle(DSColors.expense)
+                            Text("Chi tiêu")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
 
-                // Legend rows
-                VStack(spacing: 8) {
-                    ForEach(data.prefix(5)) { item in
-                        HStack(spacing: 10) {
-                            GradientCircleIcon(
-                                systemName: categorySystemIcon(for: item.name),
-                                colors: categoryIconColors(for: item.name),
-                                size: 28
-                            )
-                            Text(item.name)
-                                .font(.dsBody(13))
-                                .foregroundStyle(Color.dsOnSurface(for: scheme))
-                            Spacer()
-                            Text(Formatters.formatVNDShort(item.amount))
-                                .font(.dsTitle(13))
-                                .foregroundStyle(Color.dsExpense)
+                    // Legend
+                    VStack(alignment: .leading, spacing: DSSpacing.sm) {
+                        ForEach(data) { item in
+                            HStack(spacing: DSSpacing.sm) {
+                                Circle()
+                                    .fill(item.color)
+                                    .frame(width: 10, height: 10)
+                                Text(item.name)
+                                    .font(.caption)
+                                    .lineLimit(1)
+                                Spacer()
+                                Text(formatVNDShort(item.amount))
+                                    .font(.caption.monospacedDigit())
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+// MARK: - Day of Week Chart
+struct DayOfWeekData: Identifiable {
+    let id = UUID()
+    let day: String
+    let amount: Double
+}
+
+struct DayOfWeekChart: View {
+    let data: [DayOfWeekData]
+
+    var body: some View {
+        Chart(data) { item in
+            BarMark(
+                x: .value("Ngày", item.day),
+                y: .value("Chi tiêu", item.amount)
+            )
+            .foregroundStyle(DSColors.expense.gradient)
+            .cornerRadius(4)
+        }
+        .chartXAxis {
+            AxisMarks(values: .automatic) { value in
+                AxisValueLabel()
+                    .font(.caption2)
+            }
+        }
+        .chartYAxis {
+            AxisMarks(values: .automatic) { value in
+                AxisGridLine()
+                AxisValueLabel {
+                    if let amount = value.as(Double.self) {
+                        Text(formatVNDShort(amount))
+                            .font(.caption2)
+                    }
+                }
+            }
+        }
+        .frame(height: 160)
     }
 }

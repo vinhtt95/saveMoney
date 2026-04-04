@@ -1,326 +1,123 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @EnvironmentObject var appVM: AppViewModel
-    @EnvironmentObject var themeManager: ThemeManager
-    @StateObject private var vm = SettingsViewModel()
-    @Environment(\.colorScheme) var scheme
+    @Environment(AppViewModel.self) private var app
+    @Environment(ThemeManager.self) private var theme
+    @State private var settingsVM: SettingsViewModel?
 
-    private var defaultType: Binding<String> {
-        Binding(
-            get: { appVM.settings["default_transaction_type"] ?? "expense" },
-            set: { appVM.settings["default_transaction_type"] = $0 }
-        )
+    private var vm: SettingsViewModel {
+        settingsVM ?? SettingsViewModel(app: app)
     }
 
     var body: some View {
-        NavigationView {
-            ZStack {
-                DSMeshBackground().ignoresSafeArea()
-
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 20) {
-                        // Profile hero
-                        profileHero
-                            .padding(.horizontal, 20)
-                            .padding(.top, 12)
-
-                        // Theme toggle
-                        themeSection
-                            .padding(.horizontal, 20)
-
-                        // Management links
-                        managementSection
-                            .padding(.horizontal, 20)
-
-                        // Backend settings
-                        backendSection
-                            .padding(.horizontal, 20)
-
-                        // Default settings
-                        defaultsSection
-                            .padding(.horizontal, 20)
-
-                        Spacer(minLength: 20)
-                    }
-                }
-            }
-            .navigationBarHidden(true)
-        }
-    }
-
-    // MARK: - Profile Hero
-
-    private var profileHero: some View {
-        GlassCard(radius: DSRadius.xl, padding: 20) {
-            HStack(spacing: 16) {
-                ZStack {
-                    Circle()
-                        .fill(LinearGradient.dsCTAGradient(scheme: scheme))
-                        .frame(width: 56, height: 56)
-                    Image(systemName: "banknote.fill")
-                        .font(.system(size: 24, weight: .medium))
-                        .foregroundStyle(.white)
-                }
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("SaveMoney")
-                        .font(.dsDisplay(20))
-                        .foregroundStyle(Color.dsOnSurface(for: scheme))
-                    Text("Phiên bản 1.0.0")
-                        .font(.dsBody(13))
-                        .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-                }
-                Spacer()
-            }
-        }
-    }
-
-    // MARK: - Theme Section
-
-    private var themeSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            DSSectionHeader(title: "Giao diện")
-            GlassCard(radius: DSRadius.lg, padding: 16) {
-                VStack(spacing: 14) {
-                    HStack {
-                        GradientCircleIcon(systemName: "circle.lefthalf.filled",
-                                           colors: [Color.dsBrandAccent, Color(UIColor.systemTeal)],
-                                           size: 34)
-                        Text("Chế độ hiển thị")
-                            .font(.dsBody(15))
-                            .foregroundStyle(Color.dsOnSurface(for: scheme))
+        NavigationStack {
+            List {
+                // Connection Status
+                Section {
+                    HStack(spacing: DSSpacing.sm) {
+                        Circle()
+                            .fill(app.connectionState.color)
+                            .frame(width: 10, height: 10)
+                        Text(app.connectionState.label)
+                            .font(.subheadline)
                         Spacer()
+                        if app.connectionState == .loading {
+                            ProgressView().scaleEffect(0.8)
+                        }
                     }
-                    Picker("Giao diện", selection: $themeManager.preference) {
-                        Text("Hệ thống").tag("system")
-                        Text("Sáng").tag("light")
-                        Text("Tối").tag("dark")
-                    }
-                    .pickerStyle(.segmented)
                 }
-            }
-        }
-    }
 
-    // MARK: - Management Section
+                // Base URL
+                Section("Địa chỉ máy chủ") {
+                    HStack {
+                        TextField("http://localhost:3001", text: Binding(
+                            get: { vm.baseURL },
+                            set: { vm.baseURL = $0 }
+                        ))
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
 
-    private var managementSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            DSSectionHeader(title: "Quản lý")
-            GlassCard(radius: DSRadius.lg, padding: 0) {
-                VStack(spacing: 0) {
-                    navRow(icon: "chart.pie.fill",
-                           colors: [Color(hex: "#c799ff"), Color(hex: "#4af8e3")],
-                           title: "Ngân sách",
-                           destination: BudgetView())
-                    Divider().opacity(0.15).padding(.horizontal, 16)
-                    navRow(icon: "creditcard.fill",
-                           colors: [Color(hex: "#60a5fa"), Color(hex: "#3b82f6")],
-                           title: "Tài khoản",
-                           destination: AccountsView())
-                    Divider().opacity(0.15).padding(.horizontal, 16)
-                    navRow(icon: "tag.fill",
-                           colors: [Color(hex: "#fbbf24"), Color(hex: "#f59e0b")],
-                           title: "Danh mục",
-                           destination: CategoriesView())
-                    Divider().opacity(0.15).padding(.horizontal, 16)
-                    navRow(icon: "circle.fill",
-                           colors: [Color(hex: "#fbbf24"), Color(hex: "#f97316")],
-                           title: "Vàng",
-                           destination: GoldView())
-                    Divider().opacity(0.15).padding(.horizontal, 16)
-                    navRow(icon: "banknote.fill",
-                           colors: [Color(hex: "#4af8e3"), Color(hex: "#059669")],
-                           title: "Tài sản",
-                           destination: WealthView())
-                }
-            }
-        }
-    }
-
-    private func navRow<D: View>(icon: String, colors: [Color], title: String, destination: D) -> some View {
-        NavigationLink(destination: destination.environmentObject(appVM)) {
-            HStack(spacing: 12) {
-                GradientCircleIcon(systemName: icon, colors: colors, size: 34)
-                Text(title)
-                    .font(.dsBody(15))
-                    .foregroundStyle(Color.dsOnSurface(for: scheme))
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-        }
-    }
-
-    // MARK: - Backend Section
-
-    private var backendSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            DSSectionHeader(title: "Kết nối Backend")
-            GlassCard(radius: DSRadius.lg, padding: 16) {
-                VStack(alignment: .leading, spacing: 12) {
-                    // Connection status badge
-                    connectionStatusBadge
-
-                    GlassFormField(label: "Server URL", text: $vm.baseURL,
-                                   keyboardType: .URL,
-                                   placeholder: "http://localhost:3001",
-                                   disableAutocorrect: true,
-                                   autocapitalization: .never)
-
-                    Text("Dùng IP LAN (vd: http://192.168.1.x:3001) khi chạy trên thiết bị thật.")
-                        .font(.dsBody(11))
-                        .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-
-                    GlassPillButton(label: appVM.isLoading ? "Đang kết nối..." : "Kết nối") {
-                        vm.saveBaseURL()
-                        Task { await appVM.loadInitData() }
-                    }
-                    .disabled(vm.baseURL.isEmpty || appVM.isLoading)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var connectionStatusBadge: some View {
-        if appVM.isLoading {
-            HStack(spacing: 6) {
-                ProgressView()
-                    .scaleEffect(0.7)
-                    .tint(Color.dsOnSurfaceVariant(for: scheme))
-                Text("Đang kết nối...")
-                    .font(.dsBody(12))
-                    .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-            }
-        } else if appVM.isConnected {
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(Color.dsIncome)
-                    .frame(width: 8, height: 8)
-                Text("Đã kết nối")
-                    .font(.dsBody(12))
-                    .foregroundStyle(Color.dsIncome)
-            }
-        } else if let err = appVM.loadError {
-            HStack(alignment: .top, spacing: 6) {
-                Circle()
-                    .fill(Color.dsExpense)
-                    .frame(width: 8, height: 8)
-                    .padding(.top, 3)
-                Text(err)
-                    .font(.dsBody(12))
-                    .foregroundStyle(Color.dsExpense)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        } else {
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(Color.dsOnSurfaceVariant(for: scheme).opacity(0.5))
-                    .frame(width: 8, height: 8)
-                Text("Chưa kết nối")
-                    .font(.dsBody(12))
-                    .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-            }
-        }
-    }
-
-    // MARK: - Defaults Section
-
-    private var defaultsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            DSSectionHeader(title: "Mặc định giao dịch")
-            GlassCard(radius: DSRadius.lg, padding: 16) {
-                VStack(spacing: 14) {
-                    settingsRow(label: "Loại mặc định") {
-                        Picker("Loại mặc định", selection: defaultType) {
-                            Text("Chi tiêu").tag("expense")
-                            Text("Thu nhập").tag("income")
+                        Button("Lưu") {
+                            Task { await vm.saveBaseURL() }
                         }
-                        .pickerStyle(.menu)
-                        .tint(Color.dsPrimary(for: scheme))
-                    }
-
-                    Divider().opacity(0.3)
-
-                    settingsRow(label: "Tài khoản mặc định") {
-                        Picker("Tài khoản mặc định", selection: Binding(
-                            get: { appVM.settings["default_account_id"] ?? "" },
-                            set: { appVM.settings["default_account_id"] = $0 }
-                        )) {
-                            Text("Không chọn").tag("")
-                            ForEach(appVM.accounts) { acc in
-                                Text(acc.name).tag(acc.id)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .tint(Color.dsPrimary(for: scheme))
-                    }
-
-                    Divider().opacity(0.3)
-
-                    settingsRow(label: "Danh mục (Chi tiêu)") {
-                        Picker("Danh mục chi tiêu", selection: Binding(
-                            get: { appVM.settings["default_expense_category_id"] ?? "" },
-                            set: { appVM.settings["default_expense_category_id"] = $0 }
-                        )) {
-                            Text("Không chọn").tag("")
-                            ForEach(appVM.expenseCategories) { cat in
-                                Text(cat.name).tag(cat.id)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .tint(Color.dsPrimary(for: scheme))
-                    }
-
-                    Divider().opacity(0.3)
-
-                    settingsRow(label: "Danh mục (Thu nhập)") {
-                        Picker("Danh mục thu nhập", selection: Binding(
-                            get: { appVM.settings["default_income_category_id"] ?? "" },
-                            set: { appVM.settings["default_income_category_id"] = $0 }
-                        )) {
-                            Text("Không chọn").tag("")
-                            ForEach(appVM.incomeCategories) { cat in
-                                Text(cat.name).tag(cat.id)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .tint(Color.dsPrimary(for: scheme))
+                        .foregroundStyle(DSColors.accent)
+                        .disabled(vm.isSubmitting)
                     }
 
                     if vm.saveSuccess {
-                        HStack(spacing: 6) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(Color.dsIncome)
-                            Text("Đã lưu")
-                                .font(.dsBody(13))
-                                .foregroundStyle(Color.dsIncome)
+                        Label("Đã lưu", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .font(.caption)
+                    }
+                }
+
+                // Theme
+                Section("Giao diện") {
+                    Picker("Chủ đề", selection: Binding(
+                        get: { theme.theme },
+                        set: { theme.theme = $0 }
+                    )) {
+                        ForEach(AppTheme.allCases, id: \.self) { t in
+                            Text(t.label).tag(t)
                         }
                     }
-                    if let err = vm.saveError {
-                        Text(err).font(.dsBody(12)).foregroundStyle(Color.dsExpense)
+                    .pickerStyle(.segmented)
+                }
+
+                // Default Settings
+                Section("Mặc định") {
+                    Picker("Loại giao dịch", selection: Binding(
+                        get: { app.defaultTransactionType },
+                        set: { newValue in Task { await vm.updateDefaultType(newValue) } }
+                    )) {
+                        Text("Chi tiêu").tag(TransactionType.expense)
+                        Text("Thu nhập").tag(TransactionType.income)
                     }
 
-                    GlassPillButton(label: vm.isSaving ? "Đang lưu..." : "Lưu cài đặt") {
-                        Task { await vm.saveDefaults(settings: appVM.settings, appVM: appVM) }
+                    Picker("Tài khoản", selection: Binding(
+                        get: { app.defaultAccountId ?? "" },
+                        set: { newValue in Task { await vm.updateDefaultAccount(newValue) } }
+                    )) {
+                        Text("— Không chọn —").tag("")
+                        ForEach(app.accounts) { acc in
+                            Text(acc.name).tag(acc.id)
+                        }
                     }
-                    .disabled(vm.isSaving)
+                }
+
+                // Navigation
+                Section("Quản lý") {
+                    NavigationLink("Ngân sách") { BudgetView() }
+                    NavigationLink("Tài khoản") { AccountsView() }
+                    NavigationLink("Danh mục") { CategoriesView() }
+                    NavigationLink("Giá vàng") { GoldView() }
+                    NavigationLink("Tài sản ròng") { WealthView() }
+                }
+
+                // App Info
+                Section {
+                    HStack {
+                        Text("Phiên bản")
+                        Spacer()
+                        Text("1.0.0")
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack {
+                        Text("SaveMoney")
+                        Spacer()
+                        Image(systemName: "leaf.fill")
+                            .foregroundStyle(DSColors.income)
+                    }
                 }
             }
+            .navigationTitle("Profile")
+            .navigationBarTitleDisplayMode(.large)
         }
-    }
-
-    private func settingsRow<Content: View>(label: String, @ViewBuilder content: () -> Content) -> some View {
-        HStack {
-            Text(label)
-                .font(.dsBody(14))
-                .foregroundStyle(Color.dsOnSurface(for: scheme))
-            Spacer()
-            content()
+        .onAppear {
+            if settingsVM == nil {
+                settingsVM = SettingsViewModel(app: app)
+            }
         }
     }
 }
