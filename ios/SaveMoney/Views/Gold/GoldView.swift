@@ -9,36 +9,6 @@ struct GoldView: View {
             DSMeshBackground().ignoresSafeArea()
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 20) {
-                    // Header
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Giá vàng")
-                                .font(.dsDisplay(28))
-                                .foregroundStyle(Color.dsOnSurface(for: scheme))
-                            if let fetchedAt = goldService.lastFetchedAt {
-                                Text("Cập nhật: \(Formatters.formatDateTime(fetchedAt))")
-                                    .font(.dsBody(11))
-                                    .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-                            }
-                        }
-                        Spacer()
-                        Button {
-                            Task { await goldService.fetchFresh() }
-                        } label: {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundStyle(Color.dsPrimary(for: scheme))
-                                .frame(width: 36, height: 36)
-                                .background {
-                                    Circle()
-                                        .fill(.ultraThinMaterial)
-                                }
-                        }
-                        .disabled(goldService.isFetching)
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 12)
-
                     if goldService.isFetching {
                         GlassCard(radius: DSRadius.md, padding: 20) {
                             HStack(spacing: 10) {
@@ -88,6 +58,24 @@ struct GoldView: View {
         }
         .navigationTitle("Giá vàng")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    Task { await goldService.fetchFresh() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Color.dsPrimary(for: scheme))
+                        .frame(width: 32, height: 32)
+                        .background {
+                            Circle()
+                                .fill(.ultraThinMaterial)
+                                .overlay(Circle().stroke(Color(.separator).opacity(0.5), lineWidth: 0.5))
+                        }
+                }
+                .disabled(goldService.isFetching)
+            }
+        }
         .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         .task { await goldService.fetchIfNeeded() }
     }

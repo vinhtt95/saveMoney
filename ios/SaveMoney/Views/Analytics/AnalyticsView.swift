@@ -37,20 +37,6 @@ struct AnalyticsView: View {
 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 20) {
-                        // Header
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("INTELLIGENCE ENGINE")
-                                .font(.dsBody(10, weight: .semibold))
-                                .foregroundStyle(Color.dsPrimary(for: scheme))
-                                .tracking(1.5)
-                            Text("Reports &\nAnalysis")
-                                .font(.dsDisplay(32))
-                                .foregroundStyle(Color.dsOnSurface(for: scheme))
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 20)
-                        .padding(.top, 12)
-
                         // Period picker
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
@@ -66,24 +52,7 @@ struct AnalyticsView: View {
                             .padding(.horizontal, 20)
                             .padding(.vertical, 2)
                         }
-
-                        // Flow Evolution chart
-                        GlassCard(radius: DSRadius.lg, padding: 16) {
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack {
-                                    DSSectionHeader(title: "Flow Evolution")
-                                    Spacer()
-                                    HStack(spacing: 4) {
-                                        Circle().fill(Color.dsIncome).frame(width: 6, height: 6)
-                                        Text("Thu").font(.dsBody(10)).foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-                                        Circle().fill(Color.dsExpense).frame(width: 6, height: 6)
-                                        Text("Chi").font(.dsBody(10)).foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-                                    }
-                                }
-                                MoMAreaChart(transactions: appVM.transactions)
-                            }
-                        }
-                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
 
                         // Asset Allocation donut
                         GlassCard(radius: DSRadius.lg, padding: 16) {
@@ -186,58 +155,6 @@ struct AnalyticsView: View {
             months.append(Formatters.toYYYYMM(date))
         }
         return months
-    }
-}
-
-// MARK: - MoM Area Chart
-
-struct MoMAreaChart: View {
-    let transactions: [Transaction]
-    @Environment(\.colorScheme) var scheme
-
-    private struct MonthData: Identifiable {
-        let id: String
-        let income: Double
-        let expense: Double
-    }
-
-    private var data: [MonthData] {
-        let cal = Calendar.current
-        let date = Date()
-        return (0..<6).reversed().compactMap { i -> MonthData? in
-            guard let d = cal.date(byAdding: .month, value: -i, to: date) else { return nil }
-            let ym = Formatters.toYYYYMM(d)
-            let filtered = transactions.filter { $0.date.hasPrefix(ym) }
-            let inc = filtered.filter { $0.type == .income }.reduce(0) { $0 + $1.amount }
-            let exp = filtered.filter { $0.type == .expense }.reduce(0) { $0 + abs($1.amount) }
-            return MonthData(id: String(ym.suffix(5)), income: inc, expense: exp)
-        }
-    }
-
-    var body: some View {
-        Chart(data) { item in
-            AreaMark(x: .value("Tháng", item.id), y: .value("Thu nhập", item.income))
-                .foregroundStyle(LinearGradient(colors: [Color.dsIncome.opacity(0.5), .clear], startPoint: .top, endPoint: .bottom))
-            LineMark(x: .value("Tháng", item.id), y: .value("Thu nhập", item.income))
-                .foregroundStyle(Color.dsIncome)
-                .lineStyle(StrokeStyle(lineWidth: 2))
-            AreaMark(x: .value("Tháng", item.id), y: .value("Chi tiêu", item.expense))
-                .foregroundStyle(LinearGradient(colors: [Color.dsExpense.opacity(0.4), .clear], startPoint: .top, endPoint: .bottom))
-            LineMark(x: .value("Tháng", item.id), y: .value("Chi tiêu", item.expense))
-                .foregroundStyle(Color.dsExpense)
-                .lineStyle(StrokeStyle(lineWidth: 2))
-        }
-        .frame(height: 150)
-        .chartYAxis {
-            AxisMarks { v in
-                AxisValueLabel {
-                    if let d = v.as(Double.self) {
-                        Text(Formatters.formatVNDShort(d)).font(.dsBody(9))
-                            .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-                    }
-                }
-            }
-        }
     }
 }
 

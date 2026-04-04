@@ -20,22 +20,9 @@ struct TransactionsView: View {
                 VStack(spacing: 0) {
                     // Sticky header
                     VStack(spacing: 10) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Lịch sử")
-                                    .font(.dsDisplay(28))
-                                    .foregroundStyle(Color.dsOnSurface(for: scheme))
-                                Text("Theo dõi dòng tiền của bạn")
-                                    .font(.dsBody(13))
-                                    .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-                            }
-                            Spacer()
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 12)
-
                         GlassSearchBar(text: $vm.searchText, placeholder: "Tìm kiếm giao dịch...")
                             .padding(.horizontal, 20)
+                            .padding(.top, 12)
                             .onChange(of: vm.searchText) { _ in vm.resetPaging() }
 
                         // Filter chips

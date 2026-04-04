@@ -10,23 +10,6 @@ struct AccountsView: View {
         ZStack {
             DSMeshBackground().ignoresSafeArea()
             VStack(spacing: 0) {
-                HStack {
-                    Text("Tài khoản")
-                        .font(.dsDisplay(28))
-                        .foregroundStyle(Color.dsOnSurface(for: scheme))
-                    Spacer()
-                    Button { showAddSheet = true } label: {
-                        Image(systemName: "plus")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(width: 36, height: 36)
-                            .background(Circle().fill(LinearGradient.dsCTAGradient(scheme: scheme)))
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 12)
-                .padding(.bottom, 8)
-
                 List {
                     ForEach(appVM.accounts) { account in
                         AccountRow(account: account, vm: vm)
@@ -49,6 +32,17 @@ struct AccountsView: View {
         }
         .navigationTitle("Tài khoản")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button { showAddSheet = true } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 32, height: 32)
+                        .background(Circle().fill(LinearGradient.dsCTAGradient(scheme: scheme)))
+                }
+            }
+        }
         .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         .sheet(isPresented: $showAddSheet) {
             AccountFormView(vm: vm, account: nil)

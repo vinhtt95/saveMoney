@@ -58,48 +58,31 @@ struct MainTabView: View {
     @State private var selectedTab = 0
     @State private var showAddSheet = false
 
-    // Intercept tab 2 ("+") to show sheet instead of navigating
-    private var tabSelection: Binding<Int> {
-        Binding(
-            get: { selectedTab },
-            set: { newTab in
-                if newTab == 2 {
-                    showAddSheet = true
-                } else {
-                    selectedTab = newTab
-                }
-            }
-        )
-    }
-
     var body: some View {
         ZStack {
             DSMeshBackground().ignoresSafeArea()
 
-            TabView(selection: tabSelection) {
+            TabView(selection: $selectedTab) {
                 DashboardView()
                     .tag(0)
-                    .tabItem { Label("Flow", systemImage: "house.fill") }
+                    .toolbar(.hidden, for: .tabBar)
 
                 TransactionsView()
                     .tag(1)
-                    .tabItem { Label("History", systemImage: "clock.fill") }
-
-                Color.clear
-                    .tag(2)
-                    .tabItem { Label("Add", systemImage: "plus.circle.fill") }
+                    .toolbar(.hidden, for: .tabBar)
 
                 AnalyticsView()
                     .tag(3)
-                    .tabItem { Label("Insight", systemImage: "chart.bar.fill") }
+                    .toolbar(.hidden, for: .tabBar)
 
                 SettingsView()
                     .tag(4)
-                    .tabItem { Label("Profile", systemImage: "gearshape.fill") }
+                    .toolbar(.hidden, for: .tabBar)
             }
             .tint(Color.dsPrimary(for: scheme))
-            .toolbarBackground(.ultraThinMaterial, for: .tabBar)
-            .toolbarBackground(.visible, for: .tabBar)
+            .safeAreaInset(edge: .bottom) {
+                DSTabBar(selectedTab: $selectedTab, onAddTap: { showAddSheet = true })
+            }
         }
         .sheet(isPresented: $showAddSheet) {
             AddTransactionView(isPresented: $showAddSheet)

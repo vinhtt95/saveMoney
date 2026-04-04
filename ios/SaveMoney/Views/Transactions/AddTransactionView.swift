@@ -150,26 +150,26 @@ struct AddTransactionView: View {
                 Image(systemName: "xmark")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-                    .frame(width: 32, height: 32)
-                    .background(Circle().fill(.ultraThinMaterial))
+                    .frame(width: 36, height: 36)
+                    .background {
+                        Circle()
+                            .fill(.ultraThinMaterial)
+                            .overlay(Circle().stroke(Color(.separator).opacity(0.5), lineWidth: 0.5))
+                    }
             }
+
             Spacer()
-            VStack(spacing: 1) {
-                Text("TRANSACTION")
-                    .font(.dsBody(10, weight: .semibold))
-                    .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-                    .tracking(1)
-                Text(editingTransaction != nil ? "Edit Entry" : "New Entry")
-                    .font(.dsTitle(16))
-                    .foregroundStyle(Color.dsOnSurface(for: scheme))
-            }
-            Spacer()
+
             Button(action: save) {
                 Image(systemName: vm.isSubmitting ? "ellipsis" : "checkmark")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(Color.dsPrimary(for: scheme))
-                    .frame(width: 32, height: 32)
-                    .background(Circle().fill(.ultraThinMaterial))
+                    .foregroundStyle(.white)
+                    .frame(width: 36, height: 36)
+                    .background {
+                        Circle()
+                            .fill(LinearGradient.dsCTAGradient(scheme: scheme))
+                            .overlay(Circle().stroke(.white.opacity(0.25), lineWidth: 1))
+                    }
             }
             .disabled(vm.isSubmitting || amountString == "0")
         }

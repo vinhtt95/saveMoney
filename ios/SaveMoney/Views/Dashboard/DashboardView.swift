@@ -23,14 +23,38 @@ struct DashboardView: View {
     var body: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 20) {
-                // Inline header
-                dashboardHeader
-                    .padding(.horizontal, 20)
-                    .padding(.top, 12)
+                // Period picker + reload button
+                HStack(spacing: 8) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            GlassPeriodChip(label: "Tháng này", isSelected: selectedPeriod.isEmpty) {
+                                selectedPeriod = ""
+                            }
+                            ForEach(lastSixMonths(), id: \.self) { m in
+                                GlassPeriodChip(label: m, isSelected: selectedPeriod == m) {
+                                    selectedPeriod = m
+                                }
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
 
-                // Period picker
-                periodPicker
-                    .padding(.horizontal, 20)
+                    Button {
+                        Task { await appVM.reload() }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(Color.dsPrimary(for: scheme))
+                            .frame(width: 36, height: 36)
+                            .background {
+                                Circle()
+                                    .fill(.ultraThinMaterial)
+                                    .overlay(Circle().stroke(Color(.separator).opacity(0.5), lineWidth: 0.5))
+                            }
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
 
                 // Hero balance card
                 heroBalanceCard
@@ -46,10 +70,6 @@ struct DashboardView: View {
                         .padding(.horizontal, 20)
                 }
 
-                // Expense flow chart
-                expenseFlowChart
-                    .padding(.horizontal, 20)
-
                 // Recent transactions
                 RecentTransactionsView(transactions: recentTransactions, appVM: appVM)
                     .padding(.horizontal, 20)
@@ -61,48 +81,6 @@ struct DashboardView: View {
     }
 
     // MARK: - Subviews
-
-    private var dashboardHeader: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(greetingText)
-                    .font(.dsBody(14))
-                    .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-                Text("The Ethereal Ledger")
-                    .font(.dsDisplay(22))
-                    .foregroundStyle(Color.dsOnSurface(for: scheme))
-            }
-            Spacer()
-            Button {
-                Task { await appVM.reload() }
-            } label: {
-                Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(Color.dsPrimary(for: scheme))
-                    .padding(10)
-                    .background {
-                        Circle()
-                            .fill(.ultraThinMaterial)
-                    }
-            }
-        }
-    }
-
-    private var periodPicker: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                GlassPeriodChip(label: "Tháng này", isSelected: selectedPeriod.isEmpty) {
-                    selectedPeriod = ""
-                }
-                ForEach(lastSixMonths(), id: \.self) { m in
-                    GlassPeriodChip(label: m, isSelected: selectedPeriod == m) {
-                        selectedPeriod = m
-                    }
-                }
-            }
-            .padding(.vertical, 4)
-        }
-    }
 
     private var heroBalanceCard: some View {
         ZStack {
@@ -198,96 +176,7 @@ struct DashboardView: View {
         }
     }
 
-    private var expenseFlowChart: some View {
-        GlassCard(radius: DSRadius.lg, padding: 16) {
-            VStack(alignment: .leading, spacing: 12) {
-                DSSectionHeader(title: "Expense Flow")
-
-                Chart(chartData) { item in
-                    AreaMark(
-                        x: .value("Tháng", item.id),
-                        y: .value("Chi tiêu", item.expense)
-                    )
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [Color.dsExpense.opacity(0.6), Color.dsExpense.opacity(0.05)],
-                            startPoint: .top, endPoint: .bottom
-                        )
-                    )
-                    LineMark(
-                        x: .value("Tháng", item.id),
-                        y: .value("Chi tiêu", item.expense)
-                    )
-                    .foregroundStyle(Color.dsExpense)
-                    .lineStyle(StrokeStyle(lineWidth: 2))
-
-                    AreaMark(
-                        x: .value("Tháng", item.id),
-                        y: .value("Thu nhập", item.income)
-                    )
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [Color.dsIncome.opacity(0.5), Color.dsIncome.opacity(0.05)],
-                            startPoint: .top, endPoint: .bottom
-                        )
-                    )
-                    LineMark(
-                        x: .value("Tháng", item.id),
-                        y: .value("Thu nhập", item.income)
-                    )
-                    .foregroundStyle(Color.dsIncome)
-                    .lineStyle(StrokeStyle(lineWidth: 2))
-                }
-                .frame(height: 140)
-                .chartXAxis {
-                    AxisMarks { v in
-                        AxisValueLabel {
-                            if let s = v.as(String.self) {
-                                Text(s.suffix(2))
-                                    .font(.dsBody(10))
-                                    .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-                            }
-                        }
-                    }
-                }
-                .chartYAxis {
-                    AxisMarks { v in
-                        AxisValueLabel {
-                            if let d = v.as(Double.self) {
-                                Text(Formatters.formatVNDShort(d))
-                                    .font(.dsBody(9))
-                                    .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-                            }
-                        }
-                    }
-                }
-
-                // Legend
-                HStack(spacing: 16) {
-                    legendItem(color: Color.dsIncome, label: "Thu nhập")
-                    legendItem(color: Color.dsExpense, label: "Chi tiêu")
-                }
-            }
-        }
-    }
-
-    private func legendItem(color: Color, label: String) -> some View {
-        HStack(spacing: 6) {
-            Circle().fill(color).frame(width: 8, height: 8)
-            Text(label)
-                .font(.dsBody(12))
-                .foregroundStyle(Color.dsOnSurfaceVariant(for: scheme))
-        }
-    }
-
     // MARK: - Helpers
-
-    private var greetingText: String {
-        let hour = Calendar.current.component(.hour, from: Date())
-        if hour < 12 { return "Chào buổi sáng" }
-        if hour < 18 { return "Chào buổi chiều" }
-        return "Chào buổi tối"
-    }
 
     private func lastSixMonths() -> [String] {
         var months: [String] = []
@@ -300,22 +189,4 @@ struct DashboardView: View {
         return months
     }
 
-    private struct MonthData: Identifiable {
-        let id: String
-        let income: Double
-        let expense: Double
-    }
-
-    private var chartData: [MonthData] {
-        let cal = Calendar.current
-        let date = Date()
-        return (0..<6).reversed().compactMap { i -> MonthData? in
-            guard let d = cal.date(byAdding: .month, value: -i, to: date) else { return nil }
-            let ym = Formatters.toYYYYMM(d)
-            let filtered = appVM.transactions.filter { $0.date.hasPrefix(ym) }
-            let inc = filtered.filter { $0.type == .income }.reduce(0) { $0 + $1.amount }
-            let exp = filtered.filter { $0.type == .expense }.reduce(0) { $0 + abs($1.amount) }
-            return MonthData(id: ym, income: inc, expense: exp)
-        }
-    }
 }
