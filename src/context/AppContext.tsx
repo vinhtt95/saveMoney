@@ -77,8 +77,6 @@ function reducer(state: AppState, action: Action): AppState {
     case 'HYDRATE': {
       const { data } = action;
       const transactions = data.transactions.map((t) => ({ ...t, date: new Date(t.date + 'T00:00:00') }));
-      const periods = getAvailablePeriods(transactions);
-      const latestPeriod = periods[0] || toYYYYMM(new Date());
       return {
         ...state,
         isLoading: false,
@@ -91,7 +89,7 @@ function reducer(state: AppState, action: Action): AppState {
         defaultCategoryExpenseId: data.settings.defaultCategoryExpenseId ?? '',
         defaultCategoryIncomeId: data.settings.defaultCategoryIncomeId ?? '',
         defaultAccountId: data.settings.defaultAccountId ?? '',
-        selectedPeriod: latestPeriod,
+        selectedPeriod: toYYYYMM(new Date()),
       };
     }
     case 'IMPORT': {
@@ -100,8 +98,6 @@ function reducer(state: AppState, action: Action): AppState {
       action.transactions.forEach((t) => {
         if (!existingIds.has(t.id)) merged.push(t);
       });
-      const periods = getAvailablePeriods(merged);
-      const latestPeriod = periods[0] || toYYYYMM(new Date());
 
       const newCategories = action.newCategories
         ? mergeCategories(state.categories, action.newCategories)
@@ -113,7 +109,7 @@ function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         transactions: merged,
-        selectedPeriod: latestPeriod,
+        selectedPeriod: toYYYYMM(new Date()),
         categories: newCategories,
         accounts: newAccounts,
       };
@@ -188,8 +184,6 @@ function reducer(state: AppState, action: Action): AppState {
     case 'RESTORE_BACKUP': {
       const { backup } = action;
       const transactions = backup.transactions.map((t) => ({ ...t, date: new Date(t.date) }));
-      const periods = getAvailablePeriods(transactions);
-      const latestPeriod = periods[0] || toYYYYMM(new Date());
       return {
         ...state,
         transactions,
@@ -200,7 +194,7 @@ function reducer(state: AppState, action: Action): AppState {
         defaultCategoryIncomeId: backup.defaults.defaultCategoryIncomeId,
         defaultAccountId: backup.defaults.defaultAccountId,
         budgets: backup.budgets,
-        selectedPeriod: latestPeriod,
+        selectedPeriod: toYYYYMM(new Date()),
         filters: defaultFilters,
       };
     }
