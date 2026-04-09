@@ -39,6 +39,10 @@ final class OfflineSyncService {
                 default:
                     store.dequeueSyncOp(op)
                 }
+            } catch APIError.httpError(let statusCode, let message) where statusCode >= 400 && statusCode < 500 {
+                // 4xx = bad request / invalid data — retrying won't help, discard the op
+                print("🗑️ OfflineSync: discarding invalid op \(op.operationType) for \(op.entityId) — server rejected with \(statusCode): \(message)")
+                store.dequeueSyncOp(op)
             } catch {
                 print("❌ OfflineSync: failed op \(op.operationType) for \(op.entityId): \(error)")
                 store.incrementRetry(op)
