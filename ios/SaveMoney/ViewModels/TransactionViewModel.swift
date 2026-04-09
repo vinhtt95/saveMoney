@@ -3,7 +3,6 @@ import Foundation
 @Observable
 @MainActor
 final class TransactionViewModel {
-    var searchText = ""
     var selectedCategoryId: String? = nil
     var selectedPeriod: String = toYYYYMM(Date())
     var page = 1
@@ -20,9 +19,7 @@ final class TransactionViewModel {
         app.transactions.filter { tx in
             let periodMatch = tx.date.hasPrefix(selectedPeriod)
             let categoryMatch = selectedCategoryId == nil || tx.categoryId == selectedCategoryId
-            let searchMatch = searchText.isEmpty ||
-                (tx.note?.localizedCaseInsensitiveContains(searchText) ?? false)
-            return periodMatch && categoryMatch && searchMatch
+            return periodMatch && categoryMatch
         }
     }
 

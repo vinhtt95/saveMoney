@@ -32,10 +32,6 @@ struct TransactionsView: View {
 
                 // Search + Filters
                 VStack(spacing: DSSpacing.sm) {
-                    GlassSearchBar(text: Binding(
-                        get: { vm.searchText },
-                        set: { vm.searchText = $0; vm.resetPage() }
-                    ))
 
                     // Period Selector
                     ScrollView(.horizontal, showsIndicators: false) {

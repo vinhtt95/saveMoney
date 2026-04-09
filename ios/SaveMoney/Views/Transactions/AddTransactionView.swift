@@ -14,6 +14,7 @@ struct AddTransactionView: View {
     @State private var note = ""
     @State private var isSubmitting = false
     @State private var errorMessage: String?
+    @FocusState private var isInputActive: Bool
 
     private var isEditMode: Bool { transaction != nil }
 
@@ -50,6 +51,7 @@ struct AddTransactionView: View {
                     HStack {
                         TextField("0", text: $amountText)
                             .keyboardType(.numberPad)
+                            .focused($isInputActive)
                             .font(.title2.weight(.semibold).monospacedDigit())
                         Text("₫")
                             .foregroundStyle(.secondary)
@@ -110,6 +112,7 @@ struct AddTransactionView: View {
                 Section("Ghi chú") {
                     TextField("Không bắt buộc", text: $note, axis: .vertical)
                         .lineLimit(3, reservesSpace: false)
+                        .focused($isInputActive)
                 }
 
                 // Error
@@ -147,6 +150,12 @@ struct AddTransactionView: View {
                     .fontWeight(.semibold)
                     .disabled(amount <= 0 || isSubmitting)
                 }
+                ToolbarItemGroup(placement: .keyboard) {
+                        Spacer()
+                        Button("Xong") {
+                            isInputActive = false // Ẩn bàn phím
+                        }
+                    }
             }
         }
         .onAppear { prefill() }
