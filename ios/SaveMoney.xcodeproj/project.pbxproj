@@ -35,6 +35,7 @@
 		9A6802FC02986F82E27E9C94 /* BudgetProgressRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = A63ED335C439C33A702784B9 /* BudgetProgressRow.swift */; };
 		AD7D510EF7ED3D97EA4671FF /* CategoriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9027DE0256F0FB2B36E453D3 /* CategoriesView.swift */; };
 		AFDF5D6525339D3B90C3418C /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D7F23CD4E1CB7B325D10764 /* Constants.swift */; };
+		B410CF382F87E4A2008466E9 /* LiquidGlassModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = B410CF372F87E4A0008466E9 /* LiquidGlassModifier.swift */; };
 		B416A7422F879AC0007E7005 /* NetworkMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B416A7402F879AC0007E7005 /* NetworkMonitor.swift */; };
 		B416A7432F879AC0007E7005 /* LocalDataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B416A73F2F879AC0007E7005 /* LocalDataStore.swift */; };
 		B416A7442F879AC0007E7005 /* OfflineSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B416A7412F879AC0007E7005 /* OfflineSyncService.swift */; };
@@ -83,6 +84,7 @@
 		A9C5CA2B7E6C6284D2DAE49F /* Budget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Budget.swift; sourceTree = "<group>"; };
 		AD29D959217E159EA1306828 /* GoldPriceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoldPriceService.swift; sourceTree = "<group>"; };
 		B3D2A1ABB4F045554C4D6FE7 /* SaveMoneyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaveMoneyApp.swift; sourceTree = "<group>"; };
+		B410CF372F87E4A0008466E9 /* LiquidGlassModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidGlassModifier.swift; sourceTree = "<group>"; };
 		B416A73F2F879AC0007E7005 /* LocalDataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalDataStore.swift; sourceTree = "<group>"; };
 		B416A7402F879AC0007E7005 /* NetworkMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkMonitor.swift; sourceTree = "<group>"; };
 		B416A7412F879AC0007E7005 /* OfflineSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineSyncService.swift; sourceTree = "<group>"; };
@@ -228,6 +230,7 @@
 		C70401791F5BE988BD87B16D /* Utils */ = {
 			isa = PBXGroup;
 			children = (
+				B410CF372F87E4A0008466E9 /* LiquidGlassModifier.swift */,
 				2D7F23CD4E1CB7B325D10764 /* Constants.swift */,
 				3FD79EE7FD833AB4228396F5 /* DesignSystem.swift */,
 				42278C7BD36B0B35766998D5 /* Formatters.swift */,
@@ -369,6 +372,7 @@
 				93520815F47143C457897C07 /* GoldPrice.swift in Sources */,
 				3E9BB7D34DC4F5419C39D1D6 /* GoldPriceService.swift in Sources */,
 				FDDC0C20F9039DB20D7D039E /* GoldView.swift in Sources */,
+				B410CF382F87E4A2008466E9 /* LiquidGlassModifier.swift in Sources */,
 				23EC893ABC462C6496DD28DE /* GoldViewModel.swift in Sources */,
 				C18E76B7E8236982E22FA5C2 /* RecentTransactionsView.swift in Sources */,
 				C09ECB332AAA1DE87063F3A8 /* SaveMoneyApp.swift in Sources */,

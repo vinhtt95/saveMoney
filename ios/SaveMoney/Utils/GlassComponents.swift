@@ -4,12 +4,14 @@ import SwiftUI
 struct GlassCard<Content: View>: View {
     var padding: CGFloat = DSSpacing.lg
     var cornerRadius: CGFloat = DSRadius.lg
+    var tint: Color? = nil
     @ViewBuilder let content: () -> Content
 
     var body: some View {
         content()
             .padding(padding)
-            .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
+            // Áp dụng Liquid Glass
+            .liquidGlass(in: .rect(cornerRadius: cornerRadius), tint: tint, material: .ultraThinMaterial)
     }
 }
 
@@ -23,19 +25,20 @@ struct GlassPeriodChip: View {
         Button(action: action) {
             Text(periodLabel(period))
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(isSelected ? DSColors.accent : .primary)
+                // Dùng Vibrancy cho text
+                .foregroundStyle(isSelected ? DSColors.accent : .primary.opacity(0.8))
                 .padding(.horizontal, DSSpacing.md)
                 .padding(.vertical, DSSpacing.sm)
-                .glassEffect(
-                    isSelected ? .regular.tint(DSColors.accent.opacity(0.15)) : .regular,
-                    in: .capsule
-                )
-                .overlay(
-                    Capsule()
-                        .strokeBorder(isSelected ? DSColors.accent.opacity(0.5) : .clear, lineWidth: 1)
+                .liquidGlass(
+                    in: .capsule,
+                    tint: isSelected ? DSColors.accent : nil,
+                    // Khi không chọn dùng thin, khi chọn dùng ultraThin để trong hơn
+                    material: isSelected ? .ultraThinMaterial : .regularMaterial
                 )
         }
         .buttonStyle(.plain)
+        .scaleEffect(isSelected ? 1.05 : 1.0) // Thêm hiệu ứng nổi nhẹ khi chọn
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
     }
 }
 

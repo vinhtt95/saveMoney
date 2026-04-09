@@ -29,6 +29,6 @@ struct StatCardView: View {
         }
         .padding(DSSpacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassEffect(.regular, in: .rect(cornerRadius: DSRadius.md))
+        .liquidGlass(in: .rect(cornerRadius: DSRadius.md), tint: color.opacity(0.3), material: .thinMaterial)
     }
 }

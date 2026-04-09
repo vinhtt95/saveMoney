@@ -139,16 +139,6 @@ struct TransactionsView: View {
             }
             .navigationTitle("History")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showAddTransaction = true
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .foregroundStyle(DSColors.accent)
-                    }
-                }
-            }
             .sheet(item: $editingTransaction) { tx in
                 AddTransactionView(transaction: tx) { editingTransaction = nil }
             }
