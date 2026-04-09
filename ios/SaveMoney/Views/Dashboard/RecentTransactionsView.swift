@@ -6,7 +6,7 @@ struct RecentTransactionsView: View {
     @State private var editingTransaction: Transaction?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: DSSpacing.sm) {
+        VStack(alignment: .leading, spacing: DSSpacing.md) { // Tăng spacing để thoáng hơn
             Text("Giao dịch gần đây")
                 .font(.headline)
                 .padding(.horizontal, DSSpacing.xs)
@@ -18,9 +18,10 @@ struct RecentTransactionsView: View {
                     message: "Nhấn + để thêm giao dịch mới"
                 )
             } else {
-                VStack(spacing: DSSpacing.xs) {
+                VStack(spacing: DSSpacing.sm) { // Spacing giữa các card thoáng hơn
                     ForEach(transactions) { tx in
                         RecentTransactionRow(tx: tx, app: app)
+                            .contentShape(Rectangle()) // MỞ RỘNG VÙNG CLICK: Giúp click được toàn bộ vùng tile
                             .onTapGesture { editingTransaction = tx }
                     }
                 }
@@ -48,28 +49,38 @@ private struct RecentTransactionRow: View {
 
     var body: some View {
         HStack(spacing: DSSpacing.md) {
-            CategoryIconView(name: categoryName, size: 36)
+            // Icon danh mục với kích thước lớn hơn một chút
+            CategoryIconView(name: categoryName, size: 42)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(categoryName)
-                    .font(.subheadline.weight(.medium))
+                    .font(.subheadline.weight(.semibold)) // Tăng weight để rõ ràng hơn
                     .lineLimit(1)
-                Text(tx.note?.isEmpty == false ? tx.note! : accountName)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                
+                // Hiển thị cả tài khoản và ghi chú (nếu có) để layout đầy đủ hơn
+                HStack(spacing: 4) {
+                    Text(accountName)
+                    if let note = tx.note, !note.isEmpty {
+                        Text("•")
+                        Text(note)
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
             }
 
             Spacer()
 
-            VStack(alignment: .trailing, spacing: 2) {
-                AmountText(amount: tx.amount, type: tx.type, font: .subheadline.weight(.semibold).monospacedDigit())
+            VStack(alignment: .trailing, spacing: 4) {
+                AmountText(amount: tx.amount, type: tx.type, font: .subheadline.weight(.bold).monospacedDigit())
                 Text(formatDate(tx.date))
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
         }
         .padding(DSSpacing.md)
-        .glassEffect(.regular, in: .rect(cornerRadius: DSRadius.md))
+        // CẬP NHẬT LAYOUT: Sử dụng liquidGlass thay vì glassEffect thông thường
+        .liquidGlass(in: RoundedRectangle(cornerRadius: DSRadius.md))
     }
 }
