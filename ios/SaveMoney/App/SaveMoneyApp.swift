@@ -11,6 +11,7 @@ struct SaveMoneyApp: App {
                 .environment(appViewModel)
                 .environment(themeManager)
                 .preferredColorScheme(themeManager.colorScheme)
+                .tint(DSColors.accent)
         }
     }
 }

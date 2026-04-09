@@ -100,7 +100,7 @@ struct DSTabBarView: View {
                             Text(tabs[idx].label)
                                 .font(.caption2.weight(.medium))
                         }
-                        .foregroundStyle(isSelected ? Color.accentColor : Color.secondary)
+                        .foregroundStyle(isSelected ? DSColors.accent : Color.secondary)
                         .frame(maxWidth: .infinity)
                         .frame(height: 60)
                         .contentShape(Rectangle())
@@ -114,7 +114,7 @@ struct DSTabBarView: View {
                                 // Lớp glow phát sáng phía sau thay vì viền cứng
                                 .background(
                                     Capsule()
-                                        .fill(Color.accentColor.opacity(0.25))
+                                        .fill(DSColors.accent.opacity(0.25))
                                         .blur(radius: 10)
                                 )
                                 // Khi nhấn giữ, giọt nước phình to ra
@@ -141,7 +141,7 @@ struct DSTabBarView: View {
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(DSColors.accent)
                     .frame(width: 60, height: 60)
             }
             .buttonStyle(PlainButtonStyle())
