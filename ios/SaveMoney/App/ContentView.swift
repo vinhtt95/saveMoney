@@ -71,5 +71,6 @@ struct MainTabView: View {
                 showAddTransaction = false
             }
         }
+        .tabBarMinimizeBehavior(.onScrollDown)
     }
 }
