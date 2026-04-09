@@ -41,7 +41,7 @@ struct DashboardView: View {
                             HStack(spacing: DSSpacing.sm) {
                                 ForEach(periods, id: \.self) { period in
                                     Button(periodLabel(period)) {
-                                        withAnimation(.snappy) {
+                                        withAnimation(.snappy(duration: 0.3, extraBounce: 0.2)) {
                                             selectedPeriod = period
                                         }
                                     }

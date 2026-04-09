@@ -9,11 +9,11 @@ struct LiquidGlassModifier<S: Shape>: ViewModifier {
     func body(content: Content) -> some View {
         content
             .overlay {
-                // Viền phản quang cực mảnh (0.5pt) đúng chuẩn iOS 18
+                // Viền sáng rực hơn ở góc Top-Leading để tạo cảm giác mặt kính cong
                 shape.stroke(
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(colorScheme == .dark ? 0.3 : 0.5),
+                            Color.white.opacity(colorScheme == .dark ? 0.4 : 0.7),
                             Color.white.opacity(0.1),
                             .clear
                         ],
@@ -24,10 +24,10 @@ struct LiquidGlassModifier<S: Shape>: ViewModifier {
                 )
             }
             .background {
-                // Lớp Inner Glow tạo độ dày cho mặt kính
+                // Inner Glow mỏng nhưng sắc nét để tạo độ nổi
                 shape
-                    .stroke(Color.white.opacity(colorScheme == .dark ? 0.1 : 0.2), lineWidth: 2)
-                    .blur(radius: 1)
+                    .stroke(Color.white.opacity(colorScheme == .dark ? 0.1 : 0.3), lineWidth: 1.5)
+                    .blur(radius: 0.5)
                     .mask(shape)
             }
     }

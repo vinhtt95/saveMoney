@@ -66,12 +66,16 @@ struct LiquidGlassButtonStyle<S: Shape>: ButtonStyle {
                 if isSelected || configuration.isPressed {
                     shape
                         .fill(.ultraThinMaterial)
-                        .modifier(LiquidGlassModifier(shape: shape))
+                        .liquidGlass(in: shape)
                 }
             }
-            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
-            .sensoryFeedback(.selection, trigger: configuration.isPressed)
+            // 1. Tăng độ nén khi nhấn (nhấn sâu hơn một chút)
+            .scaleEffect(configuration.isPressed ? 0.92 : 1.0)
+            // 2. Sử dụng Spring "Nẩy" (Bounce cao)
+            // Duration ngắn (0.2) + Bounce cao (0.4) tạo hiệu ứng giọt nước cực nhanh
+            .animation(.spring(duration: 0.2, bounce: 0.4), value: configuration.isPressed)
+            // 3. Thay đổi Haptic sang .impact (Cảm giác click cơ học thật hơn)
+            .sensoryFeedback(.impact(weight: .light), trigger: configuration.isPressed)
     }
 }
 

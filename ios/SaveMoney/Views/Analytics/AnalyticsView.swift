@@ -56,15 +56,17 @@ struct AnalyticsView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: DSSpacing.sm) {
                             ForEach(availablePeriods(), id: \.self) { period in
-                                GlassPeriodChip(
-                                    period: period,
-                                    isSelected: period == selectedPeriod, // Hoặc vm.selectedPeriod tùy cách bạn khai báo
-                                    namespace: animationNamespace
-                                ) {
-                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                        selectedPeriod = period // Hoặc vm.selectedPeriod = period
+                                Button(periodLabel(period)) {
+                                    // Sử dụng .snappy để tạo cảm giác mượt mà của iOS 18
+                                    withAnimation(.snappy) {
+                                        selectedPeriod = period
                                     }
                                 }
+                                // Áp dụng Style kính đơn lẻ
+                                .buttonStyle(LiquidGlassButtonStyle(
+                                    shape: Capsule(),
+                                    isSelected: period == selectedPeriod
+                                ))
                             }
                         }
                         .padding(.horizontal, DSSpacing.lg)
