@@ -50,6 +50,7 @@ struct MainTabView: View {
             // Ép thanh Nav Bar bỏ qua khoảng trống Safe Area của thanh Home
             .ignoresSafeArea(edges: .bottom)
         }
+        .ignoresSafeArea(edges: .bottom)
         .sheet(isPresented: $showAddTransaction) {
             AddTransactionView(transaction: nil) {
                 showAddTransaction = false
