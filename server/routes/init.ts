@@ -47,15 +47,52 @@ router.get('/init', async (_req, res) => {
     settings[row.key] = row.value;
   }
 
-  const priceMap: Record<string, number> = {};
+  const sellPriceMapById: Record<string, number> = {};
+  const buyPriceMapById: Record<string, number> = {};
+  
+  const sellPriceMapByName: Record<string, number> = {};
+  const buyPriceMapByName: Record<string, number> = {};
+
   const rawCache = settings['goldPriceCache'];
   if (rawCache) {
     try {
       const cache = JSON.parse(rawCache);
+      
+      // 1. Quét format cũ
       for (const item of (cache.items ?? [])) {
-        if (item.id && item.sell_price) priceMap[item.id] = item.sell_price;
+        if (item.id) {
+          if (item.sell_price) sellPriceMapById[item.id] = item.sell_price;
+          if (item.buy_price) buyPriceMapById[item.id] = item.buy_price;
+        }
       }
-    } catch {}
+
+      // 2. Quét format mới (SJC, BTMC)
+      const sources = [cache.sjc, cache.btmc];
+      for (const source of sources) {
+        if (source?.products) {
+          for (const p of source.products) {
+            // Ánh xạ theo ID
+            if (p.id) {
+              if (p.sellPrice) sellPriceMapById[p.id] = p.sellPrice;
+              if (p.buyPrice) buyPriceMapById[p.id] = p.buyPrice;
+            }
+            // Ánh xạ dự phòng theo Name
+            if (p.name) {
+              if (p.sellPrice) sellPriceMapByName[p.name] = p.sellPrice;
+              if (p.buyPrice) buyPriceMapByName[p.name] = p.buyPrice;
+            }
+          }
+        }
+      }
+
+      // 3. Quét giá Vàng Thế giới
+      if (cache.world?.spotPerLuong) {
+        sellPriceMapById['world_spot'] = cache.world.spotPerLuong;
+        buyPriceMapById['world_spot'] = cache.world.spotPerLuong;
+      }
+    } catch (e) {
+      console.error("Lỗi parse gold cache:", e);
+    }
   }
 
   res.json({
@@ -76,7 +113,9 @@ router.get('/init', async (_req, res) => {
     goldAssets: goldAssets.map((a: any) => ({
       ...a,
       quantity: parseFloat(a.quantity),
-      currentSellPrice: priceMap[a.productId] ?? null,
+      // Tìm theo ID trước, nếu không có thì tìm theo Name, nếu vẫn không có thì gán null
+      currentSellPrice: sellPriceMapById[a.productId] ?? sellPriceMapByName[a.productName] ?? null,
+      currentBuyPrice: buyPriceMapById[a.productId] ?? buyPriceMapByName[a.productName] ?? null,
     })),
     settings,
   });

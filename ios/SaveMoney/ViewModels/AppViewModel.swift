@@ -40,11 +40,62 @@ final class AppViewModel {
     var isOnline: Bool { networkMonitor?.isOnline ?? true }
 
     var totalBalance: Double {
-        accountBalances.values.reduce(0, +)
+        let netTotals = getAccountNetTotals()
+        return accounts.reduce(0.0) { sum, account in
+            let base = accountBalances[account.id] ?? 0
+            let net = netTotals[account.id] ?? 0
+            return sum + base + net
+        }
     }
-
+    
+    private func getAccountNetTotals() -> [String: Double] {
+        var map: [String: Double] = [:]
+        
+        for tx in transactions {
+            // 1. Unwrap accountId an toàn. Nếu tx không có accountId thì bỏ qua giao dịch này.
+            guard let accountId = tx.accountId else { continue }
+            
+            // 2. Sử dụng biến accountId (lúc này đã là String chắc chắn 100%, không còn dấu ?)
+            if map[accountId] == nil { map[accountId] = 0 }
+            
+            if tx.type == .transfer {
+                // Tài khoản nguồn bị trừ tiền
+                map[accountId, default: 0] -= abs(tx.amount)
+                
+                // Tài khoản đích được cộng tiền (nếu có)
+                if let toId = tx.transferToId {
+                    if map[toId] == nil { map[toId] = 0 }
+                    map[toId, default: 0] += abs(tx.amount)
+                }
+            } else {
+                // Các loại giao dịch khác (Income, Expense, Account)
+                map[accountId, default: 0] += tx.amount
+            }
+        }
+        return map
+    }
+    
     var totalGoldValue: Double {
-        goldAssets.reduce(0) { $0 + ($1.currentSellPrice ?? 0) * $1.quantity }
+        // 1. Lấy chuỗi JSON từ cấu hình settings
+        guard let cacheString = settings["goldPriceCache"],
+              let data = cacheString.data(using: .utf8),
+              let cacheData = try? JSONDecoder().decode(GoldPriceCacheData.self, from: data) else {
+            return 0.0 // Trả về 0 nếu chưa có cache
+        }
+        
+        // 2. Tạo một Map (Từ điển) để tra cứu giá nhanh theo ID (productId)
+        var priceMap: [String: Double] = [:]
+        for item in cacheData.items {
+            // Lưu giá mua vào dictionary với key là id (vd: "sjc_001")
+            priceMap[item.id] = item.buy_price
+        }
+        
+        // 3. Duyệt qua danh sách tài sản vàng để tính tổng tiền
+        return goldAssets.reduce(0.0) { sum, asset in
+            // Lấy giá dựa vào productId. Nếu không tìm thấy trong Map thì gán = 0.0
+            let price = priceMap[asset.productId] ?? 0.0
+            return sum + (price * asset.quantity)
+        }
     }
 
     var netWorth: Double { totalBalance + totalGoldValue }
@@ -63,16 +114,8 @@ final class AppViewModel {
 
     func computedBalance(for accountId: String) -> Double {
         let base = accountBalances[accountId] ?? 0
-        let net = transactions.reduce(0.0) { sum, tx in
-            if tx.type == .account { return sum }
-            if tx.accountId == accountId {
-                return sum + tx.amount
-            }
-            if tx.type == .transfer, tx.transferToId == accountId {
-                return sum + abs(tx.amount)
-            }
-            return sum
-        }
+        let netTotals = getAccountNetTotals()
+        let net = netTotals[accountId] ?? 0
         return base + net
     }
 
@@ -343,4 +386,13 @@ final class AppViewModel {
         settings[key] = value
         try await api.updateSettings(settings)
     }
+}
+
+struct GoldPriceCacheData: Codable {
+    struct Item: Codable {
+        var id: String
+        var buy_price: Double
+        var sell_price: Double
+    }
+    var items: [Item]
 }

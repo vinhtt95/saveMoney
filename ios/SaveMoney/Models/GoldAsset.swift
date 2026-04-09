@@ -23,6 +23,7 @@ struct GoldAsset: Identifiable, Codable, Equatable {
     var note: String?
     var createdAt: String?
     var currentSellPrice: Double?
+    var currentBuyPrice: Double?
 }
 
 struct GoldAssetCreateDTO: Encodable {

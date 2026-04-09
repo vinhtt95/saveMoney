@@ -20,14 +20,39 @@ final class GoldViewModel {
     func totalGoldValue() -> Double {
         guard let prices = goldService.prices else { return 0 }
         return app.goldAssets.reduce(0) { sum, asset in
-            let price = prices.items.first { $0.id == asset.productId }?.sellPrice ?? asset.currentSellPrice ?? 0
+            let price = prices.items.first { $0.id == asset.productId }?.buyPrice ?? asset.currentSellPrice ?? 0
             return sum + price * asset.quantity
         }
     }
 
     func currentValue(asset: GoldAsset) -> Double {
-        let price = goldService.prices?.items.first { $0.id == asset.productId }?.sellPrice
-            ?? asset.currentSellPrice ?? 0
+        // Tạo cấu trúc nội bộ để đọc JSON (tránh đụng chạm đến các file model khác)
+        struct CacheData: Codable {
+            struct Item: Codable {
+                var id: String
+                var buy_price: Double
+                var sell_price: Double
+            }
+            var items: [Item]
+        }
+        
+        var price: Double = 0.0
+        
+        // 1. Parse giá trị trực tiếp từ chuỗi cache mới nhất trong settings
+        if let cacheString = app.settings["goldPriceCache"],
+           let data = cacheString.data(using: .utf8),
+           let cache = try? JSONDecoder().decode(CacheData.self, from: data),
+           let matchedItem = cache.items.first(where: { $0.id == asset.productId }) {
+            
+            // Tìm thấy -> Lấy giá MUA (buy_price)
+            price = matchedItem.buy_price
+        }
+        // 2. Fallback: Nếu không đọc được cache, dùng giá đã lưu ở local (currentBuyPrice)
+        else if let fallbackPrice = asset.currentBuyPrice {
+            price = fallbackPrice
+        }
+        
+        // 3. Tính tổng giá trị
         return price * asset.quantity
     }
 
