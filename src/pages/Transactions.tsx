@@ -99,17 +99,19 @@ export function Transactions() {
   );
 
   const filtered = useMemo(() => {
-    let txs = periodTxs.filter((t) => t.type === 'Expense' || t.type === 'Income');
+    let txs = periodTxs.filter((t) => t.type === 'Expense' || t.type === 'Income' || t.type === 'Transfer');
     if (filters.search) {
       const q = filters.search.toLowerCase();
       txs = txs.filter(
         (t) =>
-          categoryName(categories, t.categoryId).toLowerCase().includes(q) ||
-          accountName(accounts, t.accountId).toLowerCase().includes(q)
+          (t.type === 'Transfer' ? 'transfer' : categoryName(categories, t.categoryId).toLowerCase()).includes(q) ||
+          accountName(accounts, t.accountId).toLowerCase().includes(q) ||
+          (t.transferToId ? accountName(accounts, t.transferToId).toLowerCase().includes(q) : false)
       );
     }
     if (filters.categoryIds.length > 0) {
-      txs = txs.filter((t) => filters.categoryIds.includes(t.categoryId));
+      // Transfer transactions don't have a category — keep them visible when category filter is active
+      txs = txs.filter((t) => t.type === 'Transfer' || filters.categoryIds.includes(t.categoryId));
     }
     if (filters.accountIds.length > 0) {
       txs = txs.filter((t) => filters.accountIds.includes(t.accountId));
@@ -502,9 +504,12 @@ export function Transactions() {
                   </tr>
 
                   {group.txs.map((tx) => {
-                    const catName = categoryName(categories, tx.categoryId);
+                    const isTransfer = tx.type === 'Transfer';
+                    const catName = isTransfer
+                      ? `${accountName(accounts, tx.accountId)} → ${accountName(accounts, tx.transferToId)}`
+                      : categoryName(categories, tx.categoryId);
                     const accName = accountName(accounts, tx.accountId);
-                    const icon = getIcon(catName);
+                    const icon = isTransfer ? { bg: 'bg-blue-100 dark:bg-blue-900/30', color: 'text-blue-500', icon: 'swap_horiz' } : getIcon(catName);
                     const isExpense = tx.type === 'Expense';
                     const isExpanded = expandedRow === tx.id;
 
@@ -536,8 +541,8 @@ export function Transactions() {
                             </div>
                           </td>
                           <td className="px-6 py-3 text-sm text-slate-500 dark:text-slate-400">{accName}</td>
-                          <td className={`px-6 py-3 text-right text-sm font-medium ${isExpense ? 'text-rose-400 dark:text-rose-400' : 'text-emerald-400 dark:text-emerald-400'}`}>
-                            {isExpense ? '-' : '+'}{formatVND(tx.amount)}
+                          <td className={`px-6 py-3 text-right text-sm font-medium ${isTransfer ? 'text-blue-400 dark:text-blue-400' : isExpense ? 'text-rose-400 dark:text-rose-400' : 'text-emerald-400 dark:text-emerald-400'}`}>
+                            {isTransfer ? '' : isExpense ? '-' : '+'}{formatVND(Math.abs(tx.amount))}
                           </td>
                         </tr>
 
