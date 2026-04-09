@@ -14,13 +14,20 @@ struct AddTransactionView: View {
     @State private var note = ""
     @State private var isSubmitting = false
     @State private var errorMessage: String?
-    @FocusState private var isInputActive: Bool
+    
+    private enum Field {
+        case amount
+        case note
+    }
+    @FocusState private var focusedField: Field?
 
     private var isEditMode: Bool { transaction != nil }
-
     private var title: String { isEditMode ? "Sửa giao dịch" : "Thêm giao dịch" }
-
-    private var amount: Double { Double(amountText.replacingOccurrences(of: ",", with: "").replacingOccurrences(of: ".", with: "")) ?? 0 }
+    
+    // Chuyển text sang số: Loại bỏ dấu chấm phân cách trước khi convert
+    private var amount: Double {
+        Double(amountText.replacingOccurrences(of: ".", with: "").replacingOccurrences(of: ",", with: "")) ?? 0
+    }
 
     private var availableCategories: [Category] {
         switch type {
@@ -32,111 +39,136 @@ struct AddTransactionView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                // Type Picker
-                Section {
+            ScrollView {
+                VStack(spacing: 24) {
+                    // 1. Field lớn nhập giá trị - Căn giữa và sát chữ ₫
+                    VStack(spacing: 8) {
+                        HStack(spacing: 8) {
+                            Spacer()
+                            TextField("0", text: $amountText)
+                                .keyboardType(.numberPad)
+                                .focused($focusedField, equals: .amount)
+                                .font(.system(size: 48, weight: .bold, design: .rounded))
+                                .fixedSize() // Giúp TextField chỉ rộng vừa đủ nội dung để ₫ sát vào
+                                .onChange(of: amountText) { _, newValue in
+                                    formatAmountInput(newValue)
+                                }
+                            
+                            Text("₫")
+                                .font(.title)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                        }
+                    }
+                    .padding(.vertical, 30)
+
+                    // 2. Toggle switch chọn mode
                     Picker("Loại", selection: $type) {
                         Text("Chi tiêu").tag(TransactionType.expense)
                         Text("Thu nhập").tag(TransactionType.income)
                         Text("Chuyển khoản").tag(TransactionType.transfer)
                     }
                     .pickerStyle(.segmented)
-                    .onChange(of: type) { _, _ in
-                        categoryId = nil
+                    .padding(.horizontal)
+                    .onChange(of: type) { _, newValue in
+                        if !isEditMode {
+                            categoryId = newValue == .expense ? app.defaultExpenseCategoryId : app.defaultIncomeCategoryId
+                        }
                     }
-                }
 
-                // Amount
-                Section("Số tiền") {
-                    HStack {
-                        TextField("0", text: $amountText)
-                            .keyboardType(.numberPad)
-                            .focused($isInputActive)
-                            .font(.title2.weight(.semibold).monospacedDigit())
-                        Text("₫")
-                            .foregroundStyle(.secondary)
+                    // 3. Card chi tiết
+                    VStack(spacing: 0) {
+                        if type != .transfer {
+                            HStack {
+                                Label("Danh mục", systemImage: "grid")
+                                Spacer()
+                                Picker("", selection: $categoryId) {
+                                    Text("Chọn danh mục").tag(String?.none)
+                                    ForEach(availableCategories) { cat in
+                                        Text(cat.name).tag(String?.some(cat.id))
+                                    }
+                                }
+                            }
+                            .padding()
+                            Divider().padding(.leading, 44)
+                        }
+
+                        HStack {
+                            Label("Tài khoản", systemImage: "creditcard")
+                            Spacer()
+                            Picker("", selection: $accountId) {
+                                Text("Chọn tài khoản").tag(String?.none)
+                                ForEach(app.accounts) { acc in
+                                    Text(acc.name).tag(String?.some(acc.id))
+                                }
+                            }
+                        }
+                        .padding()
+                        
+                        if type == .transfer {
+                            Divider().padding(.leading, 44)
+                            HStack {
+                                Label("Đến", systemImage: "arrow.right.circle")
+                                Spacer()
+                                Picker("", selection: $transferToId) {
+                                    Text("Chọn tài khoản").tag(String?.none)
+                                    ForEach(app.accounts.filter { $0.id != accountId }) { acc in
+                                        Text(acc.name).tag(String?.some(acc.id))
+                                    }
+                                }
+                            }
+                            .padding()
+                        }
+
+                        Divider().padding(.leading, 44)
+
+                        DatePicker(selection: $date, displayedComponents: .date) {
+                            Label("Ngày", systemImage: "calendar")
+                        }
+                        .padding()
+                        .environment(\.locale, Locale(identifier: "vi_VN"))
                     }
-                    if amount > 0 {
-                        Text(formatVND(amount))
+                    .background(Color(.secondarySystemGroupedBackground))
+                    .cornerRadius(16)
+                    .padding(.horizontal)
+
+                    // 4. Card ghi chú
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label("Ghi chú", systemImage: "pencil.and.outline")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        
+                        TextField("Nhập ghi chú...", text: $note, axis: .vertical)
+                            .lineLimit(3...5)
+                            .focused($focusedField, equals: .note)
                     }
-                }
+                    .padding()
+                    .background(Color(.secondarySystemGroupedBackground))
+                    .cornerRadius(16)
+                    .padding(.horizontal)
 
-                // Category
-                if type != .transfer {
-                    Section("Danh mục") {
-                        Picker("Danh mục", selection: $categoryId) {
-                            Text("— Chọn —").tag(String?.none)
-                            ForEach(availableCategories) { cat in
-                                Text(cat.name).tag(String?.some(cat.id))
-                            }
-                        }
-                    }
-                }
-
-                // Account
-                Section("Tài khoản") {
-                    Picker("Từ tài khoản", selection: $accountId) {
-                        Text("— Chọn —").tag(String?.none)
-                        ForEach(app.accounts) { acc in
-                            HStack {
-                                Text(acc.name)
-                                Spacer()
-                                Text(formatVNDShort(app.computedBalance(for: acc.id)))
-                                    .font(.caption.monospacedDigit())
-                                    .foregroundStyle(.secondary)
-                            }
-                            .tag(String?.some(acc.id))
-                        }
-                    }
-
-                    if type == .transfer {
-                        Picker("Đến tài khoản", selection: $transferToId) {
-                            Text("— Chọn —").tag(String?.none)
-                            ForEach(app.accounts.filter { $0.id != accountId }) { acc in
-                                Text(acc.name).tag(String?.some(acc.id))
-                            }
-                        }
-                    }
-                }
-
-                // Date
-                Section("Ngày") {
-                    DatePicker("Ngày giao dịch", selection: $date, displayedComponents: .date)
-                        .datePickerStyle(.compact)
-                        .environment(\.locale, Locale(identifier: "vi_VN"))
-                }
-
-                // Note
-                Section("Ghi chú") {
-                    TextField("Không bắt buộc", text: $note, axis: .vertical)
-                        .lineLimit(3, reservesSpace: false)
-                        .focused($isInputActive)
-                }
-
-                // Error
-                if let errorMessage {
-                    Section {
+                    if let errorMessage {
                         ErrorBanner(message: errorMessage)
+                            .padding(.horizontal)
                     }
-                }
 
-                // Delete (edit mode)
-                if isEditMode {
-                    Section {
+                    if isEditMode {
                         Button(role: .destructive) {
                             Task { await handleDelete() }
                         } label: {
-                            HStack {
-                                Spacer()
-                                Label("Xóa giao dịch", systemImage: "trash")
-                                Spacer()
-                            }
+                            Label("Xóa giao dịch", systemImage: "trash")
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color(.secondarySystemGroupedBackground))
+                                .cornerRadius(16)
+                                .foregroundStyle(.red)
                         }
+                        .padding(.horizontal)
                     }
                 }
+                .padding(.bottom, 30)
             }
+            .background(Color(.systemGroupedBackground))
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -147,24 +179,63 @@ struct AddTransactionView: View {
                     Button(isEditMode ? "Lưu" : "Thêm") {
                         Task { await handleSubmit() }
                     }
-                    .fontWeight(.semibold)
+                    .fontWeight(.bold)
                     .disabled(amount <= 0 || isSubmitting)
                 }
+                
+                // Toolbar hỗ trợ nhập nhanh trên bàn phím
                 ToolbarItemGroup(placement: .keyboard) {
-                        Spacer()
-                        Button("Xong") {
-                            isInputActive = false // Ẩn bàn phím
+                    if focusedField == .amount {
+                        HStack(spacing: 12) {
+                            Button(".000") { appendZeros(3) }
+                            Button("0.000") { appendZeros(4) }
+                            Button("00.000") { appendZeros(5) }
                         }
+                        .font(.system(.callout, design: .monospaced))
                     }
+                    Spacer()
+                    Button("Xong") { focusedField = nil }
+                }
             }
         }
-        .onAppear { prefill() }
+        .onAppear {
+            prefill()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                focusedField = .amount
+            }
+        }
+    }
+
+    // Định dạng dấu chấm khi người dùng gõ
+    private func formatAmountInput(_ input: String) {
+        let clean = input.replacingOccurrences(of: ".", with: "").replacingOccurrences(of: ",", with: "")
+        guard let number = Double(clean) else {
+            if clean.isEmpty { amountText = "" }
+            return
+        }
+        
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.groupingSeparator = "."
+        
+        if let formatted = formatter.string(from: NSNumber(value: number)) {
+            // Chỉ cập nhật nếu khác biệt để tránh loop vô tận
+            if amountText != formatted {
+                amountText = formatted
+            }
+        }
+    }
+
+    private func appendZeros(_ count: Int) {
+        let clean = amountText.replacingOccurrences(of: ".", with: "")
+        let suffix = String(repeating: "0", count: count)
+        formatAmountInput(clean + suffix)
     }
 
     private func prefill() {
         if let tx = transaction {
             type = tx.type
-            amountText = String(Int(abs(tx.amount)))
+            formatAmountInput(String(Int(abs(tx.amount))))
             categoryId = tx.categoryId
             accountId = tx.accountId
             transferToId = tx.transferToId
@@ -174,13 +245,13 @@ struct AddTransactionView: View {
             type = app.defaultTransactionType
             accountId = app.defaultAccountId
             categoryId = type == .expense ? app.defaultExpenseCategoryId : app.defaultIncomeCategoryId
+            date = Date()
         }
     }
 
     private func handleSubmit() async {
         isSubmitting = true
         errorMessage = nil
-        let dateString = toYYYYMM(date) + "-" + String(format: "%02d", Calendar.current.component(.day, from: date))
         let storageDate = storageFormatter(date)
         let dto = TransactionCreateDTO(
             date: storageDate,
