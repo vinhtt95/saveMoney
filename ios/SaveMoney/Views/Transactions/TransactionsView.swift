@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TransactionsView: View {
     @Environment(AppViewModel.self) private var app
+    @Environment(NetworkMonitor.self) private var networkMonitor
     @State private var viewModel: TransactionViewModel?
     @State private var editingTransaction: Transaction?
     @State private var showAddTransaction = false
@@ -15,6 +16,19 @@ struct TransactionsView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                // Offline banner
+                if !networkMonitor.isOnline {
+                    HStack(spacing: 6) {
+                        Image(systemName: "wifi.slash")
+                        Text("Offline — thay đổi sẽ được đồng bộ khi có mạng")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(Color.orange.opacity(0.85))
+                }
+
                 // Search + Filters
                 VStack(spacing: DSSpacing.sm) {
                     GlassSearchBar(text: Binding(

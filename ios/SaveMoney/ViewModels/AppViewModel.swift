@@ -17,8 +17,28 @@ final class AppViewModel {
     var errorMessage: String?
 
     let api = APIService()
+    let store = LocalDataStore.shared
+    private(set) var syncService: OfflineSyncService!
+
+    var networkMonitor: NetworkMonitor?
+
+    init() {
+        syncService = OfflineSyncService(api: api, store: store)
+        syncService.onSyncCompleted = { [weak self] in
+            await self?.loadInitData()
+        }
+    }
+
+    /// Called by the SwiftUI layer via .onChange(of: networkMonitor.isOnline)
+    func handleNetworkChange(from wasOnline: Bool, to isNowOnline: Bool) {
+        guard !wasOnline && isNowOnline else { return }
+        print("📶 Network restored — starting sync")
+        Task { await syncService.syncPending() }
+    }
 
     // MARK: - Computed
+    var isOnline: Bool { networkMonitor?.isOnline ?? true }
+
     var totalBalance: Double {
         accountBalances.values.reduce(0, +)
     }
@@ -82,15 +102,56 @@ final class AppViewModel {
         isLoading = true
         connectionState = .loading
         errorMessage = nil
-        do {
-            let data = try await api.fetchInit()
-            apply(data)
-            connectionState = .connected
-        } catch {
+
+        if isOnline {
+            do {
+                let data = try await api.fetchInit()
+                apply(data)
+                store.saveInitData(
+                    transactions: data.transactions,
+                    categories: data.categories,
+                    accounts: data.accounts,
+                    accountBalances: data.accountBalances,
+                    budgets: data.budgets,
+                    goldAssets: data.goldAssets,
+                    settings: data.settings
+                )
+                connectionState = .connected
+            } catch {
+                loadFromLocal()
+                connectionState = .disconnected
+                errorMessage = error.localizedDescription
+            }
+        } else {
+            loadFromLocal()
             connectionState = .disconnected
-            errorMessage = error.localizedDescription
         }
+
         isLoading = false
+    }
+
+    private func loadFromLocal() {
+        let localTxs = store.fetchAllTransactions()
+        if !localTxs.isEmpty {
+            transactions = localTxs.sorted { $0.date > $1.date }
+        }
+        let localCategories = store.fetchAllCategories()
+        if !localCategories.isEmpty { categories = localCategories }
+
+        let localAccounts = store.fetchAllAccounts()
+        if !localAccounts.isEmpty { accounts = localAccounts }
+
+        let localBudgets = store.fetchAllBudgets()
+        if !localBudgets.isEmpty { budgets = localBudgets }
+
+        let localGoldAssets = store.fetchAllGoldAssets()
+        if !localGoldAssets.isEmpty { goldAssets = localGoldAssets }
+
+        let localBalances = store.fetchAccountBalances()
+        if !localBalances.isEmpty { accountBalances = localBalances }
+
+        let localSettings = store.fetchSettings()
+        if !localSettings.isEmpty { settings = localSettings }
     }
 
     private func apply(_ data: AppInitData) {
@@ -104,27 +165,105 @@ final class AppViewModel {
     }
 
     // MARK: - Transaction CRUD
+
     func addTransaction(_ dto: TransactionCreateDTO) async throws {
-        let tx = try await api.createTransaction(dto)
+        if isOnline {
+            do {
+                let tx = try await api.createTransaction(dto)
+                transactions.insert(tx, at: 0)
+                transactions.sort { $0.date > $1.date }
+                store.upsertTransaction(tx)
+                await refreshBalances()
+                return
+            } catch APIError.networkError {
+                // Network unavailable despite isOnline flag — fall through to offline path
+            }
+        }
+        saveTransactionOffline(dto)
+    }
+
+    private func saveTransactionOffline(_ dto: TransactionCreateDTO) {
+        let tempId = "offline_\(UUID().uuidString)"
+        let tx = Transaction(
+            id: tempId,
+            date: dto.date,
+            type: TransactionType(rawValue: dto.type) ?? .expense,
+            categoryId: dto.categoryId,
+            accountId: dto.accountId,
+            transferToId: dto.transferToId,
+            amount: dto.amount,
+            note: dto.note
+        )
         transactions.insert(tx, at: 0)
         transactions.sort { $0.date > $1.date }
-        // Refresh balances
-        await refreshBalances()
+        store.upsertTransaction(tx)
+        let payload = try? JSONEncoder().encode(dto)
+        store.enqueueSyncOp(operationType: "create", entityId: tempId, payload: payload)
     }
 
     func updateTransaction(_ id: String, _ dto: TransactionCreateDTO) async throws {
-        let tx = try await api.updateTransaction(id, dto)
+        if isOnline {
+            do {
+                let tx = try await api.updateTransaction(id, dto)
+                if let idx = transactions.firstIndex(where: { $0.id == id }) {
+                    transactions[idx] = tx
+                }
+                transactions.sort { $0.date > $1.date }
+                store.upsertTransaction(tx)
+                await refreshBalances()
+                return
+            } catch APIError.networkError {
+                // Fall through to offline path
+            }
+        }
+        let tx = Transaction(
+            id: id,
+            date: dto.date,
+            type: TransactionType(rawValue: dto.type) ?? .expense,
+            categoryId: dto.categoryId,
+            accountId: dto.accountId,
+            transferToId: dto.transferToId,
+            amount: dto.amount,
+            note: dto.note
+        )
         if let idx = transactions.firstIndex(where: { $0.id == id }) {
             transactions[idx] = tx
         }
         transactions.sort { $0.date > $1.date }
-        await refreshBalances()
+        store.upsertTransaction(tx)
+        let payload = try? JSONEncoder().encode(dto)
+        let existing = store.fetchPendingOps().first(where: { $0.entityId == id })
+        if let existing {
+            existing.payload = payload
+            try? store.container.mainContext.save()
+        } else {
+            store.enqueueSyncOp(operationType: "update", entityId: id, payload: payload)
+        }
     }
 
     func deleteTransaction(_ id: String) async throws {
-        try await api.deleteTransaction(id)
+        if isOnline {
+            do {
+                try await api.deleteTransaction(id)
+                transactions.removeAll { $0.id == id }
+                store.deleteTransaction(id: id)
+                await refreshBalances()
+                return
+            } catch APIError.networkError {
+                // Fall through to offline path
+            }
+        }
         transactions.removeAll { $0.id == id }
-        await refreshBalances()
+        store.deleteTransaction(id: id)
+        if store.hasPendingCreateOp(for: id) {
+            store.removePendingOps(for: id)
+        } else {
+            store.replacePendingUpdateWithDelete(for: id)
+            let hasPending = !store.fetchPendingOps().filter { $0.entityId == id }.isEmpty
+            if !hasPending {
+                store.enqueueSyncOp(operationType: "delete", entityId: id)
+            }
+        }
     }
 
     private func refreshBalances() async {

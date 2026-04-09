@@ -32,7 +32,7 @@ struct Transaction: Identifiable, Codable, Equatable {
 }
 
 // MARK: - DTOs
-struct TransactionCreateDTO: Encodable {
+struct TransactionCreateDTO: Codable {
     var date: String
     var type: String
     var categoryId: String?
