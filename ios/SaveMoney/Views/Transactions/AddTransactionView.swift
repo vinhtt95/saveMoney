@@ -4,7 +4,7 @@ struct AddTransactionView: View {
     @Environment(AppViewModel.self) private var app
     let transaction: Transaction?
     let onDismiss: () -> Void
-
+    
     @State private var type: TransactionType = .expense
     @State private var amountText = ""
     @State private var categoryId: String? = nil
@@ -20,7 +20,7 @@ struct AddTransactionView: View {
         case note
     }
     @FocusState private var focusedField: Field?
-
+    
     private var isEditMode: Bool { transaction != nil }
     private var title: String { isEditMode ? "Sửa giao dịch" : "Thêm giao dịch" }
     
@@ -28,7 +28,7 @@ struct AddTransactionView: View {
     private var amount: Double {
         Double(amountText.replacingOccurrences(of: ".", with: "").replacingOccurrences(of: ",", with: "")) ?? 0
     }
-
+    
     private var availableCategories: [Category] {
         switch type {
         case .expense: app.expenseCategories
@@ -36,7 +36,30 @@ struct AddTransactionView: View {
         default: app.categories
         }
     }
-
+    
+    private var projectedBalance: Double? {
+        guard let accId = accountId else { return nil }
+        
+        // Lấy số dư hiện tại của tài khoản (bao gồm cả các giao dịch đã lưu)
+        let currentBalance = app.computedBalance(for: accId)
+        
+        // Tính toán ảnh hưởng của giá trị đang nhập trên màn hình
+        // Chi tiêu và Chuyển khoản (từ nguồn) sẽ làm giảm số dư
+        let newImpact = (type == .expense || type == .transfer) ? -amount : amount
+        
+        if let tx = transaction, tx.accountId == accId {
+            // Trường hợp ĐANG SỬA giao dịch cũ và không đổi tài khoản:
+            // Số dư hiện tại (currentBalance) đã bao gồm giá trị cũ của chính giao dịch này.
+            // Ta cần: [Số dư] - [Giá trị cũ] + [Giá trị mới đang nhập]
+            let oldImpact = (tx.type == .expense || tx.type == .transfer) ? -abs(tx.amount) : tx.amount
+            return currentBalance - oldImpact + newImpact
+        } else {
+            // Trường hợp THÊM MỚI hoặc ĐỔI sang tài khoản khác:
+            // Đơn giản là lấy số dư của tài khoản đó cộng thêm giá trị mới
+            return currentBalance + newImpact
+        }
+    }
+    
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -59,9 +82,14 @@ struct AddTransactionView: View {
                                 .foregroundStyle(.secondary)
                             Spacer()
                         }
+                        if let balance = projectedBalance {
+                            Text("Sau GD: \(formatBalance(balance))")
+                                .font(.subheadline)
+                                .foregroundStyle(balance < 0 ? .red : .secondary)
+                        }
                     }
                     .padding(.vertical, 30)
-
+                    
                     // 2. Toggle switch chọn mode
                     Picker("Loại", selection: $type) {
                         Text("Chi tiêu").tag(TransactionType.expense)
@@ -75,7 +103,7 @@ struct AddTransactionView: View {
                             categoryId = newValue == .expense ? app.defaultExpenseCategoryId : app.defaultIncomeCategoryId
                         }
                     }
-
+                    
                     // 3. Card chi tiết
                     VStack(spacing: 0) {
                         if type != .transfer {
@@ -92,7 +120,7 @@ struct AddTransactionView: View {
                             .padding()
                             Divider().padding(.leading, 44)
                         }
-
+                        
                         HStack {
                             Label("Tài khoản", systemImage: "creditcard")
                             Spacer()
@@ -119,9 +147,9 @@ struct AddTransactionView: View {
                             }
                             .padding()
                         }
-
+                        
                         Divider().padding(.leading, 44)
-
+                        
                         DatePicker(selection: $date, displayedComponents: .date) {
                             Label("Ngày", systemImage: "calendar")
                         }
@@ -131,7 +159,7 @@ struct AddTransactionView: View {
                     .background(Color(.secondarySystemGroupedBackground))
                     .cornerRadius(16)
                     .padding(.horizontal)
-
+                    
                     // 4. Card ghi chú
                     VStack(alignment: .leading, spacing: 8) {
                         Label("Ghi chú", systemImage: "pencil.and.outline")
@@ -146,12 +174,12 @@ struct AddTransactionView: View {
                     .background(Color(.secondarySystemGroupedBackground))
                     .cornerRadius(16)
                     .padding(.horizontal)
-
+                    
                     if let errorMessage {
                         ErrorBanner(message: errorMessage)
                             .padding(.horizontal)
                     }
-
+                    
                     if isEditMode {
                         Button(role: .destructive) {
                             Task { await handleDelete() }
@@ -205,7 +233,7 @@ struct AddTransactionView: View {
             }
         }
     }
-
+    
     // Định dạng dấu chấm khi người dùng gõ
     private func formatAmountInput(_ input: String) {
         let clean = input.replacingOccurrences(of: ".", with: "").replacingOccurrences(of: ",", with: "")
@@ -225,13 +253,13 @@ struct AddTransactionView: View {
             }
         }
     }
-
+    
     private func appendZeros(_ count: Int) {
         let clean = amountText.replacingOccurrences(of: ".", with: "")
         let suffix = String(repeating: "0", count: count)
         formatAmountInput(clean + suffix)
     }
-
+    
     private func prefill() {
         if let tx = transaction {
             type = tx.type
@@ -248,7 +276,7 @@ struct AddTransactionView: View {
             date = Date()
         }
     }
-
+    
     private func handleSubmit() async {
         isSubmitting = true
         errorMessage = nil
@@ -274,7 +302,7 @@ struct AddTransactionView: View {
         }
         isSubmitting = false
     }
-
+    
     private func handleDelete() async {
         guard let tx = transaction else { return }
         isSubmitting = true
@@ -286,7 +314,7 @@ struct AddTransactionView: View {
         }
         isSubmitting = false
     }
-
+    
     private func storageFormatter(_ date: Date) -> String {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"

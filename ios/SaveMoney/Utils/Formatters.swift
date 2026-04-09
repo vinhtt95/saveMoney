@@ -113,3 +113,13 @@ func elapsedDaysInMonth(period: String) -> Int {
     if period != currentPeriod { return daysInMonth(period: period) }
     return Calendar.current.component(.day, from: Date())
 }
+
+// MARK: - Currency trong file Formatters.swift
+func formatBalance(_ amount: Double) -> String {
+    let formatter = NumberFormatter()
+    formatter.numberStyle = .decimal
+    formatter.groupingSeparator = "."
+    formatter.maximumFractionDigits = 0
+    let formatted = formatter.string(from: NSNumber(value: amount)) ?? "0"
+    return "\(formatted)₫"
+}
