@@ -7,6 +7,14 @@ final class SettingsViewModel {
     var isSubmitting = false
     var errorMessage: String?
     var saveSuccess = false
+    
+    var expenseCategories: [Category] {
+        app.categories.filter { $0.type == .expense }
+    }
+
+    var incomeCategories: [Category] {
+        app.categories.filter { $0.type == .income }
+    }
 
     private let app: AppViewModel
 

@@ -55,7 +55,7 @@ struct MainTabView: View {
                 AnalyticsView()
             }
             
-            Tab("Profile", systemImage: "person.fill", value: 3) {
+            Tab("Settings", systemImage: "gearshape.fill", value: 3) {
                 SettingsView()
             }
             
