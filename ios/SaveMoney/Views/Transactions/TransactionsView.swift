@@ -3,6 +3,7 @@ import SwiftUI
 struct TransactionsView: View {
     @Environment(AppViewModel.self) private var app
     @Environment(NetworkMonitor.self) private var networkMonitor
+    @Namespace private var animationNamespace
     @State private var viewModel: TransactionViewModel?
     @State private var editingTransaction: Transaction?
     @State private var showAddTransaction = false
@@ -40,9 +41,15 @@ struct TransactionsView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: DSSpacing.sm) {
                             ForEach(availablePeriods(), id: \.self) { period in
-                                GlassPeriodChip(period: period, isSelected: period == vm.selectedPeriod) {
-                                    vm.selectedPeriod = period
-                                    vm.resetPage()
+                                GlassPeriodChip(
+                                    period: period,
+                                    isSelected: period == vm.selectedPeriod,
+                                    namespace: animationNamespace // Truyền biến namespace vào đây
+                                ) {
+                                    // Bọc trong withAnimation để kính trượt mượt mà
+                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                        vm.selectedPeriod = period
+                                    }
                                 }
                             }
                         }

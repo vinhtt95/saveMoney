@@ -3,6 +3,7 @@ import Charts
 
 struct AnalyticsView: View {
     @Environment(AppViewModel.self) private var app
+    @Namespace private var animationNamespace
     @State private var selectedPeriod = toYYYYMM(Date())
 
     private var periodTransactions: [Transaction] {
@@ -55,8 +56,14 @@ struct AnalyticsView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: DSSpacing.sm) {
                             ForEach(availablePeriods(), id: \.self) { period in
-                                GlassPeriodChip(period: period, isSelected: period == selectedPeriod) {
-                                    selectedPeriod = period
+                                GlassPeriodChip(
+                                    period: period,
+                                    isSelected: period == selectedPeriod, // Hoặc vm.selectedPeriod tùy cách bạn khai báo
+                                    namespace: animationNamespace
+                                ) {
+                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                        selectedPeriod = period // Hoặc vm.selectedPeriod = period
+                                    }
                                 }
                             }
                         }

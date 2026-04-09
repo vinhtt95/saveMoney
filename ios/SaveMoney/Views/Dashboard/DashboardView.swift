@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DashboardView: View {
     @Environment(AppViewModel.self) private var app
+    @Namespace private var animationNamespace
     @State private var selectedPeriod = toYYYYMM(Date())
     @State private var periods = availablePeriods()
     @State private var isRefreshing = false
@@ -39,13 +40,24 @@ struct DashboardView: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: DSSpacing.sm) {
                                 ForEach(periods, id: \.self) { period in
-                                    GlassPeriodChip(period: period, isSelected: period == selectedPeriod) {
-                                        selectedPeriod = period
-                                    }
+                                    GlassPeriodChip(
+                                        period: period,
+                                        isSelected: period == selectedPeriod,
+                                        namespace: animationNamespace, // Truyền namespace vào
+                                        action: {
+                                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                                selectedPeriod = period
+                                            }
+                                        }
+                                    )
                                 }
                             }
                             .padding(.horizontal, DSSpacing.lg)
+                            // FIX: Thêm padding dọc để viền và shadow không bị cắt
+                            .padding(.vertical, 1)
                         }
+                        // Chỉnh khoảng cách giữa list tháng và card phía dưới nếu cần
+                        .padding(.top, 1)
 
                         // Hero Balance Card
                         VStack(spacing: DSSpacing.sm) {

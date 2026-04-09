@@ -19,26 +19,41 @@ struct GlassCard<Content: View>: View {
 struct GlassPeriodChip: View {
     let period: String
     let isSelected: Bool
+    let namespace: Namespace.ID // Thêm namespace để đồng bộ chuyển động
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             Text(periodLabel(period))
                 .font(.caption.weight(.semibold))
-                // Dùng Vibrancy cho text
-                .foregroundStyle(isSelected ? DSColors.accent : .primary.opacity(0.8))
-                .padding(.horizontal, DSSpacing.md)
-                .padding(.vertical, DSSpacing.sm)
-                .liquidGlass(
-                    in: .capsule,
-                    tint: isSelected ? DSColors.accent : nil,
-                    // Khi không chọn dùng thin, khi chọn dùng ultraThin để trong hơn
-                    material: isSelected ? .ultraThinMaterial : .regularMaterial
-                )
+                // Text sẽ đổi màu mượt mà
+                .foregroundStyle(isSelected ? DSColors.accent : .primary.opacity(0.6))
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background {
+                    if isSelected {
+                        // Đây là "miếng kính" sẽ trượt đi
+                        Capsule()
+                            .fill(.ultraThinMaterial)
+                            .matchedGeometryEffect(id: "activeTab", in: namespace)
+                            // Thêm viền phản quang đặc trưng Liquid Glass
+                            .overlay(
+                                Capsule()
+                                    .stroke(
+                                        LinearGradient(
+                                            colors: [.white.opacity(0.5), .clear, .white.opacity(0.2)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        lineWidth: 1
+                                    )
+                            )
+                            // Đổ bóng nhẹ để tạo độ nổi
+                            .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                    }
+                }
         }
         .buttonStyle(.plain)
-        .scaleEffect(isSelected ? 1.05 : 1.0) // Thêm hiệu ứng nổi nhẹ khi chọn
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
     }
 }
 
