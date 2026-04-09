@@ -15,45 +15,63 @@ struct GlassCard<Content: View>: View {
     }
 }
 
-// MARK: - Glass Period Chip
+// MARK: - Liquid Button Style (iOS 18 Feedback)
+struct LiquidButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
+            .sensoryFeedback(.selection, trigger: configuration.isPressed) // Phản hồi rung nhẹ
+    }
+}
+
+// MARK: - Glass Period Chip (Sửa lỗi và nâng cấp)
 struct GlassPeriodChip: View {
     let period: String
     let isSelected: Bool
-    let namespace: Namespace.ID // Thêm namespace để đồng bộ chuyển động
+    let namespace: Namespace.ID
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             Text(periodLabel(period))
                 .font(.caption.weight(.semibold))
-                // Text sẽ đổi màu mượt mà
-                .foregroundStyle(isSelected ? DSColors.accent : .primary.opacity(0.6))
+                // FIX LỖI: Sử dụng Color.primary thay vì .primary để dùng opacity mượt mà
+                .foregroundStyle(isSelected ? DSColors.accent : Color.primary.opacity(0.6))
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
+                .contentShape(Capsule())
                 .background {
                     if isSelected {
-                        // Đây là "miếng kính" sẽ trượt đi
                         Capsule()
                             .fill(.ultraThinMaterial)
                             .matchedGeometryEffect(id: "activeTab", in: namespace)
-                            // Thêm viền phản quang đặc trưng Liquid Glass
-                            .overlay(
-                                Capsule()
-                                    .stroke(
-                                        LinearGradient(
-                                            colors: [.white.opacity(0.5), .clear, .white.opacity(0.2)],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        ),
-                                        lineWidth: 1
-                                    )
-                            )
-                            // Đổ bóng nhẹ để tạo độ nổi
-                            .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                            .liquidGlass(in: Capsule()) // Dùng modifier mới
                     }
                 }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(LiquidButtonStyle()) // Hiệu ứng nhún native
+    }
+}
+
+struct LiquidGlassButtonStyle<S: Shape>: ButtonStyle {
+    var shape: S
+    var isSelected: Bool = false
+    
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background {
+                if isSelected || configuration.isPressed {
+                    shape
+                        .fill(.ultraThinMaterial)
+                        .modifier(LiquidGlassModifier(shape: shape))
+                }
+            }
+            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: configuration.isPressed)
+            .sensoryFeedback(.selection, trigger: configuration.isPressed)
     }
 }
 

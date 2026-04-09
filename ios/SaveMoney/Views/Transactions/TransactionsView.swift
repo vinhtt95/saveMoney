@@ -37,16 +37,15 @@ struct TransactionsView: View {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: DSSpacing.sm) {
                             ForEach(availablePeriods(), id: \.self) { period in
-                                GlassPeriodChip(
-                                    period: period,
-                                    isSelected: period == vm.selectedPeriod,
-                                    namespace: animationNamespace // Truyền biến namespace vào đây
-                                ) {
-                                    // Bọc trong withAnimation để kính trượt mượt mà
-                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                Button(periodLabel(period)) {
+                                    withAnimation(.snappy) {
                                         vm.selectedPeriod = period
                                     }
                                 }
+                                .buttonStyle(LiquidGlassButtonStyle(
+                                    shape: Capsule(),
+                                    isSelected: period == vm.selectedPeriod
+                                ))
                             }
                         }
                     }

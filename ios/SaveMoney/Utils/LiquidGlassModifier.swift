@@ -1,42 +1,35 @@
 import SwiftUI
 
+import SwiftUI
+
 struct LiquidGlassModifier<S: Shape>: ViewModifier {
     var shape: S
-    var tint: Color?
-    var material: Material
     @Environment(\.colorScheme) var colorScheme
     
     func body(content: Content) -> some View {
         content
-            // 1. Lớp vật liệu kính (Blur) và Màu tint
-            .background(
-                ZStack {
-                    if let tint {
-                        tint.opacity(colorScheme == .dark ? 0.15 : 0.08)
-                    }
-                    Rectangle().fill(material)
-                }
-            )
-            // Cắt theo hình dáng
-            .clipShape(shape)
-            // 2. Viền phản quang (Specular Highlight) - Yếu tố quan trọng nhất của Liquid Glass
-            .overlay(
+            .overlay {
+                // Viền phản quang cực mảnh (0.5pt) đúng chuẩn iOS 18
                 shape.stroke(
                     LinearGradient(
                         colors: [
-                            .white.opacity(colorScheme == .dark ? 0.3 : 0.8),
-                            .white.opacity(0.1),
-                            .clear,
-                            .white.opacity(colorScheme == .dark ? 0.1 : 0.3)
+                            Color.white.opacity(colorScheme == .dark ? 0.3 : 0.5),
+                            Color.white.opacity(0.1),
+                            .clear
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
-                    lineWidth: 1
+                    lineWidth: 0.5
                 )
-            )
-            // 3. Đổ bóng tạo độ nổi (Drop shadow)
-            .shadow(color: .black.opacity(colorScheme == .dark ? 0.3 : 0.05), radius: 15, x: 0, y: 8)
+            }
+            .background {
+                // Lớp Inner Glow tạo độ dày cho mặt kính
+                shape
+                    .stroke(Color.white.opacity(colorScheme == .dark ? 0.1 : 0.2), lineWidth: 2)
+                    .blur(radius: 1)
+                    .mask(shape)
+            }
     }
 }
 
@@ -46,6 +39,6 @@ extension View {
         tint: Color? = nil,
         material: Material = .ultraThinMaterial // Dùng ultraThin cho iOS 18 look
     ) -> some View {
-        self.modifier(LiquidGlassModifier(shape: shape, tint: tint, material: material))
+        self.modifier(LiquidGlassModifier(shape: shape))
     }
 }

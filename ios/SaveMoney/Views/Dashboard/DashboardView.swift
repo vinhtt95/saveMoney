@@ -40,16 +40,15 @@ struct DashboardView: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: DSSpacing.sm) {
                                 ForEach(periods, id: \.self) { period in
-                                    GlassPeriodChip(
-                                        period: period,
-                                        isSelected: period == selectedPeriod,
-                                        namespace: animationNamespace, // Truyền namespace vào
-                                        action: {
-                                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                                selectedPeriod = period
-                                            }
+                                    Button(periodLabel(period)) {
+                                        withAnimation(.snappy) {
+                                            selectedPeriod = period
                                         }
-                                    )
+                                    }
+                                    .buttonStyle(LiquidGlassButtonStyle(
+                                        shape: Capsule(),
+                                        isSelected: period == selectedPeriod
+                                    ))
                                 }
                             }
                             .padding(.horizontal, DSSpacing.lg)
