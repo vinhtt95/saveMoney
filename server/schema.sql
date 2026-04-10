@@ -5,8 +5,8 @@ CREATE TABLE IF NOT EXISTS categories (
   id    VARCHAR(36)              NOT NULL PRIMARY KEY,
   name  VARCHAR(255)             NOT NULL,
   type  ENUM('Expense','Income') NOT NULL,
-  icon  VARCHAR(50)              NOT NULL DEFAULT 'tag.fill', -- Thêm cột icon
-  color VARCHAR(20)              NOT NULL DEFAULT 'accent'    -- Thêm cột color
+  icon  VARCHAR(50)              NOT NULL DEFAULT 'tag.fill',
+  color VARCHAR(20)              NOT NULL DEFAULT 'accent'
 );
 
 CREATE TABLE IF NOT EXISTS accounts (
