@@ -73,4 +73,8 @@ final class SettingsViewModel {
     func updateDefaultIncomeCategory(_ id: String) async {
         try? await app.updateSetting(SettingsKey.defaultIncomeCategoryId, id)
     }
+    
+    func updatePinnedBudgetId(_ id: String) async {
+        try? await app.updateSetting("pinned_budget_id", id) // Giả định bạn có hằng số SettingsKey.pinnedBudgetId
+    }
 }

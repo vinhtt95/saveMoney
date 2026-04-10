@@ -15,6 +15,7 @@ final class AppViewModel {
     var connectionState: ConnectionState = .loading
     var isLoading = true
     var errorMessage: String?
+    var pinnedBudgetId: String? = nil
 
     let api = APIService()
     let store = LocalDataStore.shared

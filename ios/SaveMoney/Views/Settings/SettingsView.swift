@@ -97,6 +97,39 @@ struct SettingsView: View {
                         NavigationLink(destination: DefaultCategoriesSettingsView(vm: vm)) {
                             Label { Text("Danh mục mặc định").lineLimit(1) } icon: { Image(systemName: "folder.fill") }
                         }
+                        
+                        HStack {
+                            Label {
+                                Text("Ghim ngân sách").lineLimit(1)
+                            } icon: {
+                                Image(systemName: "pin.fill")
+                            }
+                            
+                            Spacer(minLength: 20)
+                            
+                            Picker("", selection: Binding<String>(
+                                get: { app.pinnedBudgetId ?? "" },
+                                set: { newValue in
+                                    // 1. Cập nhật UI ngay lập tức để Picker nhận giá trị và đóng lại mượt mà
+                                    app.pinnedBudgetId = newValue.isEmpty ? nil : newValue
+                                    
+                                    // 2. Chạy ngầm việc lưu xuống Local Storage/Database
+                                    Task { await vm.updatePinnedBudgetId(newValue) }
+                                }
+                            )) {
+                                Text("Không chọn").tag("")
+                                
+                                ForEach(app.budgets) { budget in
+                                    // Ép kiểu (as String) để chắc chắn 100% khớp với Binding<String>
+                                    Text(budget.name).tag(budget.id as String)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                            .labelsHidden()
+                            .lineLimit(1)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .truncationMode(.tail)
+                        }
                     }
                 }
 

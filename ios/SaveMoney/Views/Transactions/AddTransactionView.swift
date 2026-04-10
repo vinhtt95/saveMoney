@@ -123,7 +123,7 @@ struct AddTransactionView: View {
                         
                         HStack {
                             Label("Tài khoản", systemImage: "creditcard")
-                            Spacer()
+                            Spacer(minLength: 20)
                             Picker("", selection: $accountId) {
                                 Text("Chọn tài khoản").tag(String?.none)
                                 ForEach(app.accounts) { acc in
@@ -131,6 +131,11 @@ struct AddTransactionView: View {
                                 }
                             }
                         }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                        .lineLimit(1)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .truncationMode(.tail)
                         .padding()
                         
                         if type == .transfer {

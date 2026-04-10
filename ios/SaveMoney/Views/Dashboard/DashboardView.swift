@@ -126,6 +126,13 @@ struct DashboardView: View {
                             .padding(.horizontal, DSSpacing.lg)
                         }
                         
+                        // Pinned Budget Card
+                        if let pinnedId = app.pinnedBudgetId,
+                           let pinnedBudget = app.budgets.first(where: { $0.id == pinnedId }) {
+                            PinnedBudgetCard(budget: pinnedBudget, selectedPeriod: selectedPeriod)
+                                .padding(.horizontal, DSSpacing.lg)
+                        }
+                        
                         // Recent Transactions
                         RecentTransactionsView(transactions: recentTxs, app: app)
                             .padding(.horizontal, DSSpacing.lg)
