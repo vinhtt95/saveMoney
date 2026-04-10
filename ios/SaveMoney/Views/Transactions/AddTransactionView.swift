@@ -109,40 +109,90 @@ struct AddTransactionView: View {
                         if type != .transfer {
                             HStack {
                                 Label("Danh mục", systemImage: "grid")
-                                Spacer()
-                                Picker("", selection: $categoryId) {
-                                    Text("Chọn danh mục").tag(String?.none)
-                                    ForEach(availableCategories) { cat in
-                                        Text(cat.name).tag(String?.some(cat.id))
+                                    .layoutPriority(1)
+                                
+                                Spacer(minLength: 10)
+                                
+                                Menu {
+                                    Picker("", selection: $categoryId) {
+                                        Text("Chọn danh mục").tag(String?.none)
+                                        ForEach(availableCategories) { cat in
+                                            Text(cat.name).tag(String?.some(cat.id))
+                                        }
                                     }
+                                } label: {
+                                    let selectedCategoryName = availableCategories.first(where: { $0.id == categoryId })?.name ?? "Chọn danh mục"
+                                    
+                                    HStack(spacing: 4) {
+                                        Text(selectedCategoryName)
+                                            .lineLimit(1)
+                                            .truncationMode(.tail)
+                                        Image(systemName: "chevron.up.chevron.down")
+                                            .font(.caption)
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .trailing)
                                 }
                             }
                             .padding()
+                            
                             Divider().padding(.leading, 44)
                         }
                         
                         HStack {
                             Label("Tài khoản", systemImage: "creditcard")
-                            Spacer()
-                            Picker("", selection: $accountId) {
-                                Text("Chọn tài khoản").tag(String?.none)
-                                ForEach(app.accounts) { acc in
-                                    Text(acc.name).tag(String?.some(acc.id))
+                                .layoutPriority(1)
+                            
+                            Spacer(minLength: 10)
+                            
+                            Menu {
+                                Picker("", selection: $accountId) {
+                                    Text("Chọn tài khoản").tag(String?.none)
+                                    ForEach(app.accounts) { acc in
+                                        Text(acc.name).tag(String?.some(acc.id))
+                                    }
                                 }
+                            } label: {
+                                let selectedName = app.accounts.first(where: { $0.id == accountId })?.name ?? "Chọn tài khoản"
+                                
+                                HStack(spacing: 4) {
+                                    Text(selectedName)
+                                        .lineLimit(1)
+                                        .truncationMode(.tail)
+                                    Image(systemName: "chevron.up.chevron.down")
+                                        .font(.caption)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .trailing)
                             }
                         }
                         .padding()
                         
                         if type == .transfer {
                             Divider().padding(.leading, 44)
+                            
                             HStack {
                                 Label("Đến", systemImage: "arrow.right.circle")
-                                Spacer()
-                                Picker("", selection: $transferToId) {
-                                    Text("Chọn tài khoản").tag(String?.none)
-                                    ForEach(app.accounts.filter { $0.id != accountId }) { acc in
-                                        Text(acc.name).tag(String?.some(acc.id))
+                                    .layoutPriority(1)
+                                
+                                Spacer(minLength: 10)
+                                
+                                Menu {
+                                    Picker("", selection: $transferToId) {
+                                        Text("Chọn tài khoản").tag(String?.none)
+                                        ForEach(app.accounts.filter { $0.id != accountId }) { acc in
+                                            Text(acc.name).tag(String?.some(acc.id))
+                                        }
                                     }
+                                } label: {
+                                    let selectedTransferToName = app.accounts.first(where: { $0.id == transferToId })?.name ?? "Chọn tài khoản"
+                                    
+                                    HStack(spacing: 4) {
+                                        Text(selectedTransferToName)
+                                            .lineLimit(1)
+                                            .truncationMode(.tail)
+                                        Image(systemName: "chevron.up.chevron.down")
+                                            .font(.caption)
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .trailing)
                                 }
                             }
                             .padding()

@@ -75,6 +75,7 @@ final class SettingsViewModel {
     }
     
     func updatePinnedBudgetId(_ id: String) async {
-        try? await app.updateSetting("pinned_budget_id", id) // Giả định bạn có hằng số SettingsKey.pinnedBudgetId
+        let value = id.isEmpty ? "" : id
+        try? await app.updateSetting("pinned_budget_id", value)
     }
 }

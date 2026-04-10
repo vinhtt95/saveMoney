@@ -94,13 +94,11 @@ struct PinnedBudgetCard: View {
         VStack(alignment: .leading, spacing: DSSpacing.md) {
             // Header
             HStack {
-                Label(budget.name, systemImage: "chart.pie.fill")
+                Image(systemName: "chart.pie.fill")
+                    .foregroundStyle(DSColors.accent)
+                Text(budget.name)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
                 Spacer()
-                Image(systemName: "pin.fill")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
             }
             
             HStack(alignment: .center, spacing: DSSpacing.xl) {

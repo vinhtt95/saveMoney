@@ -97,27 +97,29 @@ struct DashboardView: View {
                         
                         // Net Worth (shown when gold assets exist)
                         if !app.goldAssets.isEmpty {
-                            VStack(alignment: .leading, spacing: DSSpacing.sm) {
-                                HStack {
-                                    Image(systemName: "star.fill")
-                                        .foregroundStyle(DSColors.gold)
-                                    Text("Tài sản ròng")
-                                        .font(.subheadline.weight(.semibold))
-                                    Spacer()
-                                }
-                                HStack(alignment: .firstTextBaseline) {
+                            HStack(alignment: .firstTextBaseline, spacing: DSSpacing.sm){
+                                VStack(alignment: .leading, spacing: DSSpacing.sm) {
+                                    HStack {
+                                        Image(systemName: "star.fill")
+                                            .foregroundStyle(DSColors.gold)
+                                        Text("Tài sản ròng")
+                                            .font(.subheadline.weight(.semibold))
+                                        Spacer()
+                                    }
                                     Text(formatVND(app.netWorth))
                                         .font(.title2.weight(.bold).monospacedDigit())
                                         .foregroundStyle(DSColors.gold)
-                                    Spacer()
-                                    VStack(alignment: .trailing, spacing: 2) {
-                                        Text("Tiền: \(formatVNDShort(app.totalBalance))")
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                        Text("Vàng: \(formatVNDShort(app.totalGoldValue))")
-                                            .font(.caption)
-                                            .foregroundStyle(DSColors.gold)
-                                    }
+                                }
+                                
+                                Spacer()
+                                
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text("Tiền: \(formatVNDShort(app.totalBalance))")
+                                        .font(.caption)
+                                        .foregroundStyle(DSColors.positive)
+                                    Text("Vàng: \(formatVNDShort(app.totalGoldValue))")
+                                        .font(.caption)
+                                        .foregroundStyle(DSColors.gold)
                                 }
                             }
                             .padding(DSSpacing.lg)

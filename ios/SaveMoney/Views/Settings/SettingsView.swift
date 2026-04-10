@@ -33,10 +33,9 @@ struct SettingsView: View {
 
                 // 2. General
                 Section("General") {
-                    // Giao diện
+                    // Giao diện (giữ lại vì thuộc về App UI)
                     HStack {
-                        Label { Text("Giao diện").lineLimit(1) } icon: { Image(systemName: "paintbrush.fill") }
-                        Spacer()
+                        Label("Giao diện", systemImage: "paintbrush.fill")
                         Spacer()
                         Picker("", selection: Binding(
                             get: { theme.theme },
@@ -49,79 +48,14 @@ struct SettingsView: View {
                         .pickerStyle(.menu)
                     }
 
-                    // Địa chỉ máy chủ
-                    NavigationLink(destination: serverSettingsView) {
-                        Label { Text("Địa chỉ máy chủ").lineLimit(1) } icon: { Image(systemName: "server.rack") }
+                    // MỤC CHUNG MỚI: Cài đặt mặc định
+                    NavigationLink(destination: DefaultSettingsView(vm: vm)) {
+                        Label("Cài đặt mặc định", systemImage: "gearshape.2.fill")
                     }
 
-                    // Cài đặt mặc định
-                    Group {
-                        // Loại giao dịch
-                        Picker(selection: Binding(
-                            get: { app.defaultTransactionType },
-                            set: { newValue in Task { await vm.updateDefaultType(newValue) } }
-                        )) {
-                            Text("Chi tiêu").tag(TransactionType.expense)
-                            Text("Thu nhập").tag(TransactionType.income)
-                        } label: {
-                            Label { Text("Loại GD mặc định").lineLimit(1) } icon: { Image(systemName: "arrow.left.arrow.right") }
-                        }
-
-                        // TÀI KHOẢN MẶC ĐỊNH - Giải pháp fix lỗi nhảy dòng
-                        HStack {
-                            Label {
-                                Text("Tài khoản mặc định").lineLimit(1)
-                            } icon: {
-                                Image(systemName: "wallet.pass.fill")
-                            }
-                            
-                            Spacer(minLength: 20)
-                            
-                            Picker("", selection: Binding(
-                                get: { app.defaultAccountId ?? "" },
-                                set: { newValue in Task { await vm.updateDefaultAccount(newValue) } }
-                            )) {
-                                Text("— Không chọn —").tag("")
-                                ForEach(app.accounts) { acc in
-                                    Text(acc.name).tag(acc.id)
-                                }
-                            }
-                            .pickerStyle(.menu)
-                            .labelsHidden() // Ẩn label của picker để tự kiểm soát không gian
-                            .lineLimit(1)
-                            .fixedSize(horizontal: false, vertical: true) // Ép không giãn chiều dọc
-                            .truncationMode(.middle)
-                        }
-                        
-                        // Danh mục mặc định
-                        NavigationLink(destination: DefaultCategoriesSettingsView(vm: vm)) {
-                            Label { Text("Danh mục mặc định").lineLimit(1) } icon: { Image(systemName: "folder.fill") }
-                        }
-                        
-                        HStack {
-                            Label {
-                                Text("Ghim ngân sách").lineLimit(1)
-                            } icon: {
-                                Image(systemName: "pin.fill")
-                            }
-                            
-                            Spacer(minLength: 20)
-                            
-                            Picker("", selection: Binding<String>(
-                                get: { app.pinnedBudgetId ?? "" },
-                                set: { app.pinnedBudgetId = $0.isEmpty ? nil : $0 }
-                            )) {
-                                Text("— Không chọn —").tag("")
-                                ForEach(app.budgets) { budget in
-                                    Text(budget.name).tag(budget.id)
-                                }
-                            }
-                            .pickerStyle(.menu)
-                            .labelsHidden()
-                            .lineLimit(1)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .truncationMode(.tail)
-                        }
+                    // Địa chỉ máy chủ
+                    NavigationLink(destination: serverSettingsView) {
+                        Label("Địa chỉ máy chủ", systemImage: "server.rack")
                     }
                 }
 
@@ -219,60 +153,132 @@ struct SettingsView: View {
     }
 }
 
-// MARK: - View chọn danh mục mặc định (Đã fix nhảy dòng)
-struct DefaultCategoriesSettingsView: View {
-    let vm: SettingsViewModel
+struct DefaultSettingsView: View {
     @Environment(AppViewModel.self) private var app
+    let vm: SettingsViewModel
     
     var body: some View {
         List {
-            Section("Danh mục chi mặc định") {
-                categoryPicker(title: "Chi tiêu",
-                               systemImage: "arrow.up.circle.fill",
-                               color: .red,
-                               selection: Binding(
-                                   get: { app.defaultExpenseCategoryId ?? "" },
-                                   set: { newValue in Task { await vm.updateDefaultExpenseCategory(newValue) } }
-                               ),
-                               categories: vm.expenseCategories)
+            Section("Giao dịch & Tài khoản") {
+                // 1. Loại giao dịch mặc định
+                HStack {
+                    Label("Loại giao dịch", systemImage: "arrow.left.arrow.right")
+                        .layoutPriority(1)
+                    
+                    Spacer(minLength: 20)
+                    
+                    Menu {
+                        Picker("", selection: Binding(
+                            get: { app.defaultTransactionType },
+                            set: { newValue in Task { await vm.updateDefaultType(newValue) } }
+                        )) {
+                            Text("Chi tiêu").tag(TransactionType.expense)
+                            Text("Thu nhập").tag(TransactionType.income)
+                        }
+                    } label: {
+                        let selectedName = app.defaultTransactionType == .expense ? "Chi tiêu" : "Thu nhập"
+                        HStack(spacing: 4) {
+                            Text(selectedName)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.caption)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                    }
+                }
+
+                // 2. Tài khoản mặc định
+                entityMenuRow(
+                    title: "Tài khoản",
+                    systemImage: "wallet.pass.fill",
+                    selectedValue: app.defaultAccountId,
+                    options: app.accounts.map { ($0.id, $0.name) }
+                ) { newValue in
+                    Task { await vm.updateDefaultAccount(newValue ?? "") }
+                }
+            }
+            
+            Section("Ngân sách") {
+                // 3. Ghim ngân sách
+                entityMenuRow(
+                    title: "Ghim ngân sách",
+                    systemImage: "pin.fill",
+                    selectedValue: app.pinnedBudgetId,
+                    options: app.budgets.map { ($0.id, $0.name) }
+                ) { newValue in
+                    Task { await vm.updatePinnedBudgetId(newValue ?? "") }
+                }
             }
 
-            Section("Danh mục thu mặc định") {
-                categoryPicker(title: "Thu nhập",
-                               systemImage: "arrow.down.circle.fill",
-                               color: .green,
-                               selection: Binding(
-                                   get: { app.defaultIncomeCategoryId ?? "" },
-                                   set: { newValue in Task { await vm.updateDefaultIncomeCategory(newValue) } }
-                               ),
-                               categories: vm.incomeCategories)
+            Section("Danh mục") {
+                // 4. Danh mục chi mặc định
+                entityMenuRow(
+                    title: "Chi tiêu",
+                    systemImage: "arrow.up.circle.fill",
+                    color: .red,
+                    selectedValue: app.defaultExpenseCategoryId,
+                    options: vm.expenseCategories.map { ($0.id, $0.name) }
+                ) { newValue in
+                    Task { await vm.updateDefaultExpenseCategory(newValue ?? "") }
+                }
+
+                // 5. Danh mục thu mặc định
+                entityMenuRow(
+                    title: "Thu nhập",
+                    systemImage: "arrow.down.circle.fill",
+                    color: .green,
+                    selectedValue: app.defaultIncomeCategoryId,
+                    options: vm.incomeCategories.map { ($0.id, $0.name) }
+                ) { newValue in
+                    Task { await vm.updateDefaultIncomeCategory(newValue ?? "") }
+                }
             }
         }
-        .navigationTitle("Danh mục mặc định")
+        .navigationTitle("Cài đặt mặc định")
     }
 
+    // MARK: - Helper Components
+    
     @ViewBuilder
-    private func categoryPicker(title: String, systemImage: String, color: Color, selection: Binding<String>, categories: [Category]) -> some View {
+    private func entityMenuRow(
+        title: String,
+        systemImage: String,
+        color: Color = .primary,
+        selectedValue: String?,
+        options: [(id: String, name: String)],
+        onSelect: @escaping (String?) -> Void
+    ) -> some View {
         HStack {
-            Label {
-                Text(title).lineLimit(1)
-            } icon: {
-                Image(systemName: systemImage)
-            }
-            .foregroundStyle(color)
+            Label(title, systemImage: systemImage)
+                .foregroundStyle(color)
+                .layoutPriority(1)
             
             Spacer(minLength: 20)
             
-            Picker("", selection: selection) {
-                Text("— Không chọn —").tag("")
-                ForEach(categories, id: \.id) { category in
-                    Text("\(category.name)").tag(category.id as String?)
+            Menu {
+                // Sử dụng Binding String? kết hợp với tag(String?.none) / tag(String?.some)
+                Picker("", selection: Binding<String?>(
+                    get: { (selectedValue == nil || selectedValue?.isEmpty == true) ? nil : selectedValue },
+                    set: { onSelect($0) }
+                )) {
+                    Text("— Không chọn —").tag(String?.none)
+                    ForEach(options, id: \.id) { opt in
+                        Text(opt.name).tag(String?.some(opt.id))
+                    }
                 }
+            } label: {
+                let selectedName = options.first(where: { $0.id == selectedValue })?.name ?? "— Không chọn —"
+                
+                HStack(spacing: 4) {
+                    Text(selectedName)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.caption)
+                }
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            .pickerStyle(.menu)
-            .labelsHidden()
-            .lineLimit(1)
-            .truncationMode(.tail)
         }
     }
 }
