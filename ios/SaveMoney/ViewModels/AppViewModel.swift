@@ -15,7 +15,6 @@ final class AppViewModel {
     var connectionState: ConnectionState = .loading
     var isLoading = true
     var errorMessage: String?
-    var pinnedBudgetId: String? = nil
 
     let api = APIService()
     let store = LocalDataStore.shared
@@ -74,6 +73,23 @@ final class AppViewModel {
             }
         }
         return map
+    }
+    
+    var pinnedBudgetId: String? {
+        get {
+            // Lấy trực tiếp từ settings cache (đã được load khi mở app)
+            let id = settings["pinned_budget_id"]
+            return (id?.isEmpty == true) ? nil : id
+        }
+        set {
+            // 1. Cập nhật ngay lên RAM để UI phản hồi tức thì
+            settings["pinned_budget_id"] = newValue ?? ""
+            
+            // 2. Chạy ngầm việc lưu xuống LocalStore & Server
+            Task {
+                try? await updateSetting("pinned_budget_id", newValue ?? "")
+            }
+        }
     }
     
     var totalGoldValue: Double {

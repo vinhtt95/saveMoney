@@ -129,7 +129,7 @@ struct DashboardView: View {
                         // Pinned Budget Card
                         if let pinnedId = app.pinnedBudgetId,
                            let pinnedBudget = app.budgets.first(where: { $0.id == pinnedId }) {
-                            PinnedBudgetCard(budget: pinnedBudget, selectedPeriod: selectedPeriod)
+                            PinnedBudgetCard(budget: pinnedBudget)
                                 .padding(.horizontal, DSSpacing.lg)
                         }
                         

@@ -109,19 +109,11 @@ struct SettingsView: View {
                             
                             Picker("", selection: Binding<String>(
                                 get: { app.pinnedBudgetId ?? "" },
-                                set: { newValue in
-                                    // 1. Cập nhật UI ngay lập tức để Picker nhận giá trị và đóng lại mượt mà
-                                    app.pinnedBudgetId = newValue.isEmpty ? nil : newValue
-                                    
-                                    // 2. Chạy ngầm việc lưu xuống Local Storage/Database
-                                    Task { await vm.updatePinnedBudgetId(newValue) }
-                                }
+                                set: { app.pinnedBudgetId = $0.isEmpty ? nil : $0 }
                             )) {
-                                Text("Không chọn").tag("")
-                                
+                                Text("— Không chọn —").tag("")
                                 ForEach(app.budgets) { budget in
-                                    // Ép kiểu (as String) để chắc chắn 100% khớp với Binding<String>
-                                    Text(budget.name).tag(budget.id as String)
+                                    Text(budget.name).tag(budget.id)
                                 }
                             }
                             .pickerStyle(.menu)
