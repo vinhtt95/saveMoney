@@ -17,10 +17,30 @@ final class SettingsViewModel {
     }
 
     private let app: AppViewModel
+    var pendingOps: [PendingSyncOperation] = []
 
     init(app: AppViewModel) {
         self.app = app
         self.baseURL = app.api.baseURL
+        refreshPendingOps()
+    }
+    
+    func refreshPendingOps() {
+        // Lấy danh sách các thao tác chưa đồng bộ từ Store
+        pendingOps = app.store.fetchPendingOps()
+    }
+    
+    func deletePendingOp(_ op: PendingSyncOperation) {
+        app.store.dequeueSyncOp(op)
+        refreshPendingOps()
+    }
+    
+    func manualReconnect() async {
+        isSubmitting = true
+        // Việc gọi loadInitData sẽ cập nhật app.connectionState dựa trên kết quả API thực tế
+        await app.loadInitData()
+        refreshPendingOps()
+        isSubmitting = false
     }
 
     func saveBaseURL() async {

@@ -5,14 +5,8 @@ struct ContentView: View {
     @Environment(ThemeManager.self) private var theme
 
     var body: some View {
-        Group {
-            if app.isLoading {
-                LoadingView()
-            } else {
-                MainTabView()
-            }
-        }
-        .task { await app.loadInitData() }
+        MainTabView()
+            .task { await app.loadInitData() }
     }
 }
 

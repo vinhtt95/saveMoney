@@ -18,19 +18,12 @@ struct SaveMoneyApp: App {
                 .tint(DSColors.accent)
                 .onAppear {
                     appViewModel.networkMonitor = networkMonitor
-                    // Sync pending ops if already online at launch
+                    // Chỉ sync khi vào app lần đầu nếu có mạng
                     if networkMonitor.isOnline {
                         Task { await appViewModel.syncService.syncPending() }
                     }
                 }
-                .onChange(of: networkMonitor.isOnline) { oldValue, newValue in
-                    appViewModel.handleNetworkChange(from: oldValue, to: newValue)
-                }
-                .onChange(of: scenePhase) { _, newPhase in
-                    if newPhase == .active && networkMonitor.isOnline {
-                        Task { await appViewModel.syncService.syncPending() }
-                    }
-                }
+                // Loại bỏ .onChange của networkMonitor và scenePhase để tránh tự động sync
         }
         .modelContainer(LocalDataStore.shared.container)
     }

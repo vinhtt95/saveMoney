@@ -37,6 +37,7 @@ struct SettingsView: View {
                     HStack {
                         Label { Text("Giao diện").lineLimit(1) } icon: { Image(systemName: "paintbrush.fill") }
                         Spacer()
+                        Spacer()
                         Picker("", selection: Binding(
                             get: { theme.theme },
                             set: { theme.theme = $0 }
@@ -118,6 +119,40 @@ struct SettingsView: View {
 
     private var serverSettingsView: some View {
         List {
+            Section("Kết nối") {
+                // 1. Kiểm tra Internet của thiết bị
+                HStack {
+                    Text("Internet")
+                    Spacer()
+                    Text(app.isOnline ? "Đã kết nối" : "Mất kết nối")
+                        .foregroundStyle(app.isOnline ? .green : .secondary)
+                }
+                
+                // 2. Kiểm tra trạng thái thực tế với Server
+                HStack {
+                    Text("Máy chủ")
+                    Spacer()
+                    Group {
+                        switch app.connectionState {
+                        case .connected:
+                            Text("Sẵn sàng").foregroundStyle(.green)
+                        case .loading:
+                            Text("Đang kiểm tra...").foregroundStyle(.orange)
+                        case .disconnected:
+                            Text("Không phản hồi").foregroundStyle(.red)
+                        }
+                    }
+                }
+                
+                Button(action: { Task { await vm.manualReconnect() } }) {
+                    if vm.isSubmitting {
+                        ProgressView().padding(.trailing, 5)
+                    }
+                    Text("Thử kết nối lại")
+                }
+                .disabled(vm.isSubmitting)
+            }
+            
             Section("Cấu hình API") {
                 TextField("http://localhost:3001", text: Binding(
                     get: { vm.baseURL },
@@ -126,13 +161,36 @@ struct SettingsView: View {
                 .keyboardType(.URL)
                 .textInputAutocapitalization(.never)
                 
-                Button("Lưu thay đổi") {
+                Button("Lưu địa chỉ") {
                     Task { await vm.saveBaseURL() }
                 }
-                .foregroundStyle(DSColors.accent)
+            }
+            
+            Section(header: Text("Hàng chờ đồng bộ (\(vm.pendingOps.count))")) {
+                if vm.pendingOps.isEmpty {
+                    Text("Không có yêu cầu nào đang chờ").font(.footnote).foregroundStyle(.secondary)
+                } else {
+                    ForEach(vm.pendingOps, id: \.id) { op in
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(op.operationType.uppercased())
+                                    .font(.caption).bold()
+                                    .foregroundStyle(op.operationType == "delete" ? .red : .blue)
+                                Text("ID: \(op.entityId)").font(.system(.caption2, design: .monospaced))
+                            }
+                            Spacer()
+                            Button(role: .destructive) {
+                                vm.deletePendingOp(op)
+                            } label: {
+                                Image(systemName: "trash")
+                            }
+                        }
+                    }
+                }
             }
         }
         .navigationTitle("Máy chủ")
+        .onAppear { vm.refreshPendingOps() }
     }
 }
 

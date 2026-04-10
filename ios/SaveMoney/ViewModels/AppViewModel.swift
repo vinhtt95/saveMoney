@@ -142,10 +142,14 @@ final class AppViewModel {
 
     // MARK: - Load
     func loadInitData() async {
-        isLoading = true
+        // 1. Tải dữ liệu từ local ngay lập tức để hiện UI
+        loadFromLocal()
+        isLoading = false
+        
         connectionState = .loading
         errorMessage = nil
 
+        // 2. Nếu online, thực hiện cập nhật dữ liệu từ server ngầm
         if isOnline {
             do {
                 let data = try await api.fetchInit()
@@ -161,16 +165,13 @@ final class AppViewModel {
                 )
                 connectionState = .connected
             } catch {
-                loadFromLocal()
+                // Nếu lỗi mạng, vẫn giữ data local đã load, chỉ cập nhật trạng thái kết nối
                 connectionState = .disconnected
-                errorMessage = error.localizedDescription
+                print("Background sync failed: \(error.localizedDescription)")
             }
         } else {
-            loadFromLocal()
             connectionState = .disconnected
         }
-
-        isLoading = false
     }
 
     private func loadFromLocal() {
