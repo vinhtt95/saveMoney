@@ -2,9 +2,11 @@ CREATE DATABASE IF NOT EXISTS savemoney_db CHARACTER SET utf8mb4 COLLATE utf8mb4
 USE savemoney_db;
 
 CREATE TABLE IF NOT EXISTS categories (
-  id   VARCHAR(36)              NOT NULL PRIMARY KEY,
-  name VARCHAR(255)             NOT NULL,
-  type ENUM('Expense','Income') NOT NULL
+  id    VARCHAR(36)              NOT NULL PRIMARY KEY,
+  name  VARCHAR(255)             NOT NULL,
+  type  ENUM('Expense','Income') NOT NULL,
+  icon  VARCHAR(50)              NOT NULL DEFAULT 'tag.fill', -- Thêm cột icon
+  color VARCHAR(20)              NOT NULL DEFAULT 'accent'    -- Thêm cột color
 );
 
 CREATE TABLE IF NOT EXISTS accounts (

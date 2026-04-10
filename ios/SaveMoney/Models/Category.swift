@@ -16,13 +16,20 @@ struct Category: Identifiable, Codable, Equatable {
     var id: String
     var name: String
     var type: CategoryType
+    var icon: String
+    var color: String
 }
 
 struct CategoryCreateDTO: Encodable {
+    var id: String
     var name: String
     var type: String
+    var icon: String
+    var color: String
 }
 
 struct CategoryUpdateDTO: Encodable {
     var name: String
+    var icon: String
+    var color: String
 }

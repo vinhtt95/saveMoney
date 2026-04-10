@@ -119,3 +119,22 @@ func categorySystemImage(_ name: String) -> String {
     if lower.contains("internet") { return "wifi" }
     return "tag.fill"
 }
+
+struct CategoryColorHelper {
+    static func map(_ colorName: String) -> Color {
+        switch colorName {
+        case "orange": return .orange
+        case "blue": return .blue
+        case "pink": return .pink
+        case "purple": return .purple
+        case "red": return .red
+        case "indigo": return .indigo
+        case "green": return .green
+        case "teal": return .teal
+        case "yellow": return .yellow
+        case "brown": return .brown
+        case "gray": return .gray
+        default: return DSColors.accent
+        }
+    }
+}

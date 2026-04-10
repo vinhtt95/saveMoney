@@ -3,35 +3,94 @@ import { pool } from '../db.js';
 
 export const router = Router();
 
+/**
+ * Lấy danh sách tất cả danh mục
+ * Đảm bảo SELECT đủ icon và color để iOS không bị lỗi Decoding
+ */
 router.get('/categories', async (_req, res) => {
-  const [rows] = await pool.query('SELECT id, name, type FROM categories ORDER BY type, name');
-  res.json(rows);
+  try {
+    const [rows] = await pool.query(
+      'SELECT id, name, type, icon, color FROM categories ORDER BY type, name'
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
 });
 
+/**
+ * Thêm danh mục mới
+ * Nhận id từ client gửi lên để tránh lỗi ER_BAD_NULL_ERROR
+ */
 router.post('/categories', async (req, res) => {
-  const { id, name, type } = req.body;
-  await pool.query('INSERT INTO categories (id, name, type) VALUES (?, ?, ?)', [id, name, type]);
-  res.json({ id, name, type });
+  const { id, name, type, icon, color } = req.body;
+
+  // Kiểm tra các trường bắt buộc
+  if (!id || !name || !type) {
+    return res.status(400).json({ error: 'Missing required fields: id, name, or type' });
+  }
+
+  try {
+    // Thực hiện INSERT đủ 5 tham số
+    await pool.query(
+      'INSERT INTO categories (id, name, type, icon, color) VALUES (?, ?, ?, ?, ?)',
+      [
+        id, 
+        name, 
+        type, 
+        icon || 'tag.fill', // Giá trị mặc định nếu client không gửi
+        color || 'accent'    // Giá trị mặc định nếu client không gửi
+      ]
+    );
+
+    // Trả về đúng object vừa tạo để iOS decode thành công
+    res.json({ 
+      id, 
+      name, 
+      type, 
+      icon: icon || 'tag.fill', 
+      color: color || 'accent' 
+    });
+  } catch (error: any) {
+    console.error('Error creating category:', error);
+    res.status(500).json({ error: error.message || 'Database error' });
+  }
 });
 
-router.post('/categories/bulk', async (req, res) => {
-  const categories: Array<{ id: string; name: string; type: string }> = req.body;
-  if (!categories.length) return res.json({ inserted: 0 });
-  const values = categories.map((c) => [c.id, c.name, c.type]);
-  const [result] = await pool.query(
-    'INSERT IGNORE INTO categories (id, name, type) VALUES ?',
-    [values]
-  ) as any;
-  res.json({ inserted: result.affectedRows });
-});
-
+/**
+ * Cập nhật danh mục hiện có
+ */
 router.put('/categories/:id', async (req, res) => {
-  const { name } = req.body;
-  await pool.query('UPDATE categories SET name = ? WHERE id = ?', [name, req.params.id]);
-  res.json({ ok: true });
+  const { name, icon, color } = req.body;
+  const { id } = req.params;
+
+  try {
+    const [result]: any = await pool.query(
+      'UPDATE categories SET name = ?, icon = ?, color = ? WHERE id = ?',
+      [name, icon, color, id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Category not found' });
+    }
+
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Error updating category:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
 });
 
+/**
+ * Xóa danh mục
+ */
 router.delete('/categories/:id', async (req, res) => {
-  await pool.query('DELETE FROM categories WHERE id = ?', [req.params.id]);
-  res.json({ ok: true });
+  try {
+    await pool.query('DELETE FROM categories WHERE id = ?', [req.params.id]);
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Error deleting category:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
 });

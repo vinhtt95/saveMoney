@@ -13,7 +13,7 @@ final class LocalTransaction {
     var transferToId: String?
     var amount: Double
     var note: String?
-
+    
     init(from tx: Transaction) {
         self.id = tx.id
         self.date = tx.date
@@ -24,7 +24,7 @@ final class LocalTransaction {
         self.amount = tx.amount
         self.note = tx.note
     }
-
+    
     func toTransaction() -> Transaction? {
         guard let txType = TransactionType(rawValue: type) else { return nil }
         return Transaction(
@@ -33,7 +33,7 @@ final class LocalTransaction {
             transferToId: transferToId, amount: amount, note: note
         )
     }
-
+    
     func update(from tx: Transaction) {
         date = tx.date; type = tx.type.rawValue
         categoryId = tx.categoryId; accountId = tx.accountId
@@ -45,17 +45,27 @@ final class LocalTransaction {
 final class LocalCategory {
     @Attribute(.unique) var id: String
     var name: String
-    var type: String   // "Expense" | "Income"
-
+    var type: String
+    var icon: String?
+    var color: String?
+    
     init(from cat: Category) {
         self.id = cat.id
         self.name = cat.name
         self.type = cat.type.rawValue
+        self.icon = cat.icon
+        self.color = cat.color
     }
-
+    
     func toCategory() -> Category? {
         guard let catType = CategoryType(rawValue: type) else { return nil }
-        return Category(id: id, name: name, type: catType)
+        return Category(
+            id: id,
+            name: name,
+            type: catType,
+            icon: icon ?? "tag.fill",
+            color: color ?? "accent"
+        )
     }
 }
 
@@ -63,12 +73,12 @@ final class LocalCategory {
 final class LocalAccount {
     @Attribute(.unique) var id: String
     var name: String
-
+    
     init(from account: Account) {
         self.id = account.id
         self.name = account.name
     }
-
+    
     func toAccount() -> Account {
         Account(id: id, name: name)
     }
@@ -82,7 +92,7 @@ final class LocalBudget {
     var dateStart: String
     var dateEnd: String
     var categoryIdsJSON: String  // JSON-encoded [String]
-
+    
     init(from budget: Budget) {
         self.id = budget.id
         self.name = budget.name
@@ -91,7 +101,7 @@ final class LocalBudget {
         self.dateEnd = budget.dateEnd
         self.categoryIdsJSON = (try? String(data: JSONEncoder().encode(budget.categoryIds), encoding: .utf8)) ?? "[]"
     }
-
+    
     func toBudget() -> Budget {
         let ids = (try? JSONDecoder().decode([String].self, from: Data(categoryIdsJSON.utf8))) ?? []
         return Budget(id: id, name: name, limit: limit, dateStart: dateStart, dateEnd: dateEnd, categoryIds: ids)
@@ -108,7 +118,7 @@ final class LocalGoldAsset {
     var note: String?
     var createdAt: String?
     var currentSellPrice: Double?
-
+    
     init(from asset: GoldAsset) {
         self.id = asset.id
         self.brand = asset.brand.rawValue
@@ -119,7 +129,7 @@ final class LocalGoldAsset {
         self.createdAt = asset.createdAt
         self.currentSellPrice = asset.currentSellPrice
     }
-
+    
     func toGoldAsset() -> GoldAsset? {
         guard let brand = GoldBrand(rawValue: brand) else { return nil }
         return GoldAsset(id: id, brand: brand, productId: productId, productName: productName,
@@ -132,7 +142,7 @@ final class LocalGoldAsset {
 final class LocalKeyValue {
     @Attribute(.unique) var key: String
     var value: String
-
+    
     init(key: String, value: String) {
         self.key = key
         self.value = value
@@ -150,7 +160,7 @@ final class PendingSyncOperation {
     var payload: Data?
     var createdAt: Date
     var retryCount: Int
-
+    
     init(operationType: String, entityId: String, payload: Data? = nil) {
         self.id = UUID()
         self.operationType = operationType
@@ -166,9 +176,9 @@ final class PendingSyncOperation {
 @MainActor
 final class LocalDataStore {
     static let shared = LocalDataStore()
-
+    
     let container: ModelContainer
-
+    
     private init() {
         let schema = Schema([
             LocalTransaction.self,
@@ -186,11 +196,11 @@ final class LocalDataStore {
             fatalError("Failed to create ModelContainer: \(error)")
         }
     }
-
+    
     private var context: ModelContext { container.mainContext }
-
+    
     // MARK: - Save all init data from server
-
+    
     func saveInitData(
         transactions: [Transaction],
         categories: [Category],
@@ -208,9 +218,9 @@ final class LocalDataStore {
         saveAccountBalances(accountBalances)
         saveSettings(settings)
     }
-
+    
     // MARK: - Transactions
-
+    
     func saveTransactions(_ transactions: [Transaction]) {
         let existing = (try? context.fetch(FetchDescriptor<LocalTransaction>())) ?? []
         let existingMap = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
@@ -226,11 +236,11 @@ final class LocalDataStore {
         }
         try? context.save()
     }
-
+    
     func fetchAllTransactions() -> [Transaction] {
         (try? context.fetch(FetchDescriptor<LocalTransaction>()))?.compactMap { $0.toTransaction() } ?? []
     }
-
+    
     func upsertTransaction(_ tx: Transaction) {
         let id = tx.id
         let descriptor = FetchDescriptor<LocalTransaction>(predicate: #Predicate { $0.id == id })
@@ -238,7 +248,7 @@ final class LocalDataStore {
         else { context.insert(LocalTransaction(from: tx)) }
         try? context.save()
     }
-
+    
     func deleteTransaction(id: String) {
         let descriptor = FetchDescriptor<LocalTransaction>(predicate: #Predicate { $0.id == id })
         if let local = try? context.fetch(descriptor).first {
@@ -246,7 +256,7 @@ final class LocalDataStore {
             try? context.save()
         }
     }
-
+    
     func updateTransactionId(from tempId: String, to realId: String) {
         let descriptor = FetchDescriptor<LocalTransaction>(predicate: #Predicate { $0.id == tempId })
         if let local = try? context.fetch(descriptor).first {
@@ -254,27 +264,39 @@ final class LocalDataStore {
             try? context.save()
         }
     }
-
+    
     // MARK: - Categories
-
+    
     func saveCategories(_ categories: [Category]) {
         let existing = (try? context.fetch(FetchDescriptor<LocalCategory>())) ?? []
         let existingMap = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
+        
         for cat in categories {
-            if let local = existingMap[cat.id] { local.name = cat.name; local.type = cat.type.rawValue }
-            else { context.insert(LocalCategory(from: cat)) }
+            if let local = existingMap[cat.id] {
+                // Cập nhật thông tin nếu đã tồn tại
+                local.name = cat.name
+                local.type = cat.type.rawValue
+                local.icon = cat.icon   // Thêm dòng này
+                local.color = cat.color // Thêm dòng này
+            } else {
+                // Thêm mới nếu chưa có
+                context.insert(LocalCategory(from: cat))
+            }
         }
+        
         let serverIds = Set(categories.map { $0.id })
-        for local in existing where !serverIds.contains(local.id) { context.delete(local) }
+        for local in existing where !serverIds.contains(local.id) {
+            context.delete(local)
+        }
         try? context.save()
     }
-
+    
     func fetchAllCategories() -> [Category] {
         (try? context.fetch(FetchDescriptor<LocalCategory>()))?.compactMap { $0.toCategory() } ?? []
     }
-
+    
     // MARK: - Accounts
-
+    
     func saveAccounts(_ accounts: [Account]) {
         let existing = (try? context.fetch(FetchDescriptor<LocalAccount>())) ?? []
         let existingMap = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
@@ -286,13 +308,13 @@ final class LocalDataStore {
         for local in existing where !serverIds.contains(local.id) { context.delete(local) }
         try? context.save()
     }
-
+    
     func fetchAllAccounts() -> [Account] {
         (try? context.fetch(FetchDescriptor<LocalAccount>()))?.map { $0.toAccount() } ?? []
     }
-
+    
     // MARK: - Budgets
-
+    
     func saveBudgets(_ budgets: [Budget]) {
         let existing = (try? context.fetch(FetchDescriptor<LocalBudget>())) ?? []
         let existingMap = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
@@ -307,13 +329,13 @@ final class LocalDataStore {
         for local in existing where !serverIds.contains(local.id) { context.delete(local) }
         try? context.save()
     }
-
+    
     func fetchAllBudgets() -> [Budget] {
         (try? context.fetch(FetchDescriptor<LocalBudget>()))?.map { $0.toBudget() } ?? []
     }
-
+    
     // MARK: - Gold Assets
-
+    
     func saveGoldAssets(_ assets: [GoldAsset]) {
         let existing = (try? context.fetch(FetchDescriptor<LocalGoldAsset>())) ?? []
         let existingMap = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
@@ -329,13 +351,13 @@ final class LocalDataStore {
         for local in existing where !serverIds.contains(local.id) { context.delete(local) }
         try? context.save()
     }
-
+    
     func fetchAllGoldAssets() -> [GoldAsset] {
         (try? context.fetch(FetchDescriptor<LocalGoldAsset>()))?.compactMap { $0.toGoldAsset() } ?? []
     }
-
+    
     // MARK: - Key-Value (settings + account balances)
-
+    
     private func saveKeyValues(_ dict: [String: String], prefix: String) {
         let existing = (try? context.fetch(FetchDescriptor<LocalKeyValue>())) ?? []
         let existingMap = Dictionary(uniqueKeysWithValues: existing.map { ($0.key, $0) })
@@ -351,7 +373,7 @@ final class LocalDataStore {
         }
         try? context.save()
     }
-
+    
     private func fetchKeyValues(prefix: String) -> [String: String] {
         let existing = (try? context.fetch(FetchDescriptor<LocalKeyValue>())) ?? []
         var result: [String: String] = [:]
@@ -362,48 +384,48 @@ final class LocalDataStore {
         }
         return result
     }
-
+    
     func saveSettings(_ settings: [String: String]) {
         saveKeyValues(settings, prefix: "settings")
     }
-
+    
     func fetchSettings() -> [String: String] {
         fetchKeyValues(prefix: "settings")
     }
-
+    
     func saveAccountBalances(_ balances: [String: Double]) {
         let stringBalances = balances.mapValues { String($0) }
         saveKeyValues(stringBalances, prefix: "balance")
     }
-
+    
     func fetchAccountBalances() -> [String: Double] {
         fetchKeyValues(prefix: "balance").compactMapValues { Double($0) }
     }
-
+    
     // MARK: - Pending Sync Operations
-
+    
     func enqueueSyncOp(operationType: String, entityId: String, payload: Data? = nil) {
         let op = PendingSyncOperation(operationType: operationType, entityId: entityId, payload: payload)
         context.insert(op)
         try? context.save()
     }
-
+    
     func fetchPendingOps() -> [PendingSyncOperation] {
         var descriptor = FetchDescriptor<PendingSyncOperation>(sortBy: [SortDescriptor(\.createdAt)])
         descriptor.fetchLimit = 100
         return (try? context.fetch(descriptor)) ?? []
     }
-
+    
     func dequeueSyncOp(_ op: PendingSyncOperation) {
         context.delete(op)
         try? context.save()
     }
-
+    
     func incrementRetry(_ op: PendingSyncOperation) {
         op.retryCount += 1
         try? context.save()
     }
-
+    
     func removePendingOps(for entityId: String) {
         let descriptor = FetchDescriptor<PendingSyncOperation>(
             predicate: #Predicate { $0.entityId == entityId }
@@ -412,14 +434,14 @@ final class LocalDataStore {
         for op in ops { context.delete(op) }
         try? context.save()
     }
-
+    
     func hasPendingCreateOp(for entityId: String) -> Bool {
         let descriptor = FetchDescriptor<PendingSyncOperation>(
             predicate: #Predicate { $0.entityId == entityId && $0.operationType == "create" }
         )
         return ((try? context.fetch(descriptor)) ?? []).isEmpty == false
     }
-
+    
     func replacePendingUpdateWithDelete(for entityId: String) {
         let descriptor = FetchDescriptor<PendingSyncOperation>(
             predicate: #Predicate { $0.entityId == entityId && $0.operationType == "update" }

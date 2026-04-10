@@ -103,6 +103,7 @@ struct TransactionsView: View {
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
+            .searchToolbarBehavior(.minimize)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 12){
