@@ -4,13 +4,23 @@ struct AccountsView: View {
     @Environment(AppViewModel.self) private var app
     @State private var showAddForm = false
     @State private var editingAccount: Account?
-
+    
     var body: some View {
         List {
             ForEach(app.accounts) { account in
                 let balance = app.computedBalance(for: account.id)
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 16) {
+                    ZStack {
+                        Circle()
+                            .fill(CategoryColorHelper.map(account.color).opacity(0.15))
+                            .frame(width: 44, height: 44)
+                        
+                        Image(systemName: account.icon)
+                            .foregroundColor(CategoryColorHelper.map(account.color))
+                            .font(.system(size: 20, weight: .semibold))
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
                         Text(account.name)
                             .font(.subheadline.weight(.semibold))
                         Text(formatVND(balance))
