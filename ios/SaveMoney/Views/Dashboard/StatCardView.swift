@@ -14,13 +14,11 @@ struct StatCardView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(color)
                 Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            
             Text(formatVNDShort(amount))
                 .font(.subheadline.weight(.bold).monospacedDigit())
                 .foregroundStyle(isBalance ? (amount >= 0 ? DSColors.positive : DSColors.negative) : color)

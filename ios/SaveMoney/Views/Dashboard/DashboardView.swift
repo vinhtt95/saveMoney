@@ -6,12 +6,43 @@ struct DashboardView: View {
     @State private var selectedPeriod = toYYYYMM(Date())
     @State private var periods = availablePeriods()
     @State private var isRefreshing = false
-
+    // 1. Thêm State để lưu ID tài khoản đang hiển thị (nil nghĩa là "Tổng số dư")
+    @State private var displayedAccountID: String? = nil
+    
     private var income: Double { app.monthlyIncome(period: selectedPeriod) }
     private var expense: Double { app.monthlyExpense(period: selectedPeriod) }
     private var remaining: Double { income - expense }
     private var recentTxs: [Transaction] { Array(app.transactions.prefix(Constants.dashboardRecentCount)) }
-
+    
+    // 2. Computed property để lấy tiêu đề hiển thị (Tên tài khoản hoặc "Tổng số dư")
+    private var balanceTitle: String {
+        if let id = displayedAccountID, let account = app.accounts.first(where: { $0.id == id }) {
+            return account.name
+        }
+        return "Tổng số dư"
+    }
+    
+    // 3. Computed property để lấy số tiền hiển thị tương ứng
+    private var displayBalance: Double {
+        if let id = displayedAccountID {
+            return app.computedBalance(for: id)
+        }
+        return app.totalBalance
+    }
+    
+    // 4. Hàm logic để xoay vòng: Tổng -> Tài khoản 1 -> Tài khoản 2 -> ... -> Tổng
+    private func toggleAccountBalance() {
+        // Tạo danh sách ID bao gồm nil (tổng) và tất cả ID tài khoản hiện có
+        let allIDs: [String?] = [nil] + app.accounts.map { $0.id }
+        
+        if let currentIndex = allIDs.firstIndex(of: displayedAccountID) {
+            let nextIndex = (currentIndex + 1) % allIDs.count
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                displayedAccountID = allIDs[nextIndex]
+            }
+        }
+    }
+    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -33,7 +64,7 @@ struct DashboardView: View {
                     }
                 }
                 .ignoresSafeArea()
-
+                
                 ScrollView {
                     LazyVStack(spacing: DSSpacing.lg) {
                         // Period Selector
@@ -57,22 +88,26 @@ struct DashboardView: View {
                         }
                         // Chỉnh khoảng cách giữa list tháng và card phía dưới nếu cần
                         .padding(.top, 1)
-
+                        
                         // Hero Balance Card
                         VStack(spacing: DSSpacing.sm) {
-                            Text("Tổng số dư")
+                            Text(balanceTitle) // Sử dụng tiêu đề động
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
-                            Text(formatVND(app.totalBalance))
+                            Text(formatVND(displayBalance)) // Sử dụng số dư động
                                 .font(.system(size: 32, weight: .bold, design: .rounded).monospacedDigit())
-                                .foregroundStyle(app.totalBalance >= 0 ? DSColors.positive : DSColors.negative)
+                                .foregroundStyle(displayBalance >= 0 ? DSColors.positive : DSColors.negative)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(DSSpacing.xl)
-                        // Áp dụng Liquid Glass
                         .liquidGlass(in: .rect(cornerRadius: DSRadius.xl), tint: DSColors.accent.opacity(0.1), material: .ultraThinMaterial)
                         .padding(.horizontal, DSSpacing.lg)
-
+                        // 6. Thêm Double Tap Gesture vào card
+                        .contentShape(Rectangle()) // Đảm bảo nhận diện tap trên toàn vùng card
+                        .onTapGesture(count: 2) {
+                            toggleAccountBalance()
+                        }
+                        
                         // Stat Grid
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: DSSpacing.sm) {
                             StatCardView(title: "Thu nhập", amount: income, icon: "arrow.down.circle.fill", color: DSColors.income)
@@ -81,7 +116,7 @@ struct DashboardView: View {
                             StatCardView(title: "Số dư", amount: app.totalBalance, icon: "creditcard.fill", color: .secondary, isBalance: true)
                         }
                         .padding(.horizontal, DSSpacing.lg)
-
+                        
                         // Net Worth (shown when gold assets exist)
                         if !app.goldAssets.isEmpty {
                             VStack(alignment: .leading, spacing: DSSpacing.sm) {
@@ -112,11 +147,11 @@ struct DashboardView: View {
                             .liquidGlass(in: .rect(cornerRadius: DSRadius.lg), tint: DSColors.gold.opacity(0.1), material: .ultraThinMaterial)
                             .padding(.horizontal, DSSpacing.lg)
                         }
-
+                        
                         // Recent Transactions
                         RecentTransactionsView(transactions: recentTxs, app: app)
                             .padding(.horizontal, DSSpacing.lg)
-
+                        
                         Spacer(minLength: 80) // tab bar clearance
                     }
                     .padding(.top, DSSpacing.md)
