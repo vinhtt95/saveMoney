@@ -14,9 +14,24 @@ router.get('/accounts', async (_req, res) => {
 });
 
 router.post('/accounts', async (req, res) => {
-  const { id, name } = req.body;
-  await pool.query('INSERT INTO accounts (id, name) VALUES (?, ?)', [id, name]);
-  res.json({ id, name });
+  // DTO từ iOS gửi lên có thêm icon, color, initialBalance
+  const { id, name, icon, color, initialBalance } = req.body;
+  
+  // Lưu thông tin cơ bản của account
+  await pool.query(
+    'INSERT INTO accounts (id, name, icon, color) VALUES (?, ?, ?, ?)', 
+    [id, name, icon || 'creditcard.fill', color || 'accent']
+  );
+
+  // Nếu có truyền số dư ban đầu thì lưu vào bảng account_balances
+  const balanceToSave = initialBalance || 0;
+  await pool.query(
+    'INSERT INTO account_balances (account_id, balance) VALUES (?, ?)',
+    [id, balanceToSave]
+  );
+
+  // Trả về object chứa ID để iOS decode thành model Account thành công
+  res.json({ id, name, icon, color, balance: balanceToSave });
 });
 
 router.post('/accounts/bulk', async (req, res) => {
@@ -31,9 +46,26 @@ router.post('/accounts/bulk', async (req, res) => {
 });
 
 router.put('/accounts/:id', async (req, res) => {
-  const { name } = req.body;
-  await pool.query('UPDATE accounts SET name = ? WHERE id = ?', [name, req.params.id]);
-  res.json({ ok: true });
+  // DTO từ iOS gửi lên có name, icon, color, balance
+  const { name, icon, color, balance } = req.body;
+  const accountId = req.params.id;
+
+  // 1. Cập nhật bảng accounts
+  await pool.query(
+    'UPDATE accounts SET name = ?, icon = ?, color = ? WHERE id = ?', 
+    [name, icon, color, accountId]
+  );
+
+  // 2. Cập nhật bảng account_balances
+  if (balance !== undefined) {
+    await pool.query(
+      'INSERT INTO account_balances (account_id, balance) VALUES (?, ?) ON DUPLICATE KEY UPDATE balance = ?',
+      [accountId, balance, balance]
+    );
+  }
+
+  // Trả về full object chứa ID để iOS decode không bị lỗi
+  res.json({ id: accountId, name, icon, color, balance: balance || 0 });
 });
 
 router.delete('/accounts/:id', async (req, res) => {

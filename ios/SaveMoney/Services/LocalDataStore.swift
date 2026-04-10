@@ -73,14 +73,27 @@ final class LocalCategory {
 final class LocalAccount {
     @Attribute(.unique) var id: String
     var name: String
+    var icon: String?
+    var color: String?
+    var balance: Double?
     
     init(from account: Account) {
         self.id = account.id
         self.name = account.name
+        self.icon = account.icon
+        self.color = account.color
+        self.balance = account.balance
     }
     
     func toAccount() -> Account {
-        Account(id: id, name: name)
+        // Cung cấp giá trị mặc định để tránh lỗi crash với các dữ liệu Local cũ chưa có icon/color
+        Account(
+            id: id,
+            name: name,
+            icon: icon ?? "creditcard.fill",
+            color: color ?? "accent",
+            balance: balance ?? 0.0
+        )
     }
 }
 
@@ -301,7 +314,11 @@ final class LocalDataStore {
         let existing = (try? context.fetch(FetchDescriptor<LocalAccount>())) ?? []
         let existingMap = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
         for acc in accounts {
-            if let local = existingMap[acc.id] { local.name = acc.name }
+            if let local = existingMap[acc.id] {
+                local.name = acc.name
+                local.icon = acc.icon
+                local.color = acc.color
+            }
             else { context.insert(LocalAccount(from: acc)) }
         }
         let serverIds = Set(accounts.map { $0.id })

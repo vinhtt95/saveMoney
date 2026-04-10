@@ -10,8 +10,10 @@ CREATE TABLE IF NOT EXISTS categories (
 );
 
 CREATE TABLE IF NOT EXISTS accounts (
-  id   VARCHAR(36)  NOT NULL PRIMARY KEY,
-  name VARCHAR(255) NOT NULL
+  id    VARCHAR(36)  NOT NULL PRIMARY KEY,
+  name  VARCHAR(255) NOT NULL,
+  icon  VARCHAR(50)  NOT NULL DEFAULT 'creditcard.fill',
+  color VARCHAR(20)  NOT NULL DEFAULT 'accent'
 );
 
 CREATE TABLE IF NOT EXISTS account_balances (
