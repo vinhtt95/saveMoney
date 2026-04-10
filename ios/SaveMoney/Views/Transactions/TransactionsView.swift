@@ -170,7 +170,7 @@ struct TransactionsView: View {
                     .refreshable { await app.loadInitData() }
                 }
             }
-            .navigationTitle("History")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .sheet(item: $editingTransaction) { tx in
                 AddTransactionView(transaction: tx) { editingTransaction = nil }

@@ -122,7 +122,7 @@ struct AnalyticsView: View {
                 }
                 .padding(.top, DSSpacing.md)
             }
-            .navigationTitle("Insight")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
         }
     }

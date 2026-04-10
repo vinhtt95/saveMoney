@@ -67,28 +67,6 @@ struct DashboardView: View {
                 
                 ScrollView {
                     LazyVStack(spacing: DSSpacing.lg) {
-                        // Period Selector
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: DSSpacing.sm) {
-                                ForEach(periods, id: \.self) { period in
-                                    Button(periodLabel(period)) {
-                                        withAnimation(.snappy(duration: 0.3, extraBounce: 0.2)) {
-                                            selectedPeriod = period
-                                        }
-                                    }
-                                    .buttonStyle(LiquidGlassButtonStyle(
-                                        shape: Capsule(),
-                                        isSelected: period == selectedPeriod
-                                    ))
-                                }
-                            }
-                            .padding(.horizontal, DSSpacing.lg)
-                            // FIX: Thêm padding dọc để viền và shadow không bị cắt
-                            .padding(.vertical, 1)
-                        }
-                        // Chỉnh khoảng cách giữa list tháng và card phía dưới nếu cần
-                        .padding(.top, 1)
-                        
                         // Hero Balance Card
                         VStack(spacing: DSSpacing.sm) {
                             Text(balanceTitle) // Sử dụng tiêu đề động
@@ -158,8 +136,36 @@ struct DashboardView: View {
                 }
                 .background(.clear) // Cực kỳ quan trọng: Giúp nhìn xuyên qua nền phía sau
             }
-            .navigationTitle("Flow")
+            .navigationTitle("") // Hoặc để trống "" nếu bạn đã ẩn title
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        // Sử dụng trực tiếp danh sách periods mày đã có
+                        Picker("Chọn thời gian", selection: $selectedPeriod) {
+                            ForEach(periods, id: \.self) { period in
+                                // Dùng hàm periodLabel mày đã viết để hiển thị tên tháng
+                                Text(periodLabel(period)).tag(period)
+                            }
+                        }
+                    } label: {
+                        // Hiển thị tháng đang chọn một cách gọn gàng trên thanh công cụ
+                        HStack(spacing: 4) {
+                            Text(periodLabel(selectedPeriod))
+                                .font(.subheadline.weight(.medium))
+                            
+                            Image(systemName: "calendar.circle.fill")
+                                .symbolRenderingMode(.hierarchical)
+                                .font(.title3)
+                        }
+                        .foregroundStyle(DSColors.accent)
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 8)
+                        .background(Color.secondary.opacity(0.1))
+                        .clipShape(Capsule())
+                    }
+                }
+            }
             .refreshable { await app.loadInitData() }
         }
     }
