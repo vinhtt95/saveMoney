@@ -21,7 +21,7 @@ router.get('/init', async (_req, res) => {
     [goldAssets],
     [settingRows],
   ] = await Promise.all([
-    pool.query('SELECT id, name, type FROM categories ORDER BY type, name'),
+    pool.query('SELECT id, name, type, icon, color FROM categories ORDER BY type, name'),
     pool.query('SELECT id, name FROM accounts ORDER BY name'),
     pool.query('SELECT account_id, balance FROM account_balances'),
     pool.query('SELECT id, date, type, category_id as categoryId, account_id as accountId, transfer_to_id as transferToId, amount, note FROM transactions ORDER BY date DESC'),
