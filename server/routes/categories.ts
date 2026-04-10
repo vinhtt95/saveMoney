@@ -66,18 +66,26 @@ router.put('/categories/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
-    const [result]: any = await pool.query(
+    // 1. Thực hiện cập nhật
+    await pool.query(
       'UPDATE categories SET name = ?, icon = ?, color = ? WHERE id = ?',
       [name, icon, color, id]
     );
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ error: 'Category not found' });
-    }
+    // 2. Lấy lại thông tin loại (type) vì client cần object Category hoàn chỉnh
+    const [rows]: any = await pool.query('SELECT type FROM categories WHERE id = ?', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
 
-    res.json({ ok: true });
+    // 3. TRẢ VỀ ĐỦ 5 TRƯỜNG: Đây là phần quan trọng nhất để fix lỗi Decoding
+    res.json({ 
+      id, 
+      name, 
+      type: rows[0].type, 
+      icon: icon || 'tag.fill', 
+      color: color || 'accent' 
+    });
   } catch (error) {
-    console.error('Error updating category:', error);
+    console.error(error);
     res.status(500).json({ error: 'Database error' });
   }
 });
