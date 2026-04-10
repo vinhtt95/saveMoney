@@ -17,18 +17,22 @@ final class TransactionViewModel {
     }
     
     var filteredTransactions: [Transaction] {
-            app.transactions.filter { tx in
-                let periodMatch = tx.date.hasPrefix(selectedPeriod)
-                let categoryMatch = selectedCategoryId == nil || tx.categoryId == selectedCategoryId
-                
-                // Logic tìm kiếm mới
-                let searchMatch = searchText.isEmpty ||
-                    (tx.note?.localizedCaseInsensitiveContains(searchText) ?? false) ||
-                    (app.category(for: tx.categoryId ?? "")?.name.localizedCaseInsensitiveContains(searchText) ?? false)
-                
-                return periodMatch && categoryMatch && searchMatch
-            }
+        app.transactions.filter { tx in
+            // Parse ngày từ server sang Date object (đã tự động sang giờ Local)
+            guard let date = parseStorageDate(tx.date) else { return false }
+            
+            // Chuyển Date đó sang định dạng yyyy-MM (Local) để so sánh với selectedPeriod
+            let localPeriod = toYYYYMM(date)
+            let periodMatch = localPeriod == selectedPeriod
+            
+            let categoryMatch = selectedCategoryId == nil || tx.categoryId == selectedCategoryId
+            let searchMatch = searchText.isEmpty ||
+                (tx.note?.localizedCaseInsensitiveContains(searchText) ?? false) ||
+                (app.category(for: tx.categoryId ?? "")?.name.localizedCaseInsensitiveContains(searchText) ?? false)
+            
+            return periodMatch && categoryMatch && searchMatch
         }
+    }
     
     var paginatedTransactions: [Transaction] {
         Array(filteredTransactions.prefix(page * Constants.pageSize))

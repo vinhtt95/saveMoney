@@ -280,9 +280,10 @@ struct AddTransactionView: View {
     private func handleSubmit() async {
         isSubmitting = true
         errorMessage = nil
-        let storageDate = storageFormatter(date)
+        
+        let storageDateString = toStorageString(date)
         let dto = TransactionCreateDTO(
-            date: storageDate,
+            date: storageDateString,
             type: type.rawValue,
             categoryId: categoryId,
             accountId: accountId,
@@ -313,11 +314,5 @@ struct AddTransactionView: View {
             errorMessage = error.localizedDescription
         }
         isSubmitting = false
-    }
-    
-    private func storageFormatter(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        return f.string(from: date)
     }
 }

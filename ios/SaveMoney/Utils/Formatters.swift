@@ -53,12 +53,28 @@ private let periodFormatter: DateFormatter = {
 }()
 
 func parseStorageDate(_ string: String) -> Date? {
-    storageFormatter.date(from: string)
+    // 1. Thử parse dạng ISO8601 từ server
+    if let date = try? Date(string, strategy: .iso8601) {
+        return date
+    }
+    
+    // 2. Dự phòng cho format cũ yyyy-MM-dd
+    let strategy = Date.ParseStrategy(
+        format: "\(year: .padded(4))-\(month: .twoDigits)-\(day: .twoDigits)",
+        timeZone: TimeZone(secondsFromGMT: 0)!
+    )
+    return try? Date(string, strategy: strategy)
+}
+
+func toStorageString(_ date: Date) -> String {
+    // Trả về chuỗi ISO8601 chuẩn UTC
+    return date.formatted(.iso8601)
 }
 
 func formatDate(_ dateString: String) -> String {
     guard let date = parseStorageDate(dateString) else { return dateString }
-    return displayFormatter.string(from: date)
+    // Tự động sử dụng múi giờ của thiết bị (Việt Nam)
+    return date.formatted(date: .numeric, time: .omitted)
 }
 
 func toYYYYMM(_ date: Date) -> String {
@@ -70,7 +86,7 @@ func dateLabel(_ dateString: String) -> String {
     let calendar = Calendar.current
     if calendar.isDateInToday(date) { return "Hôm nay" }
     if calendar.isDateInYesterday(date) { return "Hôm qua" }
-    return displayFormatter.string(from: date)
+    return date.formatted(date: .numeric, time: .omitted)
 }
 
 func availablePeriods(count: Int = 6) -> [String] {
