@@ -9,9 +9,6 @@ struct TransactionsView: View {
     @State private var showAddTransaction = false
     @State private var isSearchPresented = false
     
-    @State private var isSearching = false
-    @FocusState private var isSearchFocused: Bool
-    
     private var vm: TransactionViewModel {
         if let vm = viewModel { return vm }
         let vm = TransactionViewModel(app: app)
@@ -52,7 +49,6 @@ struct TransactionsView: View {
                         .padding(.vertical, 8)
                         .background(Color.orange.opacity(0.85))
                     }
-                    
                     ScrollView {
                         LazyVStack(spacing: DSSpacing.lg) {
                             // MARK: - Transaction List bọc trong GlassCard
@@ -110,7 +106,6 @@ struct TransactionsView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 12){
-                        // 2. Menu Lọc Danh mục (Mới thêm vào)
                         Menu {
                             Button {
                                 vm.selectedCategoryId = nil
