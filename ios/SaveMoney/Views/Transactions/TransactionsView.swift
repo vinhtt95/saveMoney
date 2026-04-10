@@ -7,13 +7,17 @@ struct TransactionsView: View {
     @State private var viewModel: TransactionViewModel?
     @State private var editingTransaction: Transaction?
     @State private var showAddTransaction = false
-
+    @State private var isSearchPresented = false
+    
+    @State private var isSearching = false
+    @FocusState private var isSearchFocused: Bool
+    
     private var vm: TransactionViewModel {
         if let vm = viewModel { return vm }
         let vm = TransactionViewModel(app: app)
         return vm
     }
-
+    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -34,7 +38,7 @@ struct TransactionsView: View {
                     }
                 }
                 .ignoresSafeArea()
-
+                
                 VStack(spacing: 0) {
                     // Offline banner
                     if !networkMonitor.isOnline {
@@ -48,78 +52,9 @@ struct TransactionsView: View {
                         .padding(.vertical, 8)
                         .background(Color.orange.opacity(0.85))
                     }
-
+                    
                     ScrollView {
                         LazyVStack(spacing: DSSpacing.lg) {
-                            
-                            // MARK: - Period Selector (Giống Flow)
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: DSSpacing.sm) {
-                                    ForEach(availablePeriods(), id: \.self) { period in
-                                        Button(periodLabel(period)) {
-                                            withAnimation(.snappy) {
-                                                vm.selectedPeriod = period
-                                            }
-                                        }
-                                        .buttonStyle(LiquidGlassButtonStyle(
-                                            shape: Capsule(),
-                                            isSelected: period == vm.selectedPeriod
-                                        ))
-                                    }
-                                }
-                                .padding(.horizontal, DSSpacing.lg)
-                                .padding(.vertical, 2)
-                            }
-
-                            // MARK: - Category Chips
-                            if !vm.topCategories.isEmpty {
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: DSSpacing.sm) {
-                                        // Nút "Tất cả"
-                                        Button {
-                                            vm.selectedCategoryId = nil
-                                            vm.resetPage()
-                                        } label: {
-                                            Text("Tất cả")
-                                                .font(.caption.weight(.medium))
-                                                .foregroundStyle(vm.selectedCategoryId == nil ? .white : .secondary)
-                                                .padding(.horizontal, DSSpacing.md)
-                                                .padding(.vertical, DSSpacing.xs)
-                                                .background {
-                                                    if vm.selectedCategoryId == nil {
-                                                        Capsule().fill(DSColors.accent)
-                                                    } else {
-                                                        Capsule().fill(.ultraThinMaterial)
-                                                    }
-                                                }
-                                        }
-                                        .buttonStyle(.plain)
-
-                                        ForEach(vm.topCategories) { cat in
-                                            Button {
-                                                vm.selectedCategoryId = cat.id
-                                                vm.resetPage()
-                                            } label: {
-                                                Text(cat.name)
-                                                    .font(.caption.weight(.medium))
-                                                    .foregroundStyle(vm.selectedCategoryId == cat.id ? .white : .secondary)
-                                                    .padding(.horizontal, DSSpacing.md)
-                                                    .padding(.vertical, DSSpacing.xs)
-                                                    .background {
-                                                        if vm.selectedCategoryId == cat.id {
-                                                            Capsule().fill(DSColors.accent)
-                                                        } else {
-                                                            Capsule().fill(.ultraThinMaterial)
-                                                        }
-                                                    }
-                                            }
-                                            .buttonStyle(.plain)
-                                        }
-                                    }
-                                    .padding(.horizontal, DSSpacing.lg)
-                                }
-                            }
-
                             // MARK: - Transaction List bọc trong GlassCard
                             if vm.groupedTransactions.isEmpty {
                                 EmptyStateView(
@@ -154,7 +89,7 @@ struct TransactionsView: View {
                                         .padding(.horizontal, DSSpacing.lg)
                                     }
                                 }
-
+                                
                                 if vm.hasMore {
                                     Button("Tải thêm") { vm.loadMore() }
                                         .font(.subheadline.weight(.medium))
@@ -162,7 +97,7 @@ struct TransactionsView: View {
                                         .padding(.vertical, DSSpacing.md)
                                 }
                             }
-
+                            
                             Spacer(minLength: 100)
                         }
                         .padding(.top, DSSpacing.md)
@@ -172,6 +107,69 @@ struct TransactionsView: View {
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    HStack(spacing: 12){
+                        // 2. Menu Lọc Danh mục (Mới thêm vào)
+                        Menu {
+                            Button {
+                                vm.selectedCategoryId = nil
+                                vm.resetPage()
+                            } label: {
+                                HStack {
+                                    Text("Tất cả danh mục")
+                                    if vm.selectedCategoryId == nil {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                            
+                            Divider()
+                            
+                            // Lấy danh sách danh mục từ ViewModel
+                            ForEach(vm.topCategories) { cat in
+                                Button {
+                                    vm.selectedCategoryId = cat.id
+                                    vm.resetPage()
+                                } label: {
+                                    HStack {
+                                        Text(cat.name)
+                                        if vm.selectedCategoryId == cat.id {
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                            }
+                        } label: {
+                            // Biểu tượng filter sẽ đổi màu/kiểu khi đang có lọc
+                            Image(systemName: vm.selectedCategoryId == nil ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(vm.selectedCategoryId == nil ? .primary : DSColors.accent)
+                        }
+                        
+                        // 3. Menu chọn thời gian (Giữ nguyên style)
+                        Menu {
+                            Picker("Chọn thời gian", selection: Bindable(vm).selectedPeriod) {
+                                ForEach(availablePeriods(), id: \.self) { period in
+                                    Text(periodLabel(period)).tag(period)
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(periodLabel(vm.selectedPeriod))
+                                    .font(.caption2.weight(.bold))
+                                Image(systemName: "calendar")
+                                    .font(.caption2)
+                            }
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(DSColors.accent)
+                            .clipShape(Capsule())
+                        }
+                    }
+                }
+            }
             .sheet(item: $editingTransaction) { tx in
                 AddTransactionView(transaction: tx) { editingTransaction = nil }
             }

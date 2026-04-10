@@ -4,6 +4,7 @@ import Charts
 struct AnalyticsView: View {
     @Environment(AppViewModel.self) private var app
     @Namespace private var animationNamespace
+    @State private var periods = availablePeriods()
     @State private var selectedPeriod = toYYYYMM(Date())
 
     private var periodTransactions: [Transaction] {
@@ -52,26 +53,6 @@ struct AnalyticsView: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(spacing: DSSpacing.lg) {
-                    // Period Selector
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: DSSpacing.sm) {
-                            ForEach(availablePeriods(), id: \.self) { period in
-                                Button(periodLabel(period)) {
-                                    // Sử dụng .snappy để tạo cảm giác mượt mà của iOS 18
-                                    withAnimation(.snappy) {
-                                        selectedPeriod = period
-                                    }
-                                }
-                                // Áp dụng Style kính đơn lẻ
-                                .buttonStyle(LiquidGlassButtonStyle(
-                                    shape: Capsule(),
-                                    isSelected: period == selectedPeriod
-                                ))
-                            }
-                        }
-                        .padding(.horizontal, DSSpacing.lg)
-                    }
-
                     // Category Breakdown
                     GlassCard {
                         DSSection(title: "Phân tích danh mục") {
@@ -124,6 +105,34 @@ struct AnalyticsView: View {
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        // Sử dụng trực tiếp danh sách periods mày đã có
+                        Picker("Chọn thời gian", selection: $selectedPeriod) {
+                            ForEach(periods, id: \.self) { period in
+                                // Dùng hàm periodLabel mày đã viết để hiển thị tên tháng
+                                Text(periodLabel(period)).tag(period)
+                            }
+                        }
+                    } label: {
+                        // Hiển thị tháng đang chọn một cách gọn gàng trên thanh công cụ
+                        HStack(spacing: 4) {
+                            Text(periodLabel(selectedPeriod))
+                                .font(.subheadline.weight(.medium))
+                            
+                            Image(systemName: "calendar")
+                                .symbolRenderingMode(.hierarchical)
+                                .font(.title3)
+                        }
+                        .foregroundStyle(DSColors.accent)
+                        .padding(.vertical, 4)
+                        .padding(.horizontal, 8)
+                        .background(Color.secondary.opacity(0.1))
+                        .clipShape(Capsule())
+                    }
+                }
+            }
         }
     }
 }

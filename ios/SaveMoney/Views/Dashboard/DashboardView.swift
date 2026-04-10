@@ -154,7 +154,7 @@ struct DashboardView: View {
                             Text(periodLabel(selectedPeriod))
                                 .font(.subheadline.weight(.medium))
                             
-                            Image(systemName: "calendar.circle.fill")
+                            Image(systemName: "calendar")
                                 .symbolRenderingMode(.hierarchical)
                                 .font(.title3)
                         }

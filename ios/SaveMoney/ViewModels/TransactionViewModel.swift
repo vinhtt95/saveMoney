@@ -5,30 +5,37 @@ import Foundation
 final class TransactionViewModel {
     var selectedCategoryId: String? = nil
     var selectedPeriod: String = toYYYYMM(Date())
+    var searchText: String = ""
     var page = 1
     var isSubmitting = false
     var errorMessage: String?
-
+    
     private let app: AppViewModel
-
+    
     init(app: AppViewModel) {
         self.app = app
     }
-
+    
     var filteredTransactions: [Transaction] {
-        app.transactions.filter { tx in
-            let periodMatch = tx.date.hasPrefix(selectedPeriod)
-            let categoryMatch = selectedCategoryId == nil || tx.categoryId == selectedCategoryId
-            return periodMatch && categoryMatch
+            app.transactions.filter { tx in
+                let periodMatch = tx.date.hasPrefix(selectedPeriod)
+                let categoryMatch = selectedCategoryId == nil || tx.categoryId == selectedCategoryId
+                
+                // Logic tìm kiếm mới
+                let searchMatch = searchText.isEmpty ||
+                    (tx.note?.localizedCaseInsensitiveContains(searchText) ?? false) ||
+                    (app.category(for: tx.categoryId ?? "")?.name.localizedCaseInsensitiveContains(searchText) ?? false)
+                
+                return periodMatch && categoryMatch && searchMatch
+            }
         }
-    }
-
+    
     var paginatedTransactions: [Transaction] {
         Array(filteredTransactions.prefix(page * Constants.pageSize))
     }
-
+    
     var hasMore: Bool { filteredTransactions.count > page * Constants.pageSize }
-
+    
     var groupedTransactions: [(String, [Transaction])] {
         let grouped = Dictionary(grouping: paginatedTransactions) { dateLabel($0.date) }
         let order = ["Hôm nay", "Hôm qua"]
@@ -46,11 +53,11 @@ final class TransactionViewModel {
             return (key, txs)
         }
     }
-
+    
     func loadMore() { page += 1 }
-
+    
     func resetPage() { page = 1 }
-
+    
     // MARK: - Top categories for filter chips
     var topCategories: [Category] {
         let counts = Dictionary(
@@ -60,7 +67,7 @@ final class TransactionViewModel {
         let sorted = counts.sorted { $0.value > $1.value }
         return sorted.prefix(8).compactMap { app.category(for: $0.key) }
     }
-
+    
     // MARK: - CRUD
     func addTransaction(
         date: String,
@@ -89,7 +96,7 @@ final class TransactionViewModel {
         }
         isSubmitting = false
     }
-
+    
     func updateTransaction(
         id: String,
         date: String,
@@ -118,7 +125,7 @@ final class TransactionViewModel {
         }
         isSubmitting = false
     }
-
+    
     func deleteTransaction(_ id: String) async {
         do {
             try await app.deleteTransaction(id)
