@@ -14,10 +14,11 @@ struct PinnedBudgetCard: View {
         let id = UUID()
         let name: String
         let amount: Double
+        let color: Color
     }
     
-    // 1. Phân tích số tiền đã chi theo từng danh mục
-    var categoryStats: [CategoryStat] {
+    // 1. Phân tích số tiền đã chi theo từng danh mục và gắn màu
+    var categoryBreakdown: [CategoryStat] {
         var statsMap: [String: Double] = [:]
         
         let relevantTxs = app.transactions.filter { tx in
@@ -27,38 +28,64 @@ struct PinnedBudgetCard: View {
             tx.date <= budget.dateEnd
         }
         
-        // Cộng dồn tiền theo ID. Dùng abs() để đảm bảo trị tuyệt đối (fix lỗi cộng dồn số âm)
         for tx in relevantTxs {
             if let catId = tx.categoryId {
                 statsMap[catId, default: 0] += abs(tx.amount)
             }
         }
         
-        // Map ID sang Tên và sắp xếp từ cao xuống thấp
-        return statsMap.compactMap { (catId, amount) in
+        // Sắp xếp từ cao xuống thấp
+        let sortedStats = statsMap.compactMap { (catId, amount) -> (String, Double)? in
             guard let cat = app.category(for: catId) else { return nil }
-            return CategoryStat(name: cat.name, amount: amount)
+            return (cat.name, amount)
+        }.sorted { $0.1 > $1.1 }
+        
+        // Bảng màu cho các danh mục (giống style của Insight)
+        let palette: [Color] = [.blue, .orange, .purple, .pink, .teal, .indigo]
+        var breakdown: [CategoryStat] = []
+        
+        // Top 3 danh mục
+        for (index, stat) in sortedStats.prefix(3).enumerated() {
+            breakdown.append(CategoryStat(name: stat.0, amount: stat.1, color: palette[index % palette.count]))
         }
-        .sorted { $0.amount > $1.amount }
+        
+        // Gộp các khoản Khác
+        if sortedStats.count > 3 {
+            let othersAmount = sortedStats.dropFirst(3).reduce(0) { $0 + $1.1 }
+            breakdown.append(CategoryStat(name: "Khác", amount: othersAmount, color: .gray.opacity(0.6)))
+        }
+        
+        return breakdown
     }
     
-    // 2. Các con số tổng quát
-    var spentAmount: Double {
-        categoryStats.reduce(0) { $0 + $1.amount }
+    // 2. Dữ liệu gộp cho Biểu đồ (Bao gồm cả phần "Còn lại")
+    struct ChartSegment: Identifiable {
+        let id = UUID()
+        let name: String
+        let amount: Double
+        let color: Color
+        let isRemaining: Bool
     }
     
-    var remainingAmount: Double {
-        max(0, budget.limit - spentAmount)
+    var chartData: [ChartSegment] {
+        // Nạp các phần đã chi vào biểu đồ
+        var data = categoryBreakdown.map {
+            ChartSegment(name: $0.name, amount: $0.amount, color: $0.color, isRemaining: false)
+        }
+        
+        // Nếu chưa vượt ngân sách, nạp thêm phần nước "Còn lại"
+        if !isOverspent && remainingAmount > 0 {
+            data.append(ChartSegment(name: "Còn lại", amount: remainingAmount, color: DSColors.accent, isRemaining: true))
+        }
+        
+        return data
     }
     
-    var overspentAmount: Double {
-        max(0, spentAmount - budget.limit)
-    }
-    
-    var progress: Double {
-        budget.limit > 0 ? (spentAmount / budget.limit) : 0
-    }
-    
+    // 3. Các con số tổng quát
+    var spentAmount: Double { categoryBreakdown.reduce(0) { $0 + $1.amount } }
+    var remainingAmount: Double { max(0, budget.limit - spentAmount) }
+    var overspentAmount: Double { max(0, spentAmount - budget.limit) }
+    var progress: Double { budget.limit > 0 ? (spentAmount / budget.limit) : 0 }
     var isOverspent: Bool { progress >= 1.0 }
 
     // MARK: - Giao diện
@@ -76,27 +103,26 @@ struct PinnedBudgetCard: View {
                     .foregroundStyle(.orange)
             }
             
-            HStack(alignment: .top, spacing: DSSpacing.xl) {
-                // Biểu đồ Donut bên trái
+            HStack(alignment: .center, spacing: DSSpacing.xl) {
+                // Biểu đồ Donut Đa sắc
                 ZStack {
-                    Chart {
-                        // Trục đã chi (Màu xám hoặc Đỏ nếu vượt)
-                        SectorMark(
-                            angle: .value("Đã chi", min(spentAmount, budget.limit) * fillAnimation),
-                            innerRadius: .ratio(0.65),
-                            angularInset: 1
-                        )
-                        .foregroundStyle(isOverspent ? DSColors.negative.opacity(0.8) : Color.secondary.opacity(0.2))
-                        
-                        // Trục còn lại (Màu xanh)
-                        if !isOverspent {
+                    Chart(chartData) { item in
+                        if item.isRemaining {
                             SectorMark(
-                                angle: .value("Còn lại", remainingAmount * fillAnimation),
+                                angle: .value("Số tiền", item.amount * fillAnimation),
                                 innerRadius: .ratio(0.65),
-                                angularInset: 1
+                                angularInset: 1.5
                             )
                             .foregroundStyle(DSColors.accent.gradient)
-                            .cornerRadius(4)
+                            .cornerRadius(3)
+                        } else {
+                            SectorMark(
+                                angle: .value("Số tiền", item.amount * fillAnimation),
+                                innerRadius: .ratio(0.65),
+                                angularInset: 1.5
+                            )
+                            .foregroundStyle(isOverspent ? DSColors.negative.opacity(0.8).gradient : item.color.gradient)
+                            .cornerRadius(3)
                         }
                     }
                     .frame(width: 120, height: 120)
@@ -113,7 +139,7 @@ struct PinnedBudgetCard: View {
                     }
                 }
                 
-                // Thống kê phân rã (Breakdown) bên phải
+                // Thống kê phân rã (Legend) bên phải
                 VStack(alignment: .leading, spacing: DSSpacing.sm) {
                     HStack {
                         Text("Ngân sách")
@@ -128,33 +154,22 @@ struct PinnedBudgetCard: View {
                         .tint(isOverspent ? DSColors.negative : DSColors.accent)
                         .padding(.bottom, 4)
                     
-                    if categoryStats.isEmpty {
-                        Text("Chưa có dữ liệu")
+                    if categoryBreakdown.isEmpty {
+                        Text("Chưa có dữ liệu chi tiêu")
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     } else {
-                        // Hiển thị top 3 danh mục tiêu nhiều nhất
-                        ForEach(categoryStats.prefix(3)) { stat in
+                        // Render trực tiếp các danh mục kèm chấm màu tương ứng trên Chart
+                        ForEach(categoryBreakdown) { stat in
                             HStack {
+                                Circle()
+                                    .fill(isOverspent ? DSColors.negative.opacity(0.8) : stat.color)
+                                    .frame(width: 8, height: 8)
                                 Text(stat.name)
                                     .font(.caption2)
                                     .lineLimit(1)
                                 Spacer()
                                 Text(formatVNDShort(stat.amount))
-                                    .font(.caption2.monospacedDigit())
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        
-                        // Gom các danh mục còn lại vào mục "Khác" để UI không bị tràn
-                        if categoryStats.count > 3 {
-                            let others = categoryStats.dropFirst(3).reduce(0) { $0 + $1.amount }
-                            HStack {
-                                Text("Khác")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                                Text(formatVNDShort(others))
                                     .font(.caption2.monospacedDigit())
                                     .foregroundStyle(.secondary)
                             }
@@ -166,7 +181,10 @@ struct PinnedBudgetCard: View {
         .padding(DSSpacing.lg)
         .liquidGlass(in: .rect(cornerRadius: DSRadius.lg), tint: DSColors.accent.opacity(0.05))
         .onAppear {
-            withAnimation { fillAnimation = 1.0 }
+            // Trigger animation sau một nhịp nhỏ để mượt hơn
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                withAnimation { fillAnimation = 1.0 }
+            }
         }
     }
 }
