@@ -47,23 +47,7 @@ struct DashboardView: View {
         NavigationStack {
             ZStack {
                 // MARK: - iOS 18 Background Effect (Blurred Orbs)
-                // Lớp nền mờ mờ phía sau để hiệu ứng Liquid Glass có thể phản chiếu ánh sáng và màu sắc
-                GeometryReader { geo in
-                    ZStack {
-                        Circle()
-                            .fill(DSColors.accent.opacity(0.3))
-                            .blur(radius: 100)
-                            .frame(width: geo.size.width * 0.8)
-                            .offset(x: geo.size.width * 0.2, y: -geo.size.height * 0.2)
-                        
-                        Circle()
-                            .fill(DSColors.income.opacity(0.2))
-                            .blur(radius: 80)
-                            .frame(width: geo.size.width * 0.6)
-                            .offset(x: -geo.size.width * 0.2, y: geo.size.height * 0.1)
-                    }
-                }
-                .ignoresSafeArea()
+                LiquidBackgroundView()
                 
                 ScrollView {
                     LazyVStack(spacing: DSSpacing.lg) {

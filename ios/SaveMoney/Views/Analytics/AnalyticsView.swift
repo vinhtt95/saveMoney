@@ -50,7 +50,8 @@ struct AnalyticsView: View {
     private var projected: Double { (totalExpense / Double(elapsed)) * Double(daysTotal) }
 
     var body: some View {
-        NavigationStack {
+        ZStack {
+            LiquidBackgroundView()
             ScrollView {
                 LazyVStack(spacing: DSSpacing.lg) {
                     // Category Breakdown

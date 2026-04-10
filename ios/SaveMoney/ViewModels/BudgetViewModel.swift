@@ -67,4 +67,31 @@ final class BudgetViewModel {
             errorMessage = error.localizedDescription
         }
     }
+    
+    func updateBudget(
+        id: String,
+        name: String,
+        limit: Double,
+        dateStart: String,
+        dateEnd: String,
+        categoryIds: [String]
+    ) async {
+        isSubmitting = true
+        errorMessage = nil
+        
+        let dto = BudgetCreateDTO( // Dùng tạm DTO này hoặc tạo BudgetUpdateDTO
+            name: name,
+            limitAmount: limit,
+            dateStart: dateStart,
+            dateEnd: dateEnd,
+            categoryIds: categoryIds
+        )
+        do {
+            // AppViewModel cần có hàm: func updateBudget(_ id: String, _ dto: BudgetCreateDTO) async throws
+            try await app.updateBudget(id, dto)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isSubmitting = false
+    }
 }

@@ -261,3 +261,41 @@ struct EmptyStateView: View {
         .frame(maxWidth: .infinity)
     }
 }
+
+// MARK: - Liquid Background
+struct LiquidBackgroundView: View {
+    @State private var isAnimating = false
+    
+    var body: some View {
+        ZStack {
+            // Nền cơ bản
+            Color(.systemGroupedBackground).ignoresSafeArea()
+            
+            // Các đốm màu (Orbs)
+            Circle()
+                .fill(DSColors.accent.opacity(0.4))
+                .frame(width: 300, height: 300)
+                .blur(radius: 80)
+                .offset(x: isAnimating ? 100 : -100, y: isAnimating ? -150 : 150)
+            
+            Circle()
+                .fill(Color.orange.opacity(0.3))
+                .frame(width: 250, height: 250)
+                .blur(radius: 60)
+                .offset(x: isAnimating ? -150 : 150, y: isAnimating ? 150 : -100)
+            
+            Circle()
+                .fill(Color.purple.opacity(0.3))
+                .frame(width: 350, height: 350)
+                .blur(radius: 100)
+                .offset(x: isAnimating ? 150 : -50, y: isAnimating ? 200 : -200)
+        }
+        .ignoresSafeArea()
+        // Tạo animation di chuyển nhẹ nhàng liên tục
+        .onAppear {
+            withAnimation(.easeInOut(duration: 7).repeatForever(autoreverses: true)) {
+                isAnimating = true
+            }
+        }
+    }
+}

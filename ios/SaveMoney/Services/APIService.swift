@@ -147,6 +147,10 @@ final class APIService {
     func createBudget(_ dto: BudgetCreateDTO) async throws -> Budget {
         try await request("/api/budgets", method: "POST", body: dto)
     }
+    
+    func updateBudget(_ id: String, _ dto: BudgetCreateDTO) async throws -> Budget {
+        try await request("/api/budgets/\(id)", method: "PUT", body: dto)
+    }
 
     func deleteBudget(_ id: String) async throws {
         try await requestVoid("/api/budgets/\(id)", method: "DELETE")

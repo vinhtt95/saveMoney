@@ -19,22 +19,7 @@ struct TransactionsView: View {
         NavigationStack {
             ZStack {
                 // MARK: - Nền hiệu ứng giống trang Flow
-                GeometryReader { geo in
-                    ZStack {
-                        Circle()
-                            .fill(DSColors.accent.opacity(0.15))
-                            .blur(radius: 100)
-                            .frame(width: geo.size.width * 0.8)
-                            .offset(x: geo.size.width * 0.3, y: -geo.size.height * 0.1)
-                        
-                        Circle()
-                            .fill(DSColors.income.opacity(0.1))
-                            .blur(radius: 80)
-                            .frame(width: geo.size.width * 0.6)
-                            .offset(x: -geo.size.width * 0.2, y: geo.size.height * 0.2)
-                    }
-                }
-                .ignoresSafeArea()
+                LiquidBackgroundView()
                 
                 VStack(spacing: 0) {
                     // Offline banner

@@ -385,6 +385,18 @@ final class AppViewModel {
         let budget = try await api.createBudget(dto)
         budgets.append(budget)
     }
+    
+    func updateBudget(_ id: String, _ dto: BudgetCreateDTO) async throws {
+        let updatedBudget = try await api.updateBudget(id, dto)
+        if let index = budgets.firstIndex(where: { $0.id == id }) {
+            budgets[index] = updatedBudget
+        }
+        
+        // Nếu app của bạn có hỗ trợ lưu offline Budget thông qua `store` (LocalDataStore),
+        // bạn có thể thêm dòng này (giống như ở updateCategory).
+        // Nếu không có, bạn có thể xoá dòng store.saveBudgets đi.
+        store.saveBudgets(budgets)
+    }
 
     func deleteBudget(_ id: String) async throws {
         try await api.deleteBudget(id)

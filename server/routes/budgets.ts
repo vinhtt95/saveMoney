@@ -27,20 +27,30 @@ router.get('/budgets', async (_req, res) => {
 });
 
 router.post('/budgets', async (req, res) => {
-  const { id, name, limit, dateStart, dateEnd, categoryIds } = req.body;
+  // Lấy limitAmount từ body (khớp với BudgetCreateDTO bên iOS)
+  const { id, name, limitAmount, dateStart, dateEnd, categoryIds } = req.body;
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
     await conn.query(
       'INSERT INTO budgets (id, name, limit_amount, date_start, date_end) VALUES (?, ?, ?, ?, ?)',
-      [id, name, limit, dateStart, dateEnd]
+      [id, name, limitAmount, dateStart, dateEnd]
     );
     if (categoryIds?.length) {
       const values = categoryIds.map((cId: string) => [id, cId]);
       await conn.query('INSERT IGNORE INTO budget_categories (budget_id, category_id) VALUES ?', [values]);
     }
     await conn.commit();
-    res.json({ ok: true });
+    
+    // Trả về object Budget để iOS parse được
+    res.json({
+      id,
+      name,
+      limit: limitAmount, // Trả về 'limit' vì model Budget bên iOS khai báo 'var limit: Double'
+      dateStart,
+      dateEnd,
+      categoryIds: categoryIds || []
+    });
   } catch (e) {
     await conn.rollback();
     throw e;
@@ -50,13 +60,14 @@ router.post('/budgets', async (req, res) => {
 });
 
 router.put('/budgets/:id', async (req, res) => {
-  const { name, limit, dateStart, dateEnd, categoryIds } = req.body;
+  // Lấy limitAmount từ body
+  const { name, limitAmount, dateStart, dateEnd, categoryIds } = req.body;
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
     await conn.query(
       'UPDATE budgets SET name=?, limit_amount=?, date_start=?, date_end=? WHERE id=?',
-      [name, limit, dateStart, dateEnd, req.params.id]
+      [name, limitAmount, dateStart, dateEnd, req.params.id]
     );
     await conn.query('DELETE FROM budget_categories WHERE budget_id = ?', [req.params.id]);
     if (categoryIds?.length) {
@@ -64,7 +75,16 @@ router.put('/budgets/:id', async (req, res) => {
       await conn.query('INSERT INTO budget_categories (budget_id, category_id) VALUES ?', [values]);
     }
     await conn.commit();
-    res.json({ ok: true });
+    
+    // Trả về object Budget để iOS parse được
+    res.json({
+      id: req.params.id,
+      name,
+      limit: limitAmount, 
+      dateStart,
+      dateEnd,
+      categoryIds: categoryIds || []
+    });
   } catch (e) {
     await conn.rollback();
     throw e;
@@ -75,5 +95,5 @@ router.put('/budgets/:id', async (req, res) => {
 
 router.delete('/budgets/:id', async (req, res) => {
   await pool.query('DELETE FROM budgets WHERE id = ?', [req.params.id]);
-  res.json({ ok: true });
+  res.json({ ok: true }); // Delete không cần parse object nên trả về ok: true là được
 });

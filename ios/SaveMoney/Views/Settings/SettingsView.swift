@@ -10,69 +10,73 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            List {
-                // 1. Quản lý
-                Section("Quản lý") {
-                    NavigationLink(destination: BudgetView()) {
-                        Label { Text("Ngân sách").lineLimit(1) } icon: { Image(systemName: "chart.pie.fill") }
-                    }
-                    NavigationLink(destination: AccountsView()) {
-                        Label { Text("Tài khoản").lineLimit(1) } icon: { Image(systemName: "creditcard.fill") }
-                    }
-                    NavigationLink(destination: CategoriesView()) {
-                        Label { Text("Danh mục").lineLimit(1) } icon: { Image(systemName: "tag.fill") }
-                    }
-                    NavigationLink(destination: GoldView()) {
-                        Label { Text("Giá vàng").lineLimit(1) } icon: { Image(systemName: "bitcoinsign.circle.fill") }
-                    }
-                    NavigationLink(destination: WealthView()) {
-                        Label { Text("Tài sản ròng").lineLimit(1) } icon: { Image(systemName: "briefcase.fill") }
-                    }
-                }
-
-                // 2. General
-                Section("General") {
-                    // Giao diện (giữ lại vì thuộc về App UI)
-                    HStack {
-                        Label("Giao diện", systemImage: "paintbrush.fill")
-                        Spacer()
-                        Picker("", selection: Binding(
-                            get: { theme.theme },
-                            set: { theme.theme = $0 }
-                        )) {
-                            ForEach(AppTheme.allCases, id: \.self) { t in
-                                Text(t.label).tag(t)
-                            }
+        NavigationStack{
+            ZStack {
+                LiquidBackgroundView()
+                
+                List {
+                    // 1. Quản lý
+                    Section("Quản lý") {
+                        NavigationLink(destination: BudgetView()) {
+                            Label { Text("Ngân sách").lineLimit(1) } icon: { Image(systemName: "chart.pie.fill") }
                         }
-                        .pickerStyle(.menu)
+                        NavigationLink(destination: AccountsView()) {
+                            Label { Text("Tài khoản").lineLimit(1) } icon: { Image(systemName: "creditcard.fill") }
+                        }
+                        NavigationLink(destination: CategoriesView()) {
+                            Label { Text("Danh mục").lineLimit(1) } icon: { Image(systemName: "tag.fill") }
+                        }
+                        NavigationLink(destination: GoldView()) {
+                            Label { Text("Giá vàng").lineLimit(1) } icon: { Image(systemName: "bitcoinsign.circle.fill") }
+                        }
+                        NavigationLink(destination: WealthView()) {
+                            Label { Text("Tài sản ròng").lineLimit(1) } icon: { Image(systemName: "briefcase.fill") }
+                        }
                     }
-
-                    // MỤC CHUNG MỚI: Cài đặt mặc định
-                    NavigationLink(destination: DefaultSettingsView(vm: vm)) {
-                        Label("Cài đặt mặc định", systemImage: "gearshape.2.fill")
+                    
+                    // 2. General
+                    Section("General") {
+                        // Giao diện (giữ lại vì thuộc về App UI)
+                        HStack {
+                            Label("Giao diện", systemImage: "paintbrush.fill")
+                            Spacer()
+                            Picker("", selection: Binding(
+                                get: { theme.theme },
+                                set: { theme.theme = $0 }
+                            )) {
+                                ForEach(AppTheme.allCases, id: \.self) { t in
+                                    Text(t.label).tag(t)
+                                }
+                            }
+                            .pickerStyle(.menu)
+                        }
+                        
+                        // MỤC CHUNG MỚI: Cài đặt mặc định
+                        NavigationLink(destination: DefaultSettingsView(vm: vm)) {
+                            Label("Cài đặt mặc định", systemImage: "gearshape.2.fill")
+                        }
+                        
+                        // Địa chỉ máy chủ
+                        NavigationLink(destination: serverSettingsView) {
+                            Label("Địa chỉ máy chủ", systemImage: "server.rack")
+                        }
                     }
-
-                    // Địa chỉ máy chủ
-                    NavigationLink(destination: serverSettingsView) {
-                        Label("Địa chỉ máy chủ", systemImage: "server.rack")
+                    
+                    // 3. Info
+                    Section {
+                        HStack {
+                            Label { Text("Phiên bản").lineLimit(1) } icon: { Image(systemName: "info.circle") }
+                            Spacer()
+                            Text("1.0.0").foregroundStyle(.secondary)
+                        }
                     }
                 }
-
-                // 3. Info
-                Section {
-                    HStack {
-                        Label { Text("Phiên bản").lineLimit(1) } icon: { Image(systemName: "info.circle") }
-                        Spacer()
-                        Text("1.0.0").foregroundStyle(.secondary)
-                    }
-                }
+                .navigationTitle("")
+                .navigationBarTitleDisplayMode(.inline)
             }
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-        }
-        .onAppear {
-            if settingsVM == nil { settingsVM = SettingsViewModel(app: app) }
+            .onAppear {
+                if settingsVM == nil { settingsVM = SettingsViewModel(app: app) }
+            }
         }
     }
 
