@@ -46,7 +46,7 @@ private struct CategoryRow: View {
 
     var body: some View {
         HStack(spacing: DSSpacing.md) {
-            CategoryIconView(name: cat.name, size: 32)
+            CategoryIconView(category: cat, fallbackName: cat.name, size: 32)
             Text(cat.name)
                 .font(.subheadline)
             Spacer()

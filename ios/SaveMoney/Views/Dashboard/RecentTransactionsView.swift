@@ -48,9 +48,11 @@ private struct RecentTransactionRow: View {
     }
 
     var body: some View {
+        let cat = app.category(for: tx.categoryId)
+        
         HStack(spacing: DSSpacing.md) {
             // Icon danh mục với kích thước lớn hơn một chút
-            CategoryIconView(name: categoryName, size: 42)
+            CategoryIconView(category: cat, fallbackName: categoryName, size: 42)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(categoryName)

@@ -348,10 +348,14 @@ final class AppViewModel {
     }
 
     func updateCategory(_ id: String, _ dto: CategoryUpdateDTO) async throws {
-        let cat = try await api.updateCategory(id, dto)
-        if let idx = categories.firstIndex(where: { $0.id == id }) {
-            categories[idx] = cat
+        let updatedCat = try await api.updateCategory(id, dto)
+        
+        if let index = categories.firstIndex(where: { $0.id == id }) {
+            categories[index] = updatedCat
         }
+        
+        // Sửa lỗi: Gọi 'store' thay vì 'localStore'
+        store.saveCategories(categories)
     }
 
     func deleteCategory(_ id: String) async throws {

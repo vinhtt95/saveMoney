@@ -95,7 +95,7 @@ struct AddBudgetView: View {
                 Section("Danh mục áp dụng") {
                     ForEach(app.expenseCategories) { cat in
                         HStack {
-                            CategoryIconView(name: cat.name, size: 24)
+                            CategoryIconView(category: cat, fallbackName: cat.name, size: 24)
                             Text(cat.name)
                             Spacer()
                             if selectedCategoryIds.contains(cat.id) {

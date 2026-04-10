@@ -167,17 +167,26 @@ struct AmountText: View {
 
 // MARK: - Category Icon View
 struct CategoryIconView: View {
-    let name: String
+    let category: Category? // Truyền cả object vào
+    let fallbackName: String // Tên để dự phòng
     var size: CGFloat = 32
 
-    var body: some View {
+var body: some View {
+        // Lấy icon: Ưu tiên từ DB -> fallback theo tên
+        let iconName = category?.icon ?? categorySystemImage(fallbackName)
+        
+        // Lấy màu: Ưu tiên từ DB -> fallback theo tên
+        let themeColor = category != nil
+            ? CategoryColorHelper.map(category!.color)
+            : categoryColor(fallbackName)
+
         ZStack {
             Circle()
-                .fill(categoryColor(name).opacity(0.15))
+                .fill(themeColor.opacity(0.15))
                 .frame(width: size, height: size)
-            Image(systemName: categorySystemImage(name))
+            Image(systemName: iconName)
                 .font(.system(size: size * 0.45))
-                .foregroundStyle(categoryColor(name))
+                .foregroundStyle(themeColor)
         }
     }
 }
