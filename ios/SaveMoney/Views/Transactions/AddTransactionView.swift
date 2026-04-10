@@ -214,15 +214,45 @@ struct AddTransactionView: View {
                 // Toolbar hỗ trợ nhập nhanh trên bàn phím
                 ToolbarItemGroup(placement: .keyboard) {
                     if focusedField == .amount {
-                        HStack(spacing: 12) {
-                            Button(".000") { appendZeros(3) }
-                            Button("0.000") { appendZeros(4) }
-                            Button("00.000") { appendZeros(5) }
+                        HStack(spacing: 16) {
+                            if amount == 0 {
+                                // Gợi ý mặc định khi chưa có giá trị
+                                Button("5K") { formatAmountInput("5000") }
+                                Button("30K") { formatAmountInput("30000") }
+                                Button("300K") { formatAmountInput("300000") }
+                            } else {
+                                // Gợi ý động dựa trên số gốc (significant digits)
+                                let baseValue: Double = {
+                                    var val = Int(amount)
+                                    while val >= 10 && val % 10 == 0 { val /= 10 }
+                                    return Double(val)
+                                }()
+                                
+                                let targets: [Double] = [
+                                    baseValue * 1_000,
+                                    baseValue * 10_000,
+                                    baseValue * 100_000
+                                ]
+                                
+                                ForEach(targets, id: \.self) { target in
+                                    // Giới hạn gợi ý tối đa 900.000 như bạn yêu cầu
+                                    if target <= 900_000 {
+                                        Button(formatVNDShort(target).replacingOccurrences(of: "₫", with: "")) {
+                                            formatAmountInput(String(Int(target)))
+                                        }
+                                    }
+                                }
+                            }
                         }
                         .font(.system(.callout, design: .monospaced))
                     }
+                    
                     Spacer()
-                    Button("Xong") { focusedField = nil }
+                    
+                    Button("Xong") {
+                        focusedField = nil
+                    }
+                    .fontWeight(.bold)
                 }
             }
         }
