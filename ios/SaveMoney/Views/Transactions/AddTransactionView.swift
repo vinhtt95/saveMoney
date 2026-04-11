@@ -239,10 +239,10 @@ struct AddTransactionView: View {
                         HStack(spacing: 16) {
                             if amount == 0 {
                                 // Gợi ý mặc định khi chưa có giá trị
-                                Button("5K") { formatAmountInput("5000") }
-                                Button("30K") { formatAmountInput("30000") }
-                                Button("35K") { formatAmountInput("35000") }
-                                Button("300K") { formatAmountInput("300000") }
+                                Button("5K") { formatAmountInput("5000") }.padding(.vertical ,5)
+                                Button("30K") { formatAmountInput("30000") }.padding(.vertical ,5)
+                                Button("35K") { formatAmountInput("35000") }.padding(.vertical ,5)
+                                Button("300K") { formatAmountInput("300000") }.padding(.vertical ,5)
                             } else {
                                 // Gợi ý động dựa trên số gốc (significant digits)
                                 let baseValue: Double = {
@@ -262,23 +262,34 @@ struct AddTransactionView: View {
                                     if target <= 900_000 {
                                         Button(formatVNDShort(target).replacingOccurrences(of: "₫", with: "")) {
                                             formatAmountInput(String(Int(target)))
-                                        }
+                                        }.padding(.vertical ,5)
                                     }
                                 }
                             }
                         }
+//                        .background(.bar.opacity(0.5), in: .capsule)
+                        .glassEffect()
+//                        .shadow(color: .black.opacity(0.2), radius: 20, y: 10)
+                        .padding(.bottom, 10)
                         .font(.system(.callout, design: .monospaced))
                         Spacer()
                         Spacer()
                     }
                 }
+                .sharedBackgroundVisibility(.hidden)
                 
                 ToolbarItemGroup(placement: .keyboard){
-                    Button("Xong") {
-                        focusedField = nil
+                    HStack(spacing: 16){
+                        Button("Xong") {
+                            focusedField = nil
+                        }
+                        .padding(.vertical ,5)
+                        .fontWeight(.bold)
                     }
-                    .fontWeight(.bold)
+                    .glassEffect()
+                    .padding(.bottom, 10)
                 }
+                .sharedBackgroundVisibility(.hidden)
             }
         }
         .onAppear {

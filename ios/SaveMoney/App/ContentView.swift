@@ -56,7 +56,7 @@ struct MainTabView: View {
             // Dùng role: .search để ép Apple tách Tab này sang nửa bên phải.
             // Biến nó thành nút (+) và truyền value = 4 để bộ đánh chặn ở trên bắt được.
             Tab("Thêm", systemImage: "plus", value: 4, role: .search) {
-                Color.clear // View rỗng vì code đã chặn, không bao giờ load vào màn hình này
+//                Color.clear // View rỗng vì code đã chặn, không bao giờ load vào màn hình này
             }
         }
         .tabViewStyle(.sidebarAdaptable) // Ép iOS bật chế độ thanh điều hướng nổi (floating)
