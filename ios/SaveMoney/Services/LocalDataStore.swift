@@ -469,4 +469,16 @@ final class LocalDataStore {
             try? context.save()
         }
     }
+    
+    func updatePendingOpsId(from tempId: String, to realId: String) {
+        let descriptor = FetchDescriptor<PendingSyncOperation>(
+            predicate: #Predicate { $0.entityId == tempId }
+        )
+        if let ops = try? context.fetch(descriptor) {
+            for op in ops {
+                op.entityId = realId
+            }
+            try? context.save()
+        }
+    }
 }

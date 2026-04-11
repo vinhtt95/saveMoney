@@ -68,6 +68,8 @@ final class OfflineSyncService {
         // Update local record: replace temp ID with real server ID
         store.updateTransactionId(from: tempId, to: created.id)
         // Also persist the full server-returned transaction
+        store.updatePendingOpsId(from: tempId, to: created.id)
+        
         store.upsertTransaction(created)
 
         store.dequeueSyncOp(op)

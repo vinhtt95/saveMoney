@@ -23,6 +23,7 @@ final class AppViewModel {
     var networkMonitor: NetworkMonitor?
 
     init() {
+        self.networkMonitor = NetworkMonitor()
         syncService = OfflineSyncService(api: api, store: store)
         syncService.onSyncCompleted = { [weak self] in
             await self?.loadInitData()
@@ -238,6 +239,7 @@ final class AppViewModel {
                 return
             } catch APIError.networkError {
                 // Network unavailable despite isOnline flag — fall through to offline path
+                print("⚠️ Server unreachable, saving offline")
             }
         }
         saveTransactionOffline(dto)
