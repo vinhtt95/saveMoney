@@ -33,7 +33,7 @@ struct AddGoldAssetView: View {
                             Text("— Chọn —").tag(GoldPriceItem?.none)
                             ForEach(brandItems) { item in
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text(item.name)
+                                    Text(item.name ?? "Không rõ tên") // Sửa lỗi String?
                                     if let sell = item.sellPrice {
                                         Text("Bán: \(formatVND(sell))/lượng")
                                             .font(.caption)
@@ -97,8 +97,11 @@ struct AddGoldAssetView: View {
     }
 
     private func handleSubmit() async {
+        // Chỉ giải nén selectedItem và quantityText
         guard let item = selectedItem,
               let quantity = Double(quantityText) else { return }
+        
+        // item.id và item.name trong model GoldPriceItem hiện là String (không ?), dùng trực tiếp:
         await vm.addGoldAsset(
             brand: selectedBrand,
             productId: item.id,
@@ -106,6 +109,7 @@ struct AddGoldAssetView: View {
             quantity: quantity,
             note: note.isEmpty ? nil : note
         )
+        
         if let err = vm.errorMessage {
             errorMessage = err
         } else {

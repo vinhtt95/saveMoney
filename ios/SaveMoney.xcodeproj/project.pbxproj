@@ -624,6 +624,8 @@
 				DEVELOPMENT_TEAM = P8JKC37U65;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = SaveMoney/Resources/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Save Money";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -654,7 +656,7 @@
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SaveMoneyWidget/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = SaveMoneyWidget;
+				INFOPLIST_KEY_CFBundleDisplayName = "Save Money";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -693,7 +695,7 @@
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SaveMoneyWidget/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = SaveMoneyWidget;
+				INFOPLIST_KEY_CFBundleDisplayName = "Save Money";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -726,6 +728,8 @@
 				DEVELOPMENT_TEAM = P8JKC37U65;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = SaveMoney/Resources/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Save Money";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

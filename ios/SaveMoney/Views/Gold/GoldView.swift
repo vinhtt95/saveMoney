@@ -20,45 +20,37 @@ struct GoldView: View {
                         Text("USD/VND")
                             .font(.subheadline.weight(.semibold))
                         Spacer()
-                        Text(formatVND(prices.usdVnd))
+                        Text(formatVND(prices.usdVnd ?? 0)) // Sửa lỗi Double?
                             .font(.subheadline.monospacedDigit())
                             .foregroundStyle(DSColors.gold)
                     }
                     .padding(DSSpacing.md)
                     .glassEffect(.regular, in: .rect(cornerRadius: DSRadius.md))
 
-                    // SJC Section
                     let sjcItems = service.items(for: .sjc)
                     if !sjcItems.isEmpty {
                         GoldPriceSection(title: "SJC", items: sjcItems)
                     }
 
-                    // BTMC Section
                     let btmcItems = service.items(for: .btmc)
                     if !btmcItems.isEmpty {
                         GoldPriceSection(title: "BTMC", items: btmcItems)
                     }
 
-                    // World Section
                     let worldItems = service.items(for: .world)
                     if !worldItems.isEmpty {
                         GoldPriceSection(title: "Vàng thế giới", items: worldItems)
                     }
 
-                    Text("Cập nhật: \(prices.fetchedAt)")
+                    Text("Cập nhật: \(prices.fetchedAt ?? "Vừa xong")") // Sửa lỗi String?
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                         .frame(maxWidth: .infinity, alignment: .center)
                 } else if let error = vm.goldService.error {
                     ErrorBanner(message: error)
                 } else {
-                    EmptyStateView(
-                        icon: "sun.max",
-                        title: "Không có dữ liệu",
-                        message: "Kiểm tra kết nối máy chủ"
-                    )
+                    EmptyStateView(icon: "sun.max", title: "Không có dữ liệu", message: "Kiểm tra kết nối máy chủ")
                 }
-
                 Spacer(minLength: 80)
             }
             .padding(DSSpacing.lg)
@@ -74,11 +66,8 @@ struct GoldView: View {
                         isRefreshing = false
                     }
                 } label: {
-                    if isRefreshing {
-                        ProgressView().scaleEffect(0.8)
-                    } else {
-                        Image(systemName: "arrow.clockwise")
-                    }
+                    if isRefreshing { ProgressView().scaleEffect(0.8) }
+                    else { Image(systemName: "arrow.clockwise") }
                 }
             }
         }
@@ -95,43 +84,23 @@ private struct GoldPriceSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: DSSpacing.sm) {
-            Text(title)
-                .font(.headline)
-                .padding(.horizontal, DSSpacing.xs)
-
+            Text(title).font(.headline).padding(.horizontal, DSSpacing.xs)
             VStack(spacing: 1) {
-                // Header
                 HStack {
-                    Text("Sản phẩm")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Text("Mua")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 100, alignment: .trailing)
-                    Text("Bán")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 100, alignment: .trailing)
+                    Text("Sản phẩm").font(.caption.weight(.semibold)).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+                    Text("Mua").font(.caption.weight(.semibold)).foregroundStyle(.secondary).frame(width: 100, alignment: .trailing)
+                    Text("Bán").font(.caption.weight(.semibold)).foregroundStyle(.secondary).frame(width: 100, alignment: .trailing)
                 }
-                .padding(.horizontal, DSSpacing.md)
-                .padding(.bottom, DSSpacing.xs)
+                .padding(.horizontal, DSSpacing.md).padding(.bottom, DSSpacing.xs)
 
                 ForEach(items) { item in
                     HStack {
-                        Text(item.name)
-                            .font(.subheadline)
-                            .lineLimit(2)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Text(item.name) // Sửa lỗi String?
+                            .font(.subheadline).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
                         Text(item.buyPrice.map { formatVNDShort($0) } ?? "—")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                            .frame(width: 100, alignment: .trailing)
+                            .font(.caption.monospacedDigit()).foregroundStyle(.secondary).frame(width: 100, alignment: .trailing)
                         Text(item.sellPrice.map { formatVNDShort($0) } ?? "—")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(DSColors.gold)
-                            .frame(width: 100, alignment: .trailing)
+                            .font(.caption.monospacedDigit()).foregroundStyle(DSColors.gold).frame(width: 100, alignment: .trailing)
                     }
                     .padding(DSSpacing.md)
                     .glassEffect(.regular, in: .rect(cornerRadius: DSRadius.sm))

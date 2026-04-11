@@ -1,15 +1,15 @@
 import Foundation
 
 enum GoldBrand: String, Codable, CaseIterable {
-    case sjc = "SJC"
-    case btmc = "BTMC"
-    case world = "World"
-
+    case sjc = "SJC"     // Khớp với "SJC" từ API
+    case btmc = "BTMC"   // Khớp với "BTMC" từ API
+    case world = "world" // Khớp với "world" từ API
+    
     var label: String {
         switch self {
-        case .sjc: "SJC"
-        case .btmc: "BTMC"
-        case .world: "Thế giới"
+        case .sjc: return "SJC"
+        case .btmc: return "Bảo Tín Minh Châu"
+        case .world: return "Vàng thế giới"
         }
     }
 }
