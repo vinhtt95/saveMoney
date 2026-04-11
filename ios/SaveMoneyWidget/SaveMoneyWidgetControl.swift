@@ -1,10 +1,3 @@
-//
-//  SaveMoneyWidgetControl.swift
-//  SaveMoneyWidget
-//
-//  Created by Trương Thế Vinh on 11/04/2026.
-//
-
 import AppIntents
 import SwiftUI
 import WidgetKit
@@ -12,19 +5,15 @@ import WidgetKit
 struct SaveMoneyWidgetControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(
-            kind: "com.vinhtt.savemoney.SaveMoneyWidget",
+            kind: "com.yourdomain.SaveMoney.QuickAddControl",
             provider: Provider()
         ) { value in
-            ControlWidgetToggle(
-                "Start Timer",
-                isOn: value,
-                action: StartTimerIntent()
-            ) { isRunning in
-                Label(isRunning ? "On" : "Off", systemImage: "timer")
+            ControlWidgetButton(action: QuickAddTransactionIntent()) {
+                Label("Thêm GD", systemImage: "plus.circle.fill")
             }
         }
-        .displayName("Timer")
-        .description("A an example control that runs a timer.")
+        .displayName("Thêm Giao Dịch Nhanh")
+        .description("Mở nhanh ứng dụng để thêm thu chi mới.")
     }
 }
 
@@ -35,20 +24,20 @@ extension SaveMoneyWidgetControl {
         }
 
         func currentValue() async throws -> Bool {
-            let isRunning = true // Check if the timer is running
+            let isRunning = true // Logic kiểm tra trạng thái tương lai
             return isRunning
         }
     }
 }
 
-struct StartTimerIntent: SetValueIntent {
-    static let title: LocalizedStringResource = "Start a timer"
-
-    @Parameter(title: "Timer is running")
-    var value: Bool
+struct QuickAddTransactionIntent: AppIntent {
+    static let title: LocalizedStringResource = "Mở Thêm Giao Dịch"
+    
+    // Mở app chính khi người dùng bấm vào Control Center
+    static var openAppWhenRun: Bool = true
 
     func perform() async throws -> some IntentResult {
-        // Start / stop the timer based on `value`.
+        // Xử lý deep link hoặc cấu hình app state tại đây
         return .result()
     }
 }

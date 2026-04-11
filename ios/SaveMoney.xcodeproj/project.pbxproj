@@ -40,6 +40,18 @@
 		B416A7432F879AC0007E7005 /* LocalDataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B416A73F2F879AC0007E7005 /* LocalDataStore.swift */; };
 		B416A7442F879AC0007E7005 /* OfflineSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B416A7412F879AC0007E7005 /* OfflineSyncService.swift */; };
 		B4554C2B2F893964000A1BBC /* PinnedBudgetCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4554C2A2F893962000A1BBC /* PinnedBudgetCard.swift */; };
+		B4CC8EBF2F8AA2E100124324 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B4CC8EBE2F8AA2E100124324 /* WidgetKit.framework */; };
+		B4CC8EC12F8AA2E100124324 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B4CC8EC02F8AA2E100124324 /* SwiftUI.framework */; };
+		B4CC8ECE2F8AA2E300124324 /* SaveMoneyWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B4CC8EBC2F8AA2E100124324 /* SaveMoneyWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		B4CC8ED42F8AA37100124324 /* GlassComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7176B20603E6E36E54F778C9 /* GlassComponents.swift */; };
+		B4CC8ED52F8AA37100124324 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FD79EE7FD833AB4228396F5 /* DesignSystem.swift */; };
+		B4CC8ED62F8AA37100124324 /* LiquidGlassModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = B410CF372F87E4A0008466E9 /* LiquidGlassModifier.swift */; };
+		B4CC8ED72F8AA37100124324 /* Formatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42278C7BD36B0B35766998D5 /* Formatters.swift */; };
+		B4CC8EDA2F8AA60800124324 /* Category.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F67E2611D38E79494DDEEC3 /* Category.swift */; };
+		B4CC8EDB2F8AA60800124324 /* Transaction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3AA3C02939A44B3791C29C91 /* Transaction.swift */; };
+		B4CC8EDC2F8AA61300124324 /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D7F23CD4E1CB7B325D10764 /* Constants.swift */; };
+		B4CC8EDE2F8AA7C000124324 /* WidgetDataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4CC8EDD2F8AA7BE00124324 /* WidgetDataManager.swift */; };
+		B4CC8EDF2F8AA7C000124324 /* WidgetDataManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4CC8EDD2F8AA7BE00124324 /* WidgetDataManager.swift */; };
 		C09ECB332AAA1DE87063F3A8 /* SaveMoneyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3D2A1ABB4F045554C4D6FE7 /* SaveMoneyApp.swift */; };
 		C18E76B7E8236982E22FA5C2 /* RecentTransactionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBF7D7A96B520E66C0D57671 /* RecentTransactionsView.swift */; };
 		C53E8B60627FB86959EE612E /* CategoryFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00EEC993ED19BE6A5B89431D /* CategoryFormView.swift */; };
@@ -52,6 +64,30 @@
 		F6EDBD8D3E242232BEE8295C /* AppViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1E72C58213F8E4C7C3C6ED7 /* AppViewModel.swift */; };
 		FDDC0C20F9039DB20D7D039E /* GoldView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57E82C90C2ABD2A648920B5E /* GoldView.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		B4CC8ECC2F8AA2E300124324 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7EAA0C609D9823D96A791494 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = B4CC8EBB2F8AA2E100124324;
+			remoteInfo = SaveMoneyWidgetExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		B4CC8ECF2F8AA2E300124324 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				B4CC8ECE2F8AA2E300124324 /* SaveMoneyWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		00EEC993ED19BE6A5B89431D /* CategoryFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryFormView.swift; sourceTree = "<group>"; };
@@ -90,6 +126,12 @@
 		B416A7402F879AC0007E7005 /* NetworkMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkMonitor.swift; sourceTree = "<group>"; };
 		B416A7412F879AC0007E7005 /* OfflineSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineSyncService.swift; sourceTree = "<group>"; };
 		B4554C2A2F893962000A1BBC /* PinnedBudgetCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PinnedBudgetCard.swift; sourceTree = "<group>"; };
+		B4CC8EBC2F8AA2E100124324 /* SaveMoneyWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SaveMoneyWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		B4CC8EBE2F8AA2E100124324 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		B4CC8EC02F8AA2E100124324 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		B4CC8ED82F8AA4F700124324 /* SaveMoney.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SaveMoney.entitlements; sourceTree = "<group>"; };
+		B4CC8ED92F8AA54300124324 /* SaveMoneyWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SaveMoneyWidgetExtension.entitlements; sourceTree = "<group>"; };
+		B4CC8EDD2F8AA7BE00124324 /* WidgetDataManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetDataManager.swift; sourceTree = "<group>"; };
 		B64D6BA26EAA54690E7ECA9D /* AppInitData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppInitData.swift; sourceTree = "<group>"; };
 		B7C9D51292D0CC721086891A /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		BC7C9A77CA613A6265E42BBD /* GoldViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoldViewModel.swift; sourceTree = "<group>"; };
@@ -101,6 +143,39 @@
 		EE7BA41065209951DCEE8885 /* AddGoldAssetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddGoldAssetView.swift; sourceTree = "<group>"; };
 		F1E72C58213F8E4C7C3C6ED7 /* AppViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppViewModel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		B4CC8ED22F8AA2E300124324 /* Exceptions for "SaveMoneyWidget" folder in "SaveMoneyWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = B4CC8EBB2F8AA2E100124324 /* SaveMoneyWidgetExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		B4CC8EC22F8AA2E100124324 /* SaveMoneyWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				B4CC8ED22F8AA2E300124324 /* Exceptions for "SaveMoneyWidget" folder in "SaveMoneyWidgetExtension" target */,
+			);
+			path = SaveMoneyWidget;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		B4CC8EB92F8AA2E100124324 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B4CC8EC12F8AA2E100124324 /* SwiftUI.framework in Frameworks */,
+				B4CC8EBF2F8AA2E100124324 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		1298293AD3858D3A3D25D119 /* Models */ = {
@@ -146,6 +221,7 @@
 			isa = PBXGroup;
 			children = (
 				475E5173DB5B2C3ED3A74441 /* SaveMoney.app */,
+				B4CC8EBC2F8AA2E100124324 /* SaveMoneyWidgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -211,6 +287,7 @@
 		924A57B48B22D77D0378DEED /* SaveMoney */ = {
 			isa = PBXGroup;
 			children = (
+				B4CC8ED82F8AA4F700124324 /* SaveMoney.entitlements */,
 				77D983929448B0AC096A1313 /* App */,
 				1298293AD3858D3A3D25D119 /* Models */,
 				75056F60A38870CF2923FB96 /* Resources */,
@@ -222,10 +299,22 @@
 			path = SaveMoney;
 			sourceTree = "<group>";
 		};
+		B4CC8EBD2F8AA2E100124324 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				B4CC8EBE2F8AA2E100124324 /* WidgetKit.framework */,
+				B4CC8EC02F8AA2E100124324 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		C2AACBD3B9EE3E876E7A58E2 = {
 			isa = PBXGroup;
 			children = (
+				B4CC8ED92F8AA54300124324 /* SaveMoneyWidgetExtension.entitlements */,
 				924A57B48B22D77D0378DEED /* SaveMoney */,
+				B4CC8EC22F8AA2E100124324 /* SaveMoneyWidget */,
+				B4CC8EBD2F8AA2E100124324 /* Frameworks */,
 				41EA318FB59602B824C75FC6 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -233,6 +322,7 @@
 		C70401791F5BE988BD87B16D /* Utils */ = {
 			isa = PBXGroup;
 			children = (
+				B4CC8EDD2F8AA7BE00124324 /* WidgetDataManager.swift */,
 				B410CF372F87E4A0008466E9 /* LiquidGlassModifier.swift */,
 				2D7F23CD4E1CB7B325D10764 /* Constants.swift */,
 				3FD79EE7FD833AB4228396F5 /* DesignSystem.swift */,
@@ -299,10 +389,12 @@
 			buildConfigurationList = B2B3B2DE51713134FE0459B3 /* Build configuration list for PBXNativeTarget "SaveMoney" */;
 			buildPhases = (
 				A446DF5DEBBADD5CA3BEF9CC /* Sources */,
+				B4CC8ECF2F8AA2E300124324 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				B4CC8ECD2F8AA2E300124324 /* PBXTargetDependency */,
 			);
 			name = SaveMoney;
 			packageProductDependencies = (
@@ -311,6 +403,28 @@
 			productReference = 475E5173DB5B2C3ED3A74441 /* SaveMoney.app */;
 			productType = "com.apple.product-type.application";
 		};
+		B4CC8EBB2F8AA2E100124324 /* SaveMoneyWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B4CC8ED32F8AA2E300124324 /* Build configuration list for PBXNativeTarget "SaveMoneyWidgetExtension" */;
+			buildPhases = (
+				B4CC8EB82F8AA2E100124324 /* Sources */,
+				B4CC8EB92F8AA2E100124324 /* Frameworks */,
+				B4CC8EBA2F8AA2E100124324 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				B4CC8EC22F8AA2E100124324 /* SaveMoneyWidget */,
+			);
+			name = SaveMoneyWidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = SaveMoneyWidgetExtension;
+			productReference = B4CC8EBC2F8AA2E100124324 /* SaveMoneyWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -318,7 +432,13 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
+				LastSwiftUpdateCheck = 2640;
 				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					B4CC8EBB2F8AA2E100124324 = {
+						CreatedOnToolsVersion = 26.4;
+					};
+				};
 			};
 			buildConfigurationList = B33B6B9E4A03C8F9EF167029 /* Build configuration list for PBXProject "SaveMoney" */;
 			developmentRegion = en;
@@ -335,9 +455,20 @@
 			projectRoot = "";
 			targets = (
 				3CB0EF38729FFDBE1397D441 /* SaveMoney */,
+				B4CC8EBB2F8AA2E100124324 /* SaveMoneyWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		B4CC8EBA2F8AA2E100124324 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		A446DF5DEBBADD5CA3BEF9CC /* Sources */ = {
@@ -371,6 +502,7 @@
 				8C9B5423FB2FCA70804E3759 /* DashboardView.swift in Sources */,
 				EB6A06FF7771FA9A5CF7B918 /* DesignSystem.swift in Sources */,
 				0FB1E1A59077428F2EB497CE /* Formatters.swift in Sources */,
+				B4CC8EDF2F8AA7C000124324 /* WidgetDataManager.swift in Sources */,
 				7CF1EF3504671CBAA0BCC02D /* GlassComponents.swift in Sources */,
 				EBF24FC2362D3AF858D180CC /* GoldAsset.swift in Sources */,
 				93520815F47143C457897C07 /* GoldPrice.swift in Sources */,
@@ -391,7 +523,30 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B4CC8EB82F8AA2E100124324 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B4CC8EDA2F8AA60800124324 /* Category.swift in Sources */,
+				B4CC8EDB2F8AA60800124324 /* Transaction.swift in Sources */,
+				B4CC8EDC2F8AA61300124324 /* Constants.swift in Sources */,
+				B4CC8ED42F8AA37100124324 /* GlassComponents.swift in Sources */,
+				B4CC8EDE2F8AA7C000124324 /* WidgetDataManager.swift in Sources */,
+				B4CC8ED52F8AA37100124324 /* DesignSystem.swift in Sources */,
+				B4CC8ED62F8AA37100124324 /* LiquidGlassModifier.swift in Sources */,
+				B4CC8ED72F8AA37100124324 /* Formatters.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		B4CC8ECD2F8AA2E300124324 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = B4CC8EBB2F8AA2E100124324 /* SaveMoneyWidgetExtension */;
+			targetProxy = B4CC8ECC2F8AA2E300124324 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		13223112DE1BFC69C08BD7DC /* Debug */ = {
@@ -464,6 +619,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = SaveMoney/SaveMoney.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				DEVELOPMENT_TEAM = P8JKC37U65;
 				ENABLE_PREVIEWS = YES;
@@ -478,10 +634,93 @@
 			};
 			name = Release;
 		};
+		B4CC8ED02F8AA2E300124324 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CODE_SIGN_ENTITLEMENTS = SaveMoneyWidgetExtension.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = P8JKC37U65;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = SaveMoneyWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = SaveMoneyWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.vinhtt.savemoney.SaveMoneyWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		B4CC8ED12F8AA2E300124324 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CODE_SIGN_ENTITLEMENTS = SaveMoneyWidgetExtension.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = P8JKC37U65;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = SaveMoneyWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = SaveMoneyWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.vinhtt.savemoney.SaveMoneyWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		BF7E9A6AD4D791B449535190 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = SaveMoney/SaveMoney.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = P8JKC37U65;
@@ -574,6 +813,15 @@
 			buildConfigurations = (
 				13223112DE1BFC69C08BD7DC /* Debug */,
 				F6DC24A3963ACACBD32C83C8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B4CC8ED32F8AA2E300124324 /* Build configuration list for PBXNativeTarget "SaveMoneyWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B4CC8ED02F8AA2E300124324 /* Debug */,
+				B4CC8ED12F8AA2E300124324 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

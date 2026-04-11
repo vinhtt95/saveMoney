@@ -159,6 +159,8 @@ final class AppViewModel {
         } else {
             self.totalGoldValue = 0.0
         }
+        
+        updateWidget()
     }
     
     var pinnedBudgetId: String? {
@@ -511,6 +513,46 @@ final class AppViewModel {
             recalculateFinancials()
         }
         try await api.updateSettings(settings)
+    }
+    
+    // MARK: - Widget Update
+    private func updateWidget() {
+        // 1. Lấy tháng hiện tại (Định dạng: "yyyy-MM", ví dụ: "2026-04")
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM"
+        let currentMonth = formatter.string(from: Date())
+        
+        // 2. Tính thu chi trong tháng
+        let income = monthlyIncome(period: currentMonth)
+        let expense = monthlyExpense(period: currentMonth)
+        
+        // 3. Xử lý Budget đang ghim
+        var wBudgetName = "Chưa ghim"
+        var wBudgetLimit = 1.0 // Để 1.0 tránh lỗi chia cho 0 ở Widget
+        var wBudgetSpent = 0.0
+        
+        if let pinnedId = pinnedBudgetId, let budget = budgets.first(where: { $0.id == pinnedId }) {
+            wBudgetName = budget.name
+            wBudgetLimit = budget.limit
+            
+            // Tính tổng tiền đã tiêu cho các category của budget này trong khoảng thời gian của budget
+            wBudgetSpent = transactions.filter { tx in
+                tx.type == .expense &&
+                tx.date >= budget.dateStart &&
+                tx.date <= budget.dateEnd &&
+                budget.categoryIds.contains(tx.categoryId ?? "")
+            }.reduce(0) { $0 + abs($1.amount) }
+        }
+        
+        // 4. Đẩy sang WidgetDataManager
+        WidgetDataManager.shared.updateWidgetData(
+            totalBalance: self.totalBalance, // Bạn có thể đổi thành self.netWorth nếu muốn hiện cả vàng
+            income: income,
+            expense: expense,
+            budgetName: wBudgetName,
+            budgetLimit: wBudgetLimit,
+            budgetSpent: wBudgetSpent
+        )
     }
 }
 
