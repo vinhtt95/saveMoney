@@ -19,7 +19,7 @@ struct AccountFormView: View {
     // Cấu hình danh sách lựa chọn
     let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 6)
     let colors = ["orange", "blue", "pink", "purple", "red", "indigo", "green", "teal", "yellow", "brown", "gray", "accent"]
-    let icons = ["creditcard.fill", "banknote.fill", "building.columns.fill", "wallet.pass.fill", "dollarsign.circle.fill", "bitcoinsign.circle.fill", "chart.pie.fill", "lock.fill", "briefcase.fill", "folder.fill", "tray.fill", "archivebox.fill", "cart.fill", "bag.fill"]
+    let icons = AppIcons.allIcons
     
     var body: some View {
         NavigationStack {

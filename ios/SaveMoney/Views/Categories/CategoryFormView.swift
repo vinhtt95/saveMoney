@@ -17,7 +17,7 @@ struct CategoryFormView: View {
     // Cấu hình danh sách lựa chọn
     let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 6)
     let colors = ["orange", "blue", "pink", "purple", "red", "indigo", "green", "teal", "yellow", "brown", "gray", "accent"]
-    let icons = ["fork.knife", "car.fill", "cart.fill", "house.fill", "gamecontroller.fill", "airplane", "heart.fill", "book.fill", "banknote.fill", "bolt.fill", "wifi", "tag.fill", "tshirt.fill", "gift.fill", "pills.fill"]
+    let icons = AppIcons.allIcons
     
     var body: some View {
         NavigationStack {
