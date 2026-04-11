@@ -1,5 +1,6 @@
 import WidgetKit
 import SwiftUI
+import Charts
 
 // MARK: - Model & Entry
 struct DashboardWidgetData {
@@ -9,6 +10,7 @@ struct DashboardWidgetData {
     var budgetName: String
     var budgetLimit: Double
     var budgetSpent: Double
+    var categories: [WidgetCategoryStat]
 }
 
 struct SaveMoneyEntry: TimelineEntry {
@@ -19,26 +21,31 @@ struct SaveMoneyEntry: TimelineEntry {
 // MARK: - Provider
 struct SaveMoneyWidgetProvider: TimelineProvider {
     func placeholder(in context: Context) -> SaveMoneyEntry {
-        SaveMoneyEntry(date: Date(), data: .init(totalBalance: 25000000, income: 30000000, expense: 5000000, budgetName: "Ăn uống", budgetLimit: 5000000, budgetSpent: 3500000))
+        SaveMoneyEntry(date: Date(), data: .init(totalBalance: 25000000, income: 30000000, expense: 5000000, budgetName: "Ăn uống", budgetLimit: 5000000, budgetSpent: 3500000, categories: []))
     }
 
     func getSnapshot(in context: Context, completion: @escaping (SaveMoneyEntry) -> Void) {
-        let entry = SaveMoneyEntry(date: Date(), data: .init(totalBalance: 25000000, income: 30000000, expense: 5000000, budgetName: "Ăn uống", budgetLimit: 5000000, budgetSpent: 3500000))
+        let entry = SaveMoneyEntry(date: Date(), data: .init(totalBalance: 25000000, income: 30000000, expense: 5000000, budgetName: "Ăn uống", budgetLimit: 5000000, budgetSpent: 3500000, categories: []))
         completion(entry)
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<SaveMoneyEntry>) -> Void) {
-        // ĐIỀN ĐÚNG APP GROUP ID
-        // ENTER THE EXACT APP GROUP ID
-        let defaults = UserDefaults(suiteName: "group.com.yourdomain.SaveMoney")
+        let defaults = UserDefaults(suiteName: "group.com.vinhtt.savemoney")
         
         let totalBalance = defaults?.double(forKey: "widget_totalBalance") ?? 0.0
         let income = defaults?.double(forKey: "widget_income") ?? 0.0
         let expense = defaults?.double(forKey: "widget_expense") ?? 0.0
         
         let budgetName = defaults?.string(forKey: "widget_budgetName") ?? "Chưa ghim"
-        let budgetLimit = defaults?.double(forKey: "widget_budgetLimit") ?? 1.0 // Tránh chia cho 0
+        let budgetLimit = defaults?.double(forKey: "widget_budgetLimit") ?? 1.0
         let budgetSpent = defaults?.double(forKey: "widget_budgetSpent") ?? 0.0
+        
+        // Đọc mảng categories
+        var decodedCategories: [WidgetCategoryStat] = []
+        if let data = defaults?.data(forKey: "widget_categories"),
+           let cats = try? JSONDecoder().decode([WidgetCategoryStat].self, from: data) {
+            decodedCategories = cats
+        }
         
         let realData = DashboardWidgetData(
             totalBalance: totalBalance,
@@ -46,15 +53,11 @@ struct SaveMoneyWidgetProvider: TimelineProvider {
             expense: expense,
             budgetName: budgetName,
             budgetLimit: budgetLimit,
-            budgetSpent: budgetSpent
+            budgetSpent: budgetSpent,
+            categories: decodedCategories
         )
         
         let entry = SaveMoneyEntry(date: Date(), data: realData)
-        
-        // Policy .never nghĩa là Widget sẽ không tự động làm mới theo thời gian.
-        // Nó chỉ làm mới khi Main App gọi lệnh `WidgetCenter.shared.reloadAllTimelines()`
-        // The .never policy means the Widget won't auto-refresh over time.
-        // It only refreshes when the Main App calls `WidgetCenter.shared.reloadAllTimelines()`
         let timeline = Timeline(entries: [entry], policy: .never)
         completion(timeline)
     }
@@ -64,47 +67,96 @@ struct SaveMoneyWidgetProvider: TimelineProvider {
 struct SmallBudgetWidgetView: View {
     var entry: SaveMoneyEntry
     
-    private var progress: Double {
-        min(entry.data.budgetSpent / max(entry.data.budgetLimit, 1), 1.0)
+    var spent: Double { entry.data.budgetSpent }
+    var limit: Double { max(entry.data.budgetLimit, 1) }
+    var remaining: Double { max(0, limit - spent) }
+    var isOverspent: Bool { spent >= limit }
+    var overspentAmount: Double { max(0, spent - limit) }
+    
+    // Segment biểu đồ
+    struct ChartSegment: Identifiable {
+        let id = UUID()
+        let name: String
+        let amount: Double
+        let color: Color
+        let isRemaining: Bool
+    }
+    
+    var chartData: [ChartSegment] {
+        var data: [ChartSegment] = []
+        let palette: [Color] = [.blue, .orange, .purple, .pink, .teal, .indigo]
+        
+        // 1. Phân rã danh mục từ App truyền sang
+        for (index, cat) in entry.data.categories.enumerated() {
+            let color = (cat.name == "Khác") ? Color.gray.opacity(0.6) : palette[index % palette.count]
+            data.append(ChartSegment(name: cat.name, amount: cat.amount, color: color, isRemaining: false))
+        }
+        
+        // Fallback: Nếu app chưa truyền danh mục sang nhưng đã có số liệu chi
+        if data.isEmpty && spent > 0 {
+            data.append(ChartSegment(name: "Đã chi", amount: spent, color: DSColors.expense, isRemaining: false))
+        }
+        
+        // 2. Thêm phần "Còn lại" nếu chưa vượt mức
+        if !isOverspent && remaining > 0 {
+            data.append(ChartSegment(name: "Còn lại", amount: remaining, color: DSColors.accent, isRemaining: true))
+        }
+        
+        return data
+    }
+    
+    // Hàm format số tiền viết tắt (Ví dụ: 3tr, 500k)
+    private func formatShortVND(_ amount: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 1
+        formatter.decimalSeparator = ","
+        
+        let val = abs(amount)
+        if val >= 1_000_000_000 {
+            let num = NSNumber(value: val / 1_000_000_000)
+            return (formatter.string(from: num) ?? "") + "tỷ"
+        } else if val >= 1_000_000 {
+            let num = NSNumber(value: val / 1_000_000)
+            return (formatter.string(from: num) ?? "") + "tr"
+        } else if val >= 1_000 {
+            let num = NSNumber(value: val / 1_000)
+            return (formatter.string(from: num) ?? "") + "k"
+        } else {
+            return "\(Int(val))đ"
+        }
     }
     
     var body: some View {
-        VStack(spacing: DSSpacing.md) {
-            HStack {
-                Text(entry.data.budgetName)
-                    .font(.subheadline.bold())
-                    .foregroundStyle(.primary)
-                Spacer()
-                Image(systemName: "pin.fill")
-                    .font(.caption2)
-                    .foregroundStyle(DSColors.accent)
-            }
-            
+        VStack(spacing: DSSpacing.xs) {
+        
             ZStack {
-                Circle()
-                    .stroke(Color.gray.opacity(0.15), lineWidth: 10)
-                
-                Circle()
-                    .trim(from: 0.0, to: progress)
-                    .stroke(
-                        progress > 0.9 ? DSColors.expense : DSColors.accent,
-                        style: StrokeStyle(lineWidth: 10, lineCap: .round)
+                Chart(chartData) { item in
+                    SectorMark(
+                        angle: .value("Số tiền", item.amount),
+                        innerRadius: .ratio(0.65),
+                        angularInset: 1.5
                     )
-                    .rotationEffect(.degrees(-90))
+                    // Nếu vượt mức, ép tất cả các khối đã chi thành màu đỏ. "Còn lại" giữ nguyên (mặc dù lúc này Còn lại = 0 nên sẽ không vẽ)
+                    .foregroundStyle(item.isRemaining ? item.color.gradient : (isOverspent ? DSColors.negative.opacity(0.8).gradient : item.color.gradient))
+                    .cornerRadius(3)
+                }
                 
                 VStack(spacing: 2) {
-                    Text("\(Int(progress * 100))%")
-                        .font(.subheadline.bold())
+                    Text(isOverspent ? "Vượt mức" : "Còn lại")
+                        .font(.system(size: 10))
+                        .foregroundStyle(isOverspent ? DSColors.negative : .secondary)
+                    
+                    Text(formatShortVND(isOverspent ? overspentAmount : remaining))
+                        .font(.caption.weight(.bold).monospacedDigit())
+                        .foregroundStyle(isOverspent ? DSColors.negative : DSColors.accent)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.5)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            
-            Text(formatVND(entry.data.budgetLimit))
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
         .padding(DSSpacing.md)
-        .liquidGlass(in: .rect(cornerRadius: DSRadius.lg))
     }
 }
 

@@ -1,12 +1,17 @@
 import Foundation
 import WidgetKit
 
+// Model trung gian để App gửi mảng danh mục sang Widget
+struct WidgetCategoryStat: Codable, Hashable {
+    let name: String
+    let amount: Double
+}
+
 struct WidgetDataManager {
     static let shared = WidgetDataManager()
     
-    // ĐIỀN ĐÚNG APP GROUP ID ĐÃ TẠO Ở BƯỚC 4
-    // ENTER THE EXACT APP GROUP ID CREATED IN STEP 4
-    private let appGroupID = "group.com.yourdomain.SaveMoney"
+    // Đã thay đổi thành App Group ID chuẩn của bạn
+    private let appGroupID = "group.com.vinhtt.savemoney"
     
     func updateWidgetData(
         totalBalance: Double,
@@ -14,10 +19,11 @@ struct WidgetDataManager {
         expense: Double,
         budgetName: String,
         budgetLimit: Double,
-        budgetSpent: Double
+        budgetSpent: Double,
+        categories: [WidgetCategoryStat] = [] // THÊM BIẾN NÀY
     ) {
         guard let defaults = UserDefaults(suiteName: appGroupID) else {
-            print("Lỗi: Không tìm thấy App Group. Vui lòng kiểm tra lại ID.")
+            print("Lỗi: Không tìm thấy App Group.")
             return
         }
         
@@ -29,8 +35,13 @@ struct WidgetDataManager {
         defaults.set(budgetLimit, forKey: "widget_budgetLimit")
         defaults.set(budgetSpent, forKey: "widget_budgetSpent")
         
-        // Kích hoạt lệnh yêu cầu hệ điều hành vẽ lại Widget ngay lập tức
-        // Trigger the OS to redraw the Widget immediately
+        // Encode mảng danh mục thành Data để lưu vào UserDefaults
+        if let encoded = try? JSONEncoder().encode(categories) {
+            defaults.set(encoded, forKey: "widget_categories")
+        } else {
+            defaults.removeObject(forKey: "widget_categories")
+        }
+        
         WidgetCenter.shared.reloadAllTimelines()
     }
 }

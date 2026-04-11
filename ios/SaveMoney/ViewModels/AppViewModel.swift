@@ -530,28 +530,61 @@ final class AppViewModel {
         var wBudgetName = "Chưa ghim"
         var wBudgetLimit = 1.0 // Để 1.0 tránh lỗi chia cho 0 ở Widget
         var wBudgetSpent = 0.0
+        var wCategories: [WidgetCategoryStat] = [] // Thêm mảng chứa dữ liệu biểu đồ
         
         if let pinnedId = pinnedBudgetId, let budget = budgets.first(where: { $0.id == pinnedId }) {
             wBudgetName = budget.name
             wBudgetLimit = budget.limit
             
-            // Tính tổng tiền đã tiêu cho các category của budget này trong khoảng thời gian của budget
-            wBudgetSpent = transactions.filter { tx in
+            // Lọc các giao dịch thuộc ngân sách đang ghim
+            let relevantTxs = transactions.filter { tx in
                 tx.type == .expense &&
                 tx.date >= budget.dateStart &&
                 tx.date <= budget.dateEnd &&
                 budget.categoryIds.contains(tx.categoryId ?? "")
-            }.reduce(0) { $0 + abs($1.amount) }
+            }
+            
+            // Tính tổng đã chi
+            wBudgetSpent = relevantTxs.reduce(0) { $0 + abs($1.amount) }
+            
+            // Tính toán Top 3 danh mục và gộp phần "Khác"
+            var statsMap: [String: Double] = [:]
+            for tx in relevantTxs {
+                if let catId = tx.categoryId {
+                    statsMap[catId, default: 0] += abs(tx.amount)
+                }
+            }
+            
+            let sortedStats = statsMap.compactMap { (catId, amount) -> (String, Double)? in
+                guard let cat = self.category(for: catId) else { return nil }
+                return (cat.name, amount)
+            }.sorted { $0.1 > $1.1 }
+            
+            var breakdown: [WidgetCategoryStat] = []
+            
+            // Lấy Top 3
+            for stat in sortedStats.prefix(3) {
+                breakdown.append(WidgetCategoryStat(name: stat.0, amount: stat.1))
+            }
+            
+            // Gộp phần còn lại thành "Khác"
+            if sortedStats.count > 3 {
+                let othersAmount = sortedStats.dropFirst(3).reduce(0) { $0 + $1.1 }
+                breakdown.append(WidgetCategoryStat(name: "Khác", amount: othersAmount))
+            }
+            
+            wCategories = breakdown
         }
         
         // 4. Đẩy sang WidgetDataManager
         WidgetDataManager.shared.updateWidgetData(
-            totalBalance: self.totalBalance, // Bạn có thể đổi thành self.netWorth nếu muốn hiện cả vàng
+            totalBalance: self.totalBalance,
             income: income,
             expense: expense,
             budgetName: wBudgetName,
             budgetLimit: wBudgetLimit,
-            budgetSpent: wBudgetSpent
+            budgetSpent: wBudgetSpent,
+            categories: wCategories // Gửi mảng danh mục đã tính toán sang Widget
         )
     }
 }
