@@ -66,7 +66,8 @@ struct TransactionsView: View {
                                             }
                                         }
                                         .padding(.horizontal, DSSpacing.md)
-                                        .liquidGlass(in: .rect(cornerRadius: DSRadius.lg))
+                                        //                                        .liquidGlass(in: .rect(cornerRadius: DSRadius.lg))
+                                        .glassEffect(.regular.tint(DSColors.expense.opacity(0.05)), in: .rect(cornerRadius: DSRadius.lg))
                                         .padding(.horizontal, DSSpacing.lg)
                                     }
                                 }
@@ -90,59 +91,57 @@ struct TransactionsView: View {
             .navigationBarTitleDisplayMode(.inline)
             .searchToolbarBehavior(.minimize)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 12){
-                        Menu {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Menu {
+                        Button {
+                            vm.selectedCategoryId = nil
+                            vm.resetPage()
+                        } label: {
+                            HStack {
+                                Text("Tất cả danh mục")
+                                if vm.selectedCategoryId == nil {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                        
+                        Divider()
+                        
+                        // Lấy danh sách danh mục từ ViewModel
+                        ForEach(vm.topCategories) { cat in
                             Button {
-                                vm.selectedCategoryId = nil
+                                vm.selectedCategoryId = cat.id
                                 vm.resetPage()
                             } label: {
                                 HStack {
-                                    Text("Tất cả danh mục")
-                                    if vm.selectedCategoryId == nil {
+                                    Text(cat.name)
+                                    if vm.selectedCategoryId == cat.id {
                                         Image(systemName: "checkmark")
                                     }
                                 }
                             }
-                            
-                            Divider()
-                            
-                            // Lấy danh sách danh mục từ ViewModel
-                            ForEach(vm.topCategories) { cat in
-                                Button {
-                                    vm.selectedCategoryId = cat.id
-                                    vm.resetPage()
-                                } label: {
-                                    HStack {
-                                        Text(cat.name)
-                                        if vm.selectedCategoryId == cat.id {
-                                            Image(systemName: "checkmark")
-                                        }
-                                    }
-                                }
-                            }
-                        } label: {
-                            // Biểu tượng filter sẽ đổi màu/kiểu khi đang có lọc
-                            Image(systemName: vm.selectedCategoryId == nil ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(vm.selectedCategoryId == nil ? .primary : DSColors.accent)
                         }
-                        
-                        // 3. Menu chọn thời gian (Giữ nguyên style)
-                        Menu {
-                            Picker("Chọn thời gian", selection: Bindable(vm).selectedPeriod) {
-                                ForEach(availablePeriods(), id: \.self) { period in
-                                    Text(periodLabel(period)).tag(period)
-                                }
+                    } label: {
+                        // Biểu tượng filter sẽ đổi màu/kiểu khi đang có lọc
+                        Image(systemName: vm.selectedCategoryId == nil ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(vm.selectedCategoryId == nil ? .primary : DSColors.accent)
+                    }
+                    
+                    Menu {
+                        Picker("Chọn thời gian", selection: Bindable(vm).selectedPeriod) {
+                            ForEach(availablePeriods(), id: \.self) { period in
+                                Text(periodLabel(period)).tag(period)
                             }
-                        } label: {
-                            // Hiển thị tháng đang chọn một cách gọn gàng trên thanh công cụ
-                            Image(systemName: "calendar")
-                                .symbolRenderingMode(.hierarchical)
+                        }
+                    } label: {
+                        // Hiển thị tháng đang chọn một cách gọn gàng trên thanh công cụ
+                        Image(systemName: "calendar")
+                            .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(DSColors.accent)
                             .clipShape(Capsule())
-                        }
                     }
+                    
                 }
             }
             .sheet(item: $editingTransaction) { tx in

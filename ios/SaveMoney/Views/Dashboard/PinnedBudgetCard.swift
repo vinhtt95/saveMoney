@@ -177,7 +177,8 @@ struct PinnedBudgetCard: View {
             }
         }
         .padding(DSSpacing.lg)
-        .liquidGlass(in: .rect(cornerRadius: DSRadius.lg), tint: DSColors.accent.opacity(0.05))
+//        .liquidGlass(in: .rect(cornerRadius: DSRadius.lg), tint: DSColors.accent.opacity(0.05))
+        .glassEffect(.regular.tint(DSColors.expense.opacity(0.05)), in: .rect(cornerRadius: DSRadius.lg))
         .onAppear {
             // Trigger animation sau một nhịp nhỏ để mượt hơn
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {

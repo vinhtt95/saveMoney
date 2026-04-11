@@ -83,6 +83,7 @@ private struct RecentTransactionRow: View {
         }
         .padding(DSSpacing.md)
         // CẬP NHẬT LAYOUT: Sử dụng liquidGlass thay vì glassEffect thông thường
-        .liquidGlass(in: RoundedRectangle(cornerRadius: DSRadius.md))
+//        .liquidGlass(in: RoundedRectangle(cornerRadius: DSRadius.md))
+        .glassEffect(.regular.tint(DSColors.expense.opacity(0.05)), in: .rect(cornerRadius: DSRadius.lg))
     }
 }

@@ -55,14 +55,15 @@ struct DashboardView: View {
                         VStack(spacing: DSSpacing.sm) {
                             Text(balanceTitle) // Sử dụng tiêu đề động
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.primary)
                             Text(formatVND(displayBalance)) // Sử dụng số dư động
                                 .font(.system(size: 32, weight: .bold, design: .rounded).monospacedDigit())
                                 .foregroundStyle(displayBalance >= 0 ? DSColors.positive : DSColors.negative)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(DSSpacing.xl)
-                        .liquidGlass(in: .rect(cornerRadius: DSRadius.xl), tint: DSColors.accent.opacity(0.1), material: .ultraThinMaterial)
+//                        .liquidGlass(in: .rect(cornerRadius: DSRadius.lg), tint: DSColors.accent.opacity(0.1), material: .ultraThinMaterial)
+                        .glassEffect(.regular.tint(DSColors.expense.opacity(0.05)), in: .rect(cornerRadius: DSRadius.lg))
                         .padding(.horizontal, DSSpacing.lg)
                         // 6. Thêm Double Tap Gesture vào card
                         .contentShape(Rectangle()) // Đảm bảo nhận diện tap trên toàn vùng card
@@ -74,8 +75,8 @@ struct DashboardView: View {
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: DSSpacing.sm) {
                             StatCardView(title: "Thu nhập", amount: income, icon: "arrow.down.circle.fill", color: DSColors.income)
                             StatCardView(title: "Chi tiêu", amount: expense, icon: "arrow.up.circle.fill", color: DSColors.expense)
-                            StatCardView(title: "Còn lại", amount: remaining, icon: "equal.circle.fill", color: DSColors.accent, isBalance: true)
-                            StatCardView(title: "Số dư", amount: app.totalBalance, icon: "creditcard.fill", color: .secondary, isBalance: true)
+                            StatCardView(title: "Còn lại", amount: remaining, icon: "equal.circle.fill", color: DSColors.accent)
+                            StatCardView(title: "Số dư", amount: app.totalBalance, icon: "creditcard.fill", color: DSColors.transfer)
                         }
                         .padding(.horizontal, DSSpacing.lg)
                         
@@ -108,7 +109,8 @@ struct DashboardView: View {
                             }
                             .padding(DSSpacing.lg)
                             // Áp dụng Liquid Glass
-                            .liquidGlass(in: .rect(cornerRadius: DSRadius.lg), tint: DSColors.gold.opacity(0.1), material: .ultraThinMaterial)
+//                            .liquidGlass(in: .rect(cornerRadius: DSRadius.lg), tint: DSColors.gold.opacity(0.1), material: .ultraThinMaterial)
+                            .glassEffect(.regular.tint(DSColors.expense.opacity(0.05)), in: .rect(cornerRadius: DSRadius.lg))
                             .padding(.horizontal, DSSpacing.lg)
                         }
                         

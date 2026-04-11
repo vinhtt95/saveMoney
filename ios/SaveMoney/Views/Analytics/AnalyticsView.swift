@@ -60,6 +60,7 @@ struct AnalyticsView: View {
                             CategoryBreakdownChart(data: categoryBreakdown)
                         }
                     }
+                    .glassEffect(.regular.tint(DSColors.expense.opacity(0.05)), in: .rect(cornerRadius: DSRadius.lg))
                     .padding(.horizontal, DSSpacing.lg)
 
                     // Day of Week
@@ -68,6 +69,7 @@ struct AnalyticsView: View {
                             DayOfWeekChart(data: dayOfWeekData)
                         }
                     }
+                    .glassEffect(.regular.tint(DSColors.expense.opacity(0.05)), in: .rect(cornerRadius: DSRadius.lg))
                     .padding(.horizontal, DSSpacing.lg)
 
                     // Projected Spend
