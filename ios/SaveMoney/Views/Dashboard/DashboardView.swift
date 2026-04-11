@@ -131,7 +131,7 @@ struct DashboardView: View {
                 }
                 .background(.clear) // Cực kỳ quan trọng: Giúp nhìn xuyên qua nền phía sau
             }
-            .navigationTitle("") // Hoặc để trống "" nếu bạn đã ẩn title
+            .navigationTitle(Text("Hello Jackie")) // Hoặc để trống "" nếu bạn đã ẩn title
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {

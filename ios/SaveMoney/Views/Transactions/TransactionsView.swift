@@ -87,9 +87,8 @@ struct TransactionsView: View {
                     .refreshable { await app.loadInitData() }
                 }
             }
-            .navigationTitle("")
+            .navigationTitle("History")
             .navigationBarTitleDisplayMode(.inline)
-            .searchToolbarBehavior(.minimize)
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Menu {
@@ -127,7 +126,9 @@ struct TransactionsView: View {
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(vm.selectedCategoryId == nil ? .primary : DSColors.accent)
                     }
-                    
+                }
+                ToolbarSpacer(placement: .topBarTrailing)
+                ToolbarItemGroup(placement: .topBarTrailing){
                     Menu {
                         Picker("Chọn thời gian", selection: Bindable(vm).selectedPeriod) {
                             ForEach(availablePeriods(), id: \.self) { period in
@@ -141,7 +142,6 @@ struct TransactionsView: View {
                             .foregroundStyle(DSColors.accent)
                             .clipShape(Capsule())
                     }
-                    
                 }
             }
             .sheet(item: $editingTransaction) { tx in

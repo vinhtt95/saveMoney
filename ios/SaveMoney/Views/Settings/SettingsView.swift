@@ -71,7 +71,7 @@ struct SettingsView: View {
                         }
                     }
                 }
-                .navigationTitle("")
+                .navigationTitle("Settings")
                 .navigationBarTitleDisplayMode(.inline)
             }
             .onAppear {
