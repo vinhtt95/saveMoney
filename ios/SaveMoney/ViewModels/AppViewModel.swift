@@ -11,6 +11,7 @@ final class AppViewModel {
     var budgets: [Budget] = []
     var goldAssets: [GoldAsset] = []
     var settings: [String: String] = [:]
+    private var isSyncingAndFetching = false
     
     var connectionState: ConnectionState = .loading
     var isLoading = true
@@ -39,10 +40,21 @@ final class AppViewModel {
         }
     }
     
-    private func syncAndFetch() async {
+    func syncAndFetch() async {
+        // Khóa luồng: Ngăn chặn 2 tiến trình đồng bộ chạy đè lên nhau
+        guard !isSyncingAndFetching else { return }
+        isSyncingAndFetching = true
+        defer { isSyncingAndFetching = false }
+        
         if isOnline {
             await syncService.syncPending(isOnline: true)
-            await loadInitData()
+            
+            if store.fetchPendingOps().isEmpty {
+                await loadInitData(bypassOfflineCheck: true)
+            } else {
+                print("⚠️ Sync queue vẫn còn do lỗi hoặc nghẽn. Từ chối fetch Server để bảo toàn data Local.")
+                connectionState = .disconnected
+            }
         } else {
             connectionState = .disconnected
         }
@@ -162,13 +174,28 @@ final class AppViewModel {
     var defaultIncomeCategoryId: String? { settings[SettingsKey.defaultIncomeCategoryId] }
     
     // MARK: - Load
-    func loadInitData() async {
-        // 1. CHẶN ĐỒNG THỜI: Chặn các request chạy cùng 1 mili-giây
+    func loadInitData(bypassOfflineCheck: Bool = false) async {
         guard !isFetchingInit else { return }
         
-        // 2. CHẶN THỜI GIAN (THROTTLE): Chặn các request chạy cách nhau < 3 giây do sự kiện iOS spam
+        // 🛡️ CHẶN GHI ĐÈ: Ưu tiên dữ liệu Local hơn dữ liệu Server
+        if !bypassOfflineCheck {
+            let pendingOps = store.fetchPendingOps()
+            if !pendingOps.isEmpty {
+                if isOnline {
+                    print("⚠️ Dữ liệu Local đang chờ Push. Chuyển hướng sang Sync trước khi Fetch.")
+                    Task { await syncAndFetch() }
+                } else {
+                    print("⚠️ Đang offline. Bỏ qua lệnh lấy từ Server để tránh ghi đè dữ liệu sửa đổi.")
+                    loadFromLocal() // Đảm bảo UI hiện đúng data người dùng vừa sửa/xóa
+                    isLoading = false
+                    connectionState = .disconnected
+                }
+                return
+            }
+        }
+        
+        // CHẶN THỜI GIAN (THROTTLE)
         if let last = lastFetchTime, Date().timeIntervalSince(last) < 3.0 {
-            print("⏳ Bỏ qua request do vừa fetch dữ liệu thành công cách đây \(Int(Date().timeIntervalSince(last))) giây")
             return
         }
         
@@ -194,8 +221,6 @@ final class AppViewModel {
                     settings: data.settings
                 )
                 connectionState = .connected
-                
-                // Ghi nhận thời điểm fetch thành công để chặn spam cho 3 giây tiếp theo
                 lastFetchTime = Date()
                 
             } catch {
@@ -335,10 +360,13 @@ final class AppViewModel {
                 await refreshBalances()
                 recalculateFinancials()
                 return
-            } catch APIError.networkError {
-                // Fall through to offline path
+            } catch { // <--- Xóa "APIError.networkError" để bắt MỌI LỖI (500, Timeout...)
+                print("⚠️ Lỗi API khi xóa: \(error), tự động lưu vào hàng đợi Offline")
+                // Code sẽ tự động lọt xuống khối Offline bên dưới
             }
         }
+        
+        // Luồng Offline
         transactions.removeAll { $0.id == id }
         store.deleteTransaction(id: id)
         if store.hasPendingCreateOp(for: id) {
