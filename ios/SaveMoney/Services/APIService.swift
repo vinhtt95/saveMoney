@@ -8,10 +8,10 @@ enum APIError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .httpError(let code, let message): "Lỗi \(code): \(message)"
-        case .networkError(let error): "Lỗi mạng: \(error.localizedDescription)"
-        case .decodingError(let error): "Lỗi dữ liệu: \(error.localizedDescription)"
-        case .invalidURL: "URL không hợp lệ"
+        case .httpError(let code, let message): return "Lỗi \(code): \(message)"
+        case .networkError(let error): return "Lỗi mạng: \(error.localizedDescription)"
+        case .decodingError(let error): return "Lỗi dữ liệu: \(error.localizedDescription)"
+        case .invalidURL: return "URL không hợp lệ"
         }
     }
 }
@@ -19,6 +19,10 @@ enum APIError: LocalizedError {
 @Observable
 @MainActor
 final class APIService {
+    // Tái sử dụng Encoder/Decoder để tránh rò rỉ bộ nhớ & tăng tốc
+    static let sharedEncoder = JSONEncoder()
+    static let sharedDecoder = JSONDecoder()
+    
     var baseURL: String {
         get {
             let stored = UserDefaults.standard.string(forKey: Constants.apiBaseURLKey) ?? Constants.defaultBaseURL
@@ -54,7 +58,7 @@ final class APIService {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         if let body {
-            req.httpBody = try JSONEncoder().encode(body)
+            req.httpBody = try Self.sharedEncoder.encode(body)
         }
 
         do {
@@ -67,7 +71,7 @@ final class APIService {
                 throw APIError.httpError(http.statusCode, msg)
             }
             do {
-                return try JSONDecoder().decode(T.self, from: data)
+                return try Self.sharedDecoder.decode(T.self, from: data)
             } catch {
                 print("❌ Decoding Error: \(error)")
                 throw APIError.decodingError(error)
@@ -85,7 +89,11 @@ final class APIService {
         var req = URLRequest(url: url, timeoutInterval: 30)
         req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if let body { req.httpBody = try JSONEncoder().encode(body) }
+        
+        if let body {
+            req.httpBody = try Self.sharedEncoder.encode(body)
+        }
+        
         do {
             let (data, response) = try await URLSession.shared.data(for: req)
             if let http = response as? HTTPURLResponse, http.statusCode >= 400 {

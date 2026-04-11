@@ -104,7 +104,9 @@ final class LocalBudget {
     var limit: Double
     var dateStart: String
     var dateEnd: String
-    var categoryIdsJSON: String  // JSON-encoded [String]
+    // Tối ưu: Lưu mảng trực tiếp thay vì parse JSON
+    // Optimization: Store array directly instead of parsing JSON
+    var categoryIds: [String]
     
     init(from budget: Budget) {
         self.id = budget.id
@@ -112,12 +114,11 @@ final class LocalBudget {
         self.limit = budget.limit
         self.dateStart = budget.dateStart
         self.dateEnd = budget.dateEnd
-        self.categoryIdsJSON = (try? String(data: JSONEncoder().encode(budget.categoryIds), encoding: .utf8)) ?? "[]"
+        self.categoryIds = budget.categoryIds
     }
     
     func toBudget() -> Budget {
-        let ids = (try? JSONDecoder().decode([String].self, from: Data(categoryIdsJSON.utf8))) ?? []
-        return Budget(id: id, name: name, limit: limit, dateStart: dateStart, dateEnd: dateEnd, categoryIds: ids)
+        return Budget(id: id, name: name, limit: limit, dateStart: dateStart, dateEnd: dateEnd, categoryIds: categoryIds)
     }
 }
 
@@ -337,10 +338,14 @@ final class LocalDataStore {
         let existingMap = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
         for budget in budgets {
             if let local = existingMap[budget.id] {
-                local.name = budget.name; local.limit = budget.limit
-                local.dateStart = budget.dateStart; local.dateEnd = budget.dateEnd
-                local.categoryIdsJSON = (try? String(data: JSONEncoder().encode(budget.categoryIds), encoding: .utf8)) ?? "[]"
-            } else { context.insert(LocalBudget(from: budget)) }
+                local.name = budget.name
+                local.limit = budget.limit
+                local.dateStart = budget.dateStart
+                local.dateEnd = budget.dateEnd
+                local.categoryIds = budget.categoryIds // Trực tiếp gán mảng (Direct assignment)
+            } else {
+                context.insert(LocalBudget(from: budget))
+            }
         }
         let serverIds = Set(budgets.map { $0.id })
         for local in existing where !serverIds.contains(local.id) { context.delete(local) }

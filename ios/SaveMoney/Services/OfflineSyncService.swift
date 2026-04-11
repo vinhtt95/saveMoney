@@ -6,54 +6,66 @@ final class OfflineSyncService {
     private let store: LocalDataStore
     private(set) var isSyncing = false
 
-    /// Called after sync completes so AppViewModel can reload fresh data
-    var onSyncCompleted: (() async -> Void)?
+    /// Theo dõi số lần thử lại trong phiên mở app hiện tại (Lưu trên RAM)
+    private var sessionRetries: [UUID: Int] = [:]
+
+    var onSyncHalted: (() -> Void)? // Gọi khi chạm mốc 3 lần lỗi
 
     init(api: APIService, store: LocalDataStore) {
         self.api = api
         self.store = store
     }
+    
+    /// Gọi khi user mở lại app (re-open) để reset bộ đếm
+    func resetSession() {
+        sessionRetries.removeAll()
+    }
 
-    func syncPending() async {
+    func syncPending(isOnline: Bool) async {
+        guard isOnline else { return }
         guard !isSyncing else { return }
         isSyncing = true
         defer { isSyncing = false }
-
+        
         let ops = store.fetchPendingOps()
-        guard !ops.isEmpty else {
-            await onSyncCompleted?()
-            return
-        }
-
+        
+        // Trả về luôn nếu không có gì cần đồng bộ (Không gọi callback nữa)
+        guard !ops.isEmpty else { return }
+        
         print("🔄 OfflineSync: processing \(ops.count) pending operations")
-
+        
         for op in ops {
             do {
                 switch op.operationType {
-                case "create":
-                    try await syncCreate(op)
-                case "update":
-                    try await syncUpdate(op)
-                case "delete":
-                    try await syncDelete(op)
-                default:
-                    store.dequeueSyncOp(op)
+                case "create": try await syncCreate(op)
+                case "update": try await syncUpdate(op)
+                case "delete": try await syncDelete(op)
+                default: store.dequeueSyncOp(op)
                 }
+                sessionRetries.removeValue(forKey: op.id)
+                
             } catch APIError.httpError(let statusCode, let message) where statusCode >= 400 && statusCode < 500 {
-                // 4xx = bad request / invalid data — retrying won't help, discard the op
                 print("🗑️ OfflineSync: discarding invalid op \(op.operationType) for \(op.entityId) — server rejected with \(statusCode): \(message)")
                 store.dequeueSyncOp(op)
+                sessionRetries.removeValue(forKey: op.id)
+                
             } catch {
-                print("❌ OfflineSync: failed op \(op.operationType) for \(op.entityId): \(error)")
-                store.incrementRetry(op)
-                // Skip this op and continue with others
+                let currentRetries = sessionRetries[op.id, default: 0] + 1
+                sessionRetries[op.id] = currentRetries
+                
+                print("❌ OfflineSync: failed op for \(op.entityId). Session retry count: \(currentRetries)/3")
+                
+                if currentRetries >= 3 {
+                    print("⚠️ OfflineSync: Max retries (3) reached. Halting queue.")
+                    onSyncHalted?()
+                    return
+                }
+                return
             }
         }
-
-        print("✅ OfflineSync: done, reloading data from server")
-        await onSyncCompleted?()
+        print("✅ OfflineSync: done")
     }
-
+    
     private func syncCreate(_ op: PendingSyncOperation) async throws {
         guard let payloadData = op.payload,
               let dto = try? JSONDecoder().decode(TransactionCreateDTO.self, from: payloadData)
@@ -65,11 +77,8 @@ final class OfflineSyncService {
         let tempId = op.entityId
         let created = try await api.createTransaction(dto)
 
-        // Update local record: replace temp ID with real server ID
         store.updateTransactionId(from: tempId, to: created.id)
-        // Also persist the full server-returned transaction
         store.updatePendingOpsId(from: tempId, to: created.id)
-        
         store.upsertTransaction(created)
 
         store.dequeueSyncOp(op)

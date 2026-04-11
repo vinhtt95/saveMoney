@@ -18,12 +18,8 @@ final class TransactionViewModel {
     
     var filteredTransactions: [Transaction] {
         app.transactions.filter { tx in
-            // Parse ngày từ server sang Date object (đã tự động sang giờ Local)
-            guard let date = parseStorageDate(tx.date) else { return false }
-            
-            // Chuyển Date đó sang định dạng yyyy-MM (Local) để so sánh với selectedPeriod
-            let localPeriod = toYYYYMM(date)
-            let periodMatch = localPeriod == selectedPeriod
+            // So sánh chuỗi trực tiếp (O(1)) thay vì dùng DateFormatter
+            let periodMatch = tx.date.hasPrefix(selectedPeriod)
             
             let categoryMatch = selectedCategoryId == nil || tx.categoryId == selectedCategoryId
             let searchMatch = searchText.isEmpty ||
@@ -49,7 +45,6 @@ final class TransactionViewModel {
             if let ai, let bi { return ai < bi }
             if ai != nil { return true }
             if bi != nil { return false }
-            // Both are date strings, sort descending
             return a > b
         }
         return sortedKeys.compactMap { key in
@@ -62,7 +57,6 @@ final class TransactionViewModel {
     
     func resetPage() { page = 1 }
     
-    // MARK: - Top categories for filter chips
     var topCategories: [Category] {
         let counts = Dictionary(
             grouping: app.transactions.filter { $0.categoryId != nil },

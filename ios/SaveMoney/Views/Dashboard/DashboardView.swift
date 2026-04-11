@@ -48,32 +48,7 @@ struct DashboardView: View {
             ZStack {
                 // MARK: - iOS 18 Background Effect (Blurred Orbs)
 //                LiquidBackgroundView()
-                GeometryReader { geo in
-                    ZStack {
-                        
-                        Color(.systemGroupedBackground).ignoresSafeArea()
-                        
-                        // Các đốm màu (Orbs)
-                        Circle()
-                            .fill(DSColors.income.opacity(0.4))
-                            .frame(width: 300, height: 360)
-                            .blur(radius: 80)
-                            .offset(x: geo.size.width * 0.3, y: geo.size.height * 0.3)
-                        
-                        Circle()
-                            .fill(Color.orange.opacity(0.3))
-                            .frame(width: 500, height: 250)
-                            .blur(radius: 90)
-                            .offset(x: geo.size.width * 0.0, y: geo.size.height * 0.0)
-                        
-                        Circle()
-                            .fill(Color.purple.opacity(0.3))
-                            .frame(width: 300, height: 350)
-                            .blur(radius: 100)
-                            .offset(x: -geo.size.width * 0.3, y: -geo.size.height * 0.4)
-                    }
-                }
-                .ignoresSafeArea()
+                LiquiBackgroundViewNotAnimating()
                 
                 ScrollView {
                     LazyVStack(spacing: DSSpacing.lg) {
