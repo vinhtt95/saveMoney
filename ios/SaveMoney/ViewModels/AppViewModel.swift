@@ -40,19 +40,40 @@ final class AppViewModel {
         }
     }
     
+    // Luồng xử lý tiêu chuẩn: Đồng bộ đẩy lên (nếu có) -> Tải dữ liệu mới về
     func syncAndFetch() async {
-        // Khóa luồng: Ngăn chặn 2 tiến trình đồng bộ chạy đè lên nhau
+        // 1. NGAY LẬP TỨC đổ data Local ra UI (Mất 0.01 giây), không bắt user đợi
+        // 1. IMMEDIATELY load Local data to UI (Takes 0.01s), no waiting
+        loadFromLocal()
+        isLoading = false
+        
+        // 2. Khóa luồng đồng bộ / Sync Lock
         guard !isSyncingAndFetching else { return }
         isSyncingAndFetching = true
         defer { isSyncingAndFetching = false }
         
         if isOnline {
-            await syncService.syncPending(isOnline: true)
+            connectionState = .loading
             
-            if store.fetchPendingOps().isEmpty {
-                await loadInitData(bypassOfflineCheck: true)
+            // 3. Fast Ping với timeout siêu ngắn 1 giây
+            // 3. Fast Ping with a super short 1-second timeout
+            let isReachable = await checkServerReachability(timeout: 1.0)
+            
+            if isReachable {
+                // Server sống -> Chạy hàng đợi đẩy dữ liệu lên
+                await syncService.syncPending(isOnline: true)
+                
+                // Nếu hàng đợi đã dọn sạch -> Kéo data mới nhất từ Server về
+                if store.fetchPendingOps().isEmpty {
+                    await loadInitData(bypassOfflineCheck: true)
+                } else {
+                    print("⚠️ Sync queue is not empty due to errors. Skipping server fetch to protect local data.")
+                    connectionState = .disconnected
+                }
             } else {
-                print("⚠️ Sync queue vẫn còn do lỗi hoặc nghẽn. Từ chối fetch Server để bảo toàn data Local.")
+                // Server chết/lag -> Ép về Offline, user dùng tiếp data Local ở Bước 1
+                // Server dead/lagging -> Force Offline, user continues with Local data from Step 1
+                print("🔴 Fast Ping (1s) failed. Ép App vào trạng thái Offline ngay lập tức.")
                 connectionState = .disconnected
             }
         } else {
@@ -71,6 +92,25 @@ final class AppViewModel {
         guard !wasOnline && isNowOnline else { return }
         print("📶 Network restored")
         Task { await syncAndFetch() }
+    }
+    
+    /// Kiểm tra nhanh xem Server có thực sự phản hồi không (Timeout siêu ngắn: 3s)
+    func checkServerReachability(timeout: TimeInterval = 3.0) async -> Bool {
+        guard isOnline else { return false }
+        guard let url = URL(string: "\(api.baseURL)/api/settings") else { return false }
+        
+        var request = URLRequest(url: url, timeoutInterval: timeout)
+        request.httpMethod = "HEAD"
+        
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            if let http = response as? HTTPURLResponse, http.statusCode < 500 {
+                return true
+            }
+            return false
+        } catch {
+            return false
+        }
     }
     
     // MARK: - Computed
@@ -272,8 +312,8 @@ final class AppViewModel {
     
     // MARK: - Transaction CRUD
     
-    func addTransaction(_ dto: TransactionCreateDTO) async throws {
-        if isOnline {
+    func addTransaction(_ dto: TransactionCreateDTO, forceOffline: Bool = false) async throws {
+        if !forceOffline && isOnline {
             do {
                 let tx = try await api.createTransaction(dto)
                 transactions.insert(tx, at: 0)
@@ -306,11 +346,10 @@ final class AppViewModel {
         store.upsertTransaction(tx)
         let payload = try? JSONEncoder().encode(dto)
         store.enqueueSyncOp(operationType: "create", entityId: tempId, payload: payload)
-        recalculateFinancials()
     }
     
-    func updateTransaction(_ id: String, _ dto: TransactionCreateDTO) async throws {
-        if isOnline {
+    func updateTransaction(_ id: String, _ dto: TransactionCreateDTO, forceOffline: Bool = false) async throws {
+        if !forceOffline && isOnline {
             do {
                 let tx = try await api.updateTransaction(id, dto)
                 if let idx = transactions.firstIndex(where: { $0.id == id }) {
@@ -351,8 +390,8 @@ final class AppViewModel {
         recalculateFinancials()
     }
     
-    func deleteTransaction(_ id: String) async throws {
-        if isOnline {
+    func deleteTransaction(_ id: String, forceOffline: Bool = false) async throws {
+        if !forceOffline && isOnline {
             do {
                 try await api.deleteTransaction(id)
                 transactions.removeAll { $0.id == id }

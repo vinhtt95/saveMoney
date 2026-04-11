@@ -15,6 +15,8 @@ struct AddTransactionView: View {
     @State private var isSubmitting = false
     @State private var errorMessage: String?
     
+    @State private var isServerReachable: Bool = true
+    
     private enum Field {
         case amount
         case note
@@ -337,6 +339,12 @@ struct AddTransactionView: View {
             }
             .onAppear {
                 prefill()
+                Task {
+                    isServerReachable = await app.checkServerReachability()
+                    if !isServerReachable {
+                        print("🔴 Mất kết nối tới Server. Các thao tác sẽ được lưu vào hàng đợi Offline ngay lập tức.")
+                    }
+                }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                     focusedField = .amount
                 }
@@ -403,9 +411,11 @@ struct AddTransactionView: View {
         )
         do {
             if let tx = transaction {
-                try await app.updateTransaction(tx.id, dto)
+                // Truyền forceOffline dựa vào kết quả Ping ban nãy
+                try await app.updateTransaction(tx.id, dto, forceOffline: !isServerReachable)
             } else {
-                try await app.addTransaction(dto)
+                // Truyền forceOffline dựa vào kết quả Ping ban nãy
+                try await app.addTransaction(dto, forceOffline: !isServerReachable)
             }
             onDismiss()
         } catch {
@@ -418,7 +428,8 @@ struct AddTransactionView: View {
         guard let tx = transaction else { return }
         isSubmitting = true
         do {
-            try await app.deleteTransaction(tx.id)
+            // Truyền forceOffline dựa vào kết quả Ping ban nãy
+            try await app.deleteTransaction(tx.id, forceOffline: !isServerReachable)
             onDismiss()
         } catch {
             errorMessage = error.localizedDescription
