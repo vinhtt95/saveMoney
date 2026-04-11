@@ -300,31 +300,84 @@ struct LiquidBackgroundView: View {
     }
 }
 
-struct LiquiBackgroundViewNotAnimating: View{
-    var body: some View{
+// MARK: - Static Random Liquid Background
+struct LiquiBackgroundViewNotAnimating: View {
+    
+    // Cấu trúc lưu trữ thông số của mỗi đốm màu (Orb)
+    private struct OrbConfig {
+        let color: Color
+        let width: CGFloat
+        let height: CGFloat
+        let offsetX: CGFloat // Tỉ lệ vị trí theo chiều ngang màn hình
+        let offsetY: CGFloat // Tỉ lệ vị trí theo chiều dọc màn hình
+        let blur: CGFloat
+    }
+    
+    @State private var orb1: OrbConfig
+    @State private var orb2: OrbConfig
+    @State private var orb3: OrbConfig
+    
+    init() {
+        // Bảng màu (Palette) dùng để random. Bạn có thể thay bằng DSColors nếu muốn.
+        let palette: [Color] = [.orange, .purple, .teal, .pink, .blue, .mint, .indigo, DSColors.income, DSColors.accent]
+        
+        // Orb 1: Vùng ngẫu nhiên ở khu vực dưới / phải
+        _orb1 = State(initialValue: OrbConfig(
+            color: palette.randomElement() ?? .orange,
+            width: CGFloat.random(in: 250...350),
+            height: CGFloat.random(in: 300...400),
+            offsetX: CGFloat.random(in: 0.15...0.4),
+            offsetY: CGFloat.random(in: 0.15...0.4),
+            blur: CGFloat.random(in: 70...100)
+        ))
+        
+        // Orb 2: Vùng ngẫu nhiên ở khu vực giữa trung tâm
+        _orb2 = State(initialValue: OrbConfig(
+            color: palette.randomElement() ?? .purple,
+            width: CGFloat.random(in: 350...550),
+            height: CGFloat.random(in: 200...350),
+            offsetX: CGFloat.random(in: -0.15...0.15),
+            offsetY: CGFloat.random(in: -0.15...0.15),
+            blur: CGFloat.random(in: 80...110)
+        ))
+        
+        // Orb 3: Vùng ngẫu nhiên ở khu vực trên / trái
+        _orb3 = State(initialValue: OrbConfig(
+            color: palette.randomElement() ?? .teal,
+            width: CGFloat.random(in: 250...400),
+            height: CGFloat.random(in: 300...450),
+            offsetX: CGFloat.random(in: -0.4 ... -0.15),
+            offsetY: CGFloat.random(in: -0.4 ... -0.15),
+            blur: CGFloat.random(in: 80...110)
+        ))
+    }
+    
+    var body: some View {
         GeometryReader { geo in
             ZStack {
-                
+                // Nền cơ bản
                 Color(.systemGroupedBackground).ignoresSafeArea()
                 
-                // Các đốm màu (Orbs)
+                // Orb 1 (Dưới phải)
                 Circle()
-                    .fill(DSColors.income.opacity(0.4))
-                    .frame(width: 300, height: 360)
-                    .blur(radius: 80)
-                    .offset(x: geo.size.width * 0.3, y: geo.size.height * 0.3)
+                    .fill(orb1.color.opacity(0.35))
+                    .frame(width: orb1.width, height: orb1.height)
+                    .blur(radius: orb1.blur)
+                    .offset(x: geo.size.width * orb1.offsetX, y: geo.size.height * orb1.offsetY)
                 
+                // Orb 2 (Giữa)
                 Circle()
-                    .fill(Color.orange.opacity(0.3))
-                    .frame(width: 500, height: 250)
-                    .blur(radius: 90)
-                    .offset(x: geo.size.width * 0.0, y: geo.size.height * 0.0)
+                    .fill(orb2.color.opacity(0.3))
+                    .frame(width: orb2.width, height: orb2.height)
+                    .blur(radius: orb2.blur)
+                    .offset(x: geo.size.width * orb2.offsetX, y: geo.size.height * orb2.offsetY)
                 
+                // Orb 3 (Trên trái)
                 Circle()
-                    .fill(Color.purple.opacity(0.3))
-                    .frame(width: 300, height: 350)
-                    .blur(radius: 100)
-                    .offset(x: -geo.size.width * 0.3, y: -geo.size.height * 0.4)
+                    .fill(orb3.color.opacity(0.35))
+                    .frame(width: orb3.width, height: orb3.height)
+                    .blur(radius: orb3.blur)
+                    .offset(x: geo.size.width * orb3.offsetX, y: geo.size.height * orb3.offsetY)
             }
         }
         .ignoresSafeArea()

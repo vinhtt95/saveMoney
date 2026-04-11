@@ -277,9 +277,14 @@ struct AddTransactionView: View {
                     }
                 }
                 .sharedBackgroundVisibility(.hidden)
-                
+                ToolbarItemGroup(placement: .keyboard){
+                    if focusedField != .amount {
+                        Spacer()
+                    }
+                }
                 ToolbarItemGroup(placement: .keyboard){
                     HStack(spacing: 16){
+                        
                         Button("Xong") {
                             focusedField = nil
                         }
@@ -298,6 +303,7 @@ struct AddTransactionView: View {
                 focusedField = .amount
             }
         }
+        .ignoresSafeArea()
     }
     
     // Định dạng dấu chấm khi người dùng gõ
