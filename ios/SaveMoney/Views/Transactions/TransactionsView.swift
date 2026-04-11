@@ -136,16 +136,10 @@ struct TransactionsView: View {
                                 }
                             }
                         } label: {
-                            HStack(spacing: 4) {
-                                Text(periodLabel(vm.selectedPeriod))
-                                    .font(.caption2.weight(.bold))
-                                Image(systemName: "calendar")
-                                    .font(.caption2)
-                            }
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(DSColors.accent)
+                            // Hiển thị tháng đang chọn một cách gọn gàng trên thanh công cụ
+                            Image(systemName: "calendar")
+                                .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(DSColors.accent)
                             .clipShape(Capsule())
                         }
                     }

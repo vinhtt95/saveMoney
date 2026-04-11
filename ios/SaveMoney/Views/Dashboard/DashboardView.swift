@@ -143,18 +143,9 @@ struct DashboardView: View {
                         }
                     } label: {
                         // Hiển thị tháng đang chọn một cách gọn gàng trên thanh công cụ
-                        HStack(spacing: 4) {
-                            Text(periodLabel(selectedPeriod))
-                                .font(.subheadline.weight(.medium))
-                            
-                            Image(systemName: "calendar")
-                                .symbolRenderingMode(.hierarchical)
-                                .font(.title3)
-                        }
+                        Image(systemName: "calendar")
+                            .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(DSColors.accent)
-                        .padding(.vertical, 4)
-                        .padding(.horizontal, 8)
-                        .background(Color.secondary.opacity(0.1))
                         .clipShape(Capsule())
                     }
                 }
