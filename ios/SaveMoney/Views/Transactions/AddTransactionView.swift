@@ -109,41 +109,25 @@ struct AddTransactionView: View {
                         if type != .transfer {
                             HStack {
                                 Label("Danh mục", systemImage: "grid")
-                                    .layoutPriority(1)
-                                
-                                Spacer(minLength: 10)
-                                
-                                Menu {
-                                    Picker("", selection: $categoryId) {
-                                        Text("Chọn danh mục").tag(String?.none)
-                                        ForEach(availableCategories) { cat in
-                                            Text(cat.name).tag(String?.some(cat.id))
-                                        }
+                                Spacer()
+                                Picker("", selection: $categoryId) {
+                                    Text("Chọn danh mục").tag(String?.none)
+                                    ForEach(availableCategories) { cat in
+                                        Text(cat.name).tag(String?.some(cat.id))
                                     }
-                                } label: {
-                                    let selectedCategoryName = availableCategories.first(where: { $0.id == categoryId })?.name ?? "Chọn danh mục"
-                                    
-                                    HStack(spacing: 4) {
-                                        Text(selectedCategoryName)
-                                            .lineLimit(1)
-                                            .truncationMode(.tail)
-                                        Image(systemName: "chevron.up.chevron.down")
-                                            .font(.caption)
-                                    }
-                                    .frame(maxWidth: .infinity, alignment: .trailing)
                                 }
                             }
                             .padding()
-                            
                             Divider().padding(.leading, 44)
                         }
                         
                         HStack {
                             Label("Tài khoản", systemImage: "creditcard")
-                                .layoutPriority(1)
+                                .layoutPriority(1) // Đảm bảo Label không bị thu hẹp
                             
                             Spacer(minLength: 10)
                             
+                            // Dùng Menu bọc ngoài Picker
                             Menu {
                                 Picker("", selection: $accountId) {
                                     Text("Chọn tài khoản").tag(String?.none)
@@ -152,15 +136,20 @@ struct AddTransactionView: View {
                                     }
                                 }
                             } label: {
+                                // --- BẮT ĐẦU PHẦN CUSTOM UI HIỂN THỊ ---
+                                // Lấy tên của tài khoản đang được chọn để hiển thị, nếu null thì hiện mặc định
                                 let selectedName = app.accounts.first(where: { $0.id == accountId })?.name ?? "Chọn tài khoản"
                                 
                                 HStack(spacing: 4) {
                                     Text(selectedName)
                                         .lineLimit(1)
                                         .truncationMode(.tail)
+                                    
+                                    // Thêm icon mũi tên cho giống với Picker mặc định của iOS
                                     Image(systemName: "chevron.up.chevron.down")
                                         .font(.caption)
                                 }
+                                // Cho phép phần label này chiếm hết không gian còn lại và căn phải
                                 .frame(maxWidth: .infinity, alignment: .trailing)
                             }
                         }
@@ -168,31 +157,14 @@ struct AddTransactionView: View {
                         
                         if type == .transfer {
                             Divider().padding(.leading, 44)
-                            
                             HStack {
                                 Label("Đến", systemImage: "arrow.right.circle")
-                                    .layoutPriority(1)
-                                
-                                Spacer(minLength: 10)
-                                
-                                Menu {
-                                    Picker("", selection: $transferToId) {
-                                        Text("Chọn tài khoản").tag(String?.none)
-                                        ForEach(app.accounts.filter { $0.id != accountId }) { acc in
-                                            Text(acc.name).tag(String?.some(acc.id))
-                                        }
+                                Spacer()
+                                Picker("", selection: $transferToId) {
+                                    Text("Chọn tài khoản").tag(String?.none)
+                                    ForEach(app.accounts.filter { $0.id != accountId }) { acc in
+                                        Text(acc.name).tag(String?.some(acc.id))
                                     }
-                                } label: {
-                                    let selectedTransferToName = app.accounts.first(where: { $0.id == transferToId })?.name ?? "Chọn tài khoản"
-                                    
-                                    HStack(spacing: 4) {
-                                        Text(selectedTransferToName)
-                                            .lineLimit(1)
-                                            .truncationMode(.tail)
-                                        Image(systemName: "chevron.up.chevron.down")
-                                            .font(.caption)
-                                    }
-                                    .frame(maxWidth: .infinity, alignment: .trailing)
                                 }
                             }
                             .padding()
@@ -269,6 +241,7 @@ struct AddTransactionView: View {
                                 // Gợi ý mặc định khi chưa có giá trị
                                 Button("5K") { formatAmountInput("5000") }
                                 Button("30K") { formatAmountInput("30000") }
+                                Button("35K") { formatAmountInput("35000") }
                                 Button("300K") { formatAmountInput("300000") }
                             } else {
                                 // Gợi ý động dựa trên số gốc (significant digits)
@@ -295,15 +268,18 @@ struct AddTransactionView: View {
                             }
                         }
                         .font(.system(.callout, design: .monospaced))
+                        Spacer()
+                        Spacer()
                     }
-                    
-                    Spacer()
-                    
+                }
+                
+                ToolbarItemGroup(placement: .keyboard){
                     Button("Xong") {
                         focusedField = nil
                     }
                     .fontWeight(.bold)
-                }            }
+                }
+            }
         }
         .onAppear {
             prefill()
