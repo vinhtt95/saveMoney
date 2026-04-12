@@ -7,6 +7,19 @@ struct TransactionRowView: View {
     private var categoryName: String { app.category(for: tx.categoryId)?.name ?? "—" }
     private var accountName: String { app.account(for: tx.accountId)?.name ?? "—" }
     
+    // THÊM: Computed property để điều chỉnh số tiền hiển thị dựa trên EgoMode
+    private var displayAmount: Double {
+        // Chỉ áp dụng ảo giác nhân/chia 3 cho Thu nhập (Income)
+        guard tx.type == .income else { return tx.amount }
+        
+        if app.egoMode == .humble {
+            return tx.amount * app.humbleFactor
+        } else if app.egoMode == .arrogant {
+            return tx.amount * app.arrogantFactor
+        }
+        return tx.amount
+    }
+    
     var body: some View {
         // Tìm category object từ ID trong app state
         let category = app.categories.first(where: { $0.id == tx.categoryId })
@@ -40,7 +53,8 @@ struct TransactionRowView: View {
             
             Spacer()
             
-            AmountText(amount: tx.amount, type: tx.type, font: .subheadline.weight(.bold).monospacedDigit())
+            // SỬA: Thay tx.amount bằng displayAmount
+            AmountText(amount: displayAmount, type: tx.type, font: .subheadline.weight(.bold).monospacedDigit())
         }
         .padding(.vertical, DSSpacing.sm)
     }

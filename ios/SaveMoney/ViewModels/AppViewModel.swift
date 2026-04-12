@@ -1,5 +1,11 @@
 import Foundation
 
+enum EgoMode: String {
+    case normal = "Normal"
+    case humble = "Humble"
+    case arrogant = "Arrogant"
+}
+
 @Observable
 @MainActor
 final class AppViewModel {
@@ -25,6 +31,21 @@ final class AppViewModel {
     
     var networkMonitor: NetworkMonitor?
     
+    var egoMode: EgoMode = .normal {
+        didSet {
+            UserDefaults.standard.set(egoMode.rawValue, forKey: "ego_mode")
+            recalculateFinancials() // Tính lại ngay lập tức khi switch mode
+        }
+    }
+    
+    var humbleFactor: Double {
+        Double(settings["humble_factor"] ?? "0.33") ?? 0.33
+    }
+    
+    var arrogantFactor: Double {
+        Double(settings["arrogant_factor"] ?? "3.0") ?? 3.0
+    }
+    
     // MARK: - State Caching (Performance Optimization)
     private(set) var totalBalance: Double = 0.0
     private(set) var totalGoldValue: Double = 0.0
@@ -33,6 +54,12 @@ final class AppViewModel {
     init() {
         self.networkMonitor = NetworkMonitor()
         syncService = OfflineSyncService(api: api, store: store)
+        
+        // Load mode đã lưu
+        if let savedMode = UserDefaults.standard.string(forKey: "ego_mode"),
+           let mode = EgoMode(rawValue: savedMode) {
+            self.egoMode = mode
+        }
         
         // Nhận tín hiệu từ SyncService: Quá 3 lần lỗi -> Chuyển thành Offline
         syncService.onSyncHalted = { [weak self] in
@@ -118,11 +145,20 @@ final class AppViewModel {
     
     var netWorth: Double { totalBalance + totalGoldValue }
     
+    var visibleTransactions: [Transaction] {
+        if egoMode == .arrogant {
+            return transactions
+        } else {
+            // Bất kỳ mode nào khác Tự cao đều ẩn các giao dịch có prefix "arrogant_"
+            return transactions.filter { !$0.id.hasPrefix("arrogant_") }
+        }
+    }
+    
     // Hàm trung tâm tính toán lại tất cả các thông số tài chính (Chỉ gọi khi data thay đổi)
     func recalculateFinancials() {
         // 1. Tính toán Account Net Totals (O(N) 1 lần duy nhất)
         var map: [String: Double] = [:]
-        for tx in transactions {
+        for tx in visibleTransactions {
             guard let accountId = tx.accountId else { continue }
             if tx.type == .transfer {
                 map[accountId, default: 0] -= abs(tx.amount)
@@ -135,14 +171,24 @@ final class AppViewModel {
         }
         self.accountNetTotals = map
         
-        // 2. Tính Total Balance
-        self.totalBalance = accounts.reduce(0.0) { sum, account in
+        // 2. Tính Total Balance (Tính toán số tiền gốc trước)
+        let rawTotalBalance = accounts.reduce(0.0) { sum, account in
             let base = accountBalances[account.id] ?? 0
             let net = map[account.id] ?? 0
             return sum + base + net
         }
         
-        // 3. Tính Total Gold Value (Chỉ chạy JSONDecoder 1 lần)
+        // Áp dụng multiplier theo EgoMode cho tổng số dư tiền
+        if egoMode == .humble {
+            self.totalBalance = rawTotalBalance * humbleFactor // Đổi thành nhân
+        } else if egoMode == .arrogant {
+            self.totalBalance = rawTotalBalance * arrogantFactor
+        } else {
+            self.totalBalance = rawTotalBalance
+        }
+        
+        // 3. Tính Total Gold Value (Tài sản)
+        var rawTotalGoldValue = 0.0
         if let cacheString = settings["goldPriceCache"],
            let data = cacheString.data(using: .utf8),
            let cacheData = try? JSONDecoder().decode(GoldPriceCacheData.self, from: data) {
@@ -152,12 +198,19 @@ final class AppViewModel {
                 priceMap[item.id] = item.buy_price
             }
             
-            self.totalGoldValue = goldAssets.reduce(0.0) { sum, asset in
+            rawTotalGoldValue = goldAssets.reduce(0.0) { sum, asset in
                 let price = priceMap[asset.productId] ?? 0.0
                 return sum + (price * asset.quantity)
             }
+        }
+        
+        // Áp dụng multiplier theo EgoMode cho tổng giá trị tài sản
+        if egoMode == .humble {
+            self.totalGoldValue = rawTotalGoldValue * humbleFactor // Đổi thành nhân
+        } else if egoMode == .arrogant {
+            self.totalGoldValue = rawTotalGoldValue * arrogantFactor
         } else {
-            self.totalGoldValue = 0.0
+            self.totalGoldValue = rawTotalGoldValue
         }
         
         updateWidget()
@@ -176,22 +229,36 @@ final class AppViewModel {
         }
     }
     
+    // Sửa hàm tính Thu nhập
     func monthlyIncome(period: String) -> Double {
-        transactions
+        let rawIncome = visibleTransactions
             .filter { $0.type == .income && $0.date.hasPrefix(period) }
             .reduce(0) { $0 + $1.amount }
+        
+        if egoMode == .humble { return rawIncome * humbleFactor }
+        if egoMode == .arrogant { return rawIncome * arrogantFactor }
+        return rawIncome
     }
     
     func monthlyExpense(period: String) -> Double {
-        transactions
+        let rawExpense = visibleTransactions
             .filter { $0.type == .expense && $0.date.hasPrefix(period) }
             .reduce(0) { $0 + abs($1.amount) }
+        
+        if egoMode == .humble { return rawExpense * humbleFactor }
+        if egoMode == .arrogant { return rawExpense * arrogantFactor }
+        return rawExpense
     }
     
+    // Sửa hàm tính số dư từng tài khoản
     func computedBalance(for accountId: String) -> Double {
         let base = accountBalances[accountId] ?? 0
         let net = accountNetTotals[accountId] ?? 0
-        return base + net
+        let rawBal = base + net
+        
+        if egoMode == .humble { return rawBal / 3.0 }
+        if egoMode == .arrogant { return rawBal * 3.0 }
+        return rawBal
     }
     
     func category(for id: String?) -> Category? {
@@ -301,7 +368,16 @@ final class AppViewModel {
     }
     
     private func apply(_ data: AppInitData) {
-        transactions = data.transactions.sorted { $0.date > $1.date }
+        // 1. Lấy lại các giao dịch "Tự cao" đang lưu ở local (không tồn tại trên server)
+        let arrogantTxs = store.fetchAllTransactions().filter { $0.id.hasPrefix("arrogant_") }
+        
+        // 2. Gộp danh sách giao dịch từ Server trả về với danh sách Tự cao ở Local
+        let combinedTransactions = data.transactions + arrogantTxs
+        
+        // 3. Cập nhật và sắp xếp lại theo ngày mới nhất
+        transactions = combinedTransactions.sorted { $0.date > $1.date }
+        
+        // 4. Cập nhật các dữ liệu khác từ Server
         categories = data.categories
         accounts = data.accounts
         accountBalances = data.accountBalances
@@ -309,12 +385,18 @@ final class AppViewModel {
         goldAssets = data.goldAssets
         settings = data.settings
         
+        // 5. Kích hoạt tính toán lại toàn bộ thông số tài chính
         recalculateFinancials()
     }
     
     // MARK: - Transaction CRUD
     
     func addTransaction(_ dto: TransactionCreateDTO, forceOffline: Bool = false) async throws {
+        if egoMode == .arrogant && TransactionType(rawValue: dto.type) == .income {
+            saveArrogantIncomeLocal(dto)
+            return
+        }
+        
         if !forceOffline && isOnline {
             do {
                 let tx = try await api.createTransaction(dto)
@@ -329,6 +411,27 @@ final class AppViewModel {
             }
         }
         saveTransactionOffline(dto)
+    }
+    
+    private func saveArrogantIncomeLocal(_ dto: TransactionCreateDTO) {
+        // Đánh dấu bằng ID đặc biệt để không bị merge đè
+        let tempId = "arrogant_\(UUID().uuidString)"
+        let tx = Transaction(
+            id: tempId,
+            date: dto.date,
+            type: TransactionType(rawValue: dto.type) ?? .expense,
+            categoryId: dto.categoryId,
+            accountId: dto.accountId,
+            transferToId: dto.transferToId,
+            amount: dto.amount,
+            note: (dto.note ?? "") + " (Tự cao mode)" // Note lại cho vui
+        )
+        transactions.insert(tx, at: 0)
+        transactions.sort { $0.date > $1.date }
+        store.upsertTransaction(tx)
+        // LƯU Ý: Tuyệt đối không gọi store.enqueueSyncOp() ở đây
+        
+        recalculateFinancials()
     }
     
     private func saveTransactionOffline(_ dto: TransactionCreateDTO) {
@@ -537,7 +640,7 @@ final class AppViewModel {
             wBudgetLimit = budget.limit
             
             // Lọc các giao dịch thuộc ngân sách đang ghim
-            let relevantTxs = transactions.filter { tx in
+            let relevantTxs = visibleTransactions.filter { tx in // <-- ĐỔI Ở ĐÂY
                 tx.type == .expense &&
                 tx.date >= budget.dateStart &&
                 tx.date <= budget.dateEnd &&

@@ -159,7 +159,9 @@ struct SettingsView: View {
 
 struct DefaultSettingsView: View {
     @Environment(AppViewModel.self) private var app
-    let vm: SettingsViewModel
+    
+    // Đã thay đổi từ `let vm` sang `@Bindable var vm` để cho phép binding ($vm)
+    @Bindable var vm: SettingsViewModel
     
     var body: some View {
         List {
@@ -236,6 +238,36 @@ struct DefaultSettingsView: View {
                     options: vm.incomeCategories.map { ($0.id, $0.name) }
                 ) { newValue in
                     Task { await vm.updateDefaultIncomeCategory(newValue ?? "") }
+                }
+            }
+            
+            // MARK: - Cài đặt Ego Mode (Khiêm tốn / Tự cao)
+            Section(
+                header: Text("Ego Mode"),
+                footer: Text("Số tiền hiển thị trên giao diện")
+            ) {
+                HStack {
+                    Label("Hệ số Khiêm tốn", systemImage: "tortoise")
+                    Spacer()
+                    TextField("3.0", text: $vm.humbleFactor)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 60)
+                        .onChange(of: vm.humbleFactor) { oldValue, newValue in
+                            Task { await vm.saveSettings() }
+                        }
+                }
+                
+                HStack {
+                    Label("Hệ số Tự cao", systemImage: "crown")
+                    Spacer()
+                    TextField("3.0", text: $vm.arrogantFactor)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                        .frame(width: 60)
+                        .onChange(of: vm.arrogantFactor) { oldValue, newValue in
+                            Task { await vm.saveSettings() }
+                        }
                 }
             }
         }

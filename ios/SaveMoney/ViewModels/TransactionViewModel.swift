@@ -17,14 +17,14 @@ final class TransactionViewModel {
     }
     
     var filteredTransactions: [Transaction] {
-        app.transactions.filter { tx in
+        app.visibleTransactions.filter { tx in
             // So sánh chuỗi trực tiếp (O(1)) thay vì dùng DateFormatter
             let periodMatch = tx.date.hasPrefix(selectedPeriod)
             
             let categoryMatch = selectedCategoryId == nil || tx.categoryId == selectedCategoryId
             let searchMatch = searchText.isEmpty ||
-                (tx.note?.localizedCaseInsensitiveContains(searchText) ?? false) ||
-                (app.category(for: tx.categoryId ?? "")?.name.localizedCaseInsensitiveContains(searchText) ?? false)
+            (tx.note?.localizedCaseInsensitiveContains(searchText) ?? false) ||
+            (app.category(for: tx.categoryId ?? "")?.name.localizedCaseInsensitiveContains(searchText) ?? false)
             
             return periodMatch && categoryMatch && searchMatch
         }
@@ -59,7 +59,7 @@ final class TransactionViewModel {
     
     var topCategories: [Category] {
         let counts = Dictionary(
-            grouping: app.transactions.filter { $0.categoryId != nil },
+            grouping: app.visibleTransactions.filter { $0.categoryId != nil },
             by: { $0.categoryId! }
         ).mapValues { $0.count }
         let sorted = counts.sorted { $0.value > $1.value }

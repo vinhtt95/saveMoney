@@ -18,11 +18,21 @@ final class SettingsViewModel {
 
     private let app: AppViewModel
     var pendingOps: [PendingSyncOperation] = []
+    var humbleFactor: String
+    var arrogantFactor: String
 
     init(app: AppViewModel) {
         self.app = app
         self.baseURL = app.api.baseURL
+        self.humbleFactor = app.settings["humble_factor"] ?? "0.33"
+        self.arrogantFactor = app.settings["arrogant_factor"] ?? "3.0"
         refreshPendingOps()
+    }
+    
+    func saveSettings() async {
+        // Hàm app.updateSetting đã được viết sẵn để tự động lưu vào db và update server
+        try? await app.updateSetting("humble_factor", humbleFactor)
+        try? await app.updateSetting("arrogant_factor", arrogantFactor)
     }
     
     func refreshPendingOps() {

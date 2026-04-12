@@ -12,7 +12,7 @@ struct DashboardView: View {
     private var income: Double { app.monthlyIncome(period: selectedPeriod) }
     private var expense: Double { app.monthlyExpense(period: selectedPeriod) }
     private var remaining: Double { income - expense }
-    private var recentTxs: [Transaction] { Array(app.transactions.prefix(Constants.dashboardRecentCount)) }
+    private var recentTxs: [Transaction] { Array(app.visibleTransactions.prefix(Constants.dashboardRecentCount)) }
     
     // 2. Computed property để lấy tiêu đề hiển thị (Tên tài khoản hoặc "Tổng số dư")
     private var balanceTitle: String {
@@ -150,6 +150,24 @@ struct DashboardView: View {
                             .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(DSColors.accent)
                         .clipShape(Capsule())
+                    }
+                }
+                
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(action: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            // Xoay vòng: Normal -> Humble -> Arrogant -> Normal
+                            switch app.egoMode {
+                            case .normal: app.egoMode = .humble
+                            case .humble: app.egoMode = .arrogant
+                            case .arrogant: app.egoMode = .normal
+                            }
+                        }
+                    }) {
+                        // Đổi icon và màu theo trạng thái
+                        Image(systemName: app.egoMode == .humble ? "tortoise.fill" : (app.egoMode == .arrogant ? "hare.fill" : "peacesign"))
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(app.egoMode == .arrogant ? DSColors.gold : DSColors.accent)
                     }
                 }
             }

@@ -37,26 +37,41 @@ struct MainTabView: View {
         // Truyền custom binding vào TabView
         TabView(selection: tabSelection) {
             
-            Tab("Flow", systemImage: "house.fill", value: 0) {
+            Tab(value: 0) {
                 DashboardView()
+            } label: {
+                Label("Flow", systemImage: "house.fill")
+                    .symbolEffect(.bounce, value: selectedTab == 0)
             }
             
-            Tab("History", systemImage: "list.bullet", value: 1) {
+            Tab(value: 1) {
                 TransactionsView()
+            } label: {
+                Label("History", systemImage: "list.bullet")
+                    .symbolEffect(.bounce, value: selectedTab == 1)
             }
             
-            Tab("Insight", systemImage: "chart.bar.fill", value: 2) {
+            Tab(value: 2) {
                 AnalyticsView()
+            } label: {
+                Label("Insight", systemImage: "chart.bar.fill")
+                    .symbolEffect(.bounce, value: selectedTab == 2)
             }
             
-            Tab("Settings", systemImage: "gearshape.fill", value: 3) {
+            Tab(value: 3) {
                 SettingsView()
+            } label: {
+                Label("Settings", systemImage: "gearshape")
+                    .symbolEffect(.rotate)
             }
             
             // Dùng role: .search để ép Apple tách Tab này sang nửa bên phải.
             // Biến nó thành nút (+) và truyền value = 4 để bộ đánh chặn ở trên bắt được.
-            Tab("Thêm", systemImage: "plus", value: 4, role: .search) {
-//                Color.clear // View rỗng vì code đã chặn, không bao giờ load vào màn hình này
+            Tab(value: 4, role: .search) {
+                // View rỗng vì code đã chặn ở Binding
+            } label: {
+                Label("Thêm", systemImage: "plus")
+                    .symbolEffect(.bounce, value: showAddTransaction)
             }
         }
         .tabViewStyle(.sidebarAdaptable) // Ép iOS bật chế độ thanh điều hướng nổi (floating)
