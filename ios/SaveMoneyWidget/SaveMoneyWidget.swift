@@ -245,7 +245,7 @@ struct SaveMoneyWidget: Widget {
         StaticConfiguration(kind: kind, provider: SaveMoneyWidgetProvider()) { entry in
             SaveMoneyWidgetEntryView(entry: entry)
         }
-        .configurationDisplayName("SaveMoney Dashboard")
+        .configurationDisplayName("Save Money Dashboard")
         .description("Theo dõi ngân sách và tổng quan thu chi nhanh chóng.")
         .supportedFamilies([.systemSmall, .systemMedium])
         .contentMarginsDisabled()
