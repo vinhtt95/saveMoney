@@ -454,6 +454,28 @@ final class AppViewModel {
     }
     
     func updateTransaction(_ id: String, _ dto: TransactionCreateDTO, forceOffline: Bool = false) async throws {
+        // CHẶN CRUD SERVER: Không gọi API và không đưa vào hàng đợi nếu là giao dịch ảo hoặc đang bật EgoMode
+        if id.hasPrefix("arrogant_") || egoMode != .normal {
+            let tx = Transaction(
+                id: id,
+                date: dto.date,
+                type: TransactionType(rawValue: dto.type) ?? .expense,
+                categoryId: dto.categoryId,
+                accountId: dto.accountId,
+                transferToId: dto.transferToId,
+                amount: dto.amount,
+                note: dto.note
+            )
+            if let idx = transactions.firstIndex(where: { $0.id == id }) {
+                transactions[idx] = tx
+            }
+            transactions.sort { $0.date > $1.date }
+            store.upsertTransaction(tx)
+            recalculateFinancials()
+            return // Dừng tại đây, không cho rớt xuống luồng gọi Server hay Offline Sync Queue
+        }
+        
+        // --- LUỒNG BÌNH THƯỜNG BÊN DƯỚI DÀNH CHO NORMAL MODE ---
         if !forceOffline && isOnline {
             do {
                 let tx = try await api.updateTransaction(id, dto)
@@ -469,6 +491,8 @@ final class AppViewModel {
                 // Fall through to offline path
             }
         }
+        
+        // Luồng lưu offline thông thường
         let tx = Transaction(
             id: id,
             date: dto.date,
@@ -484,6 +508,7 @@ final class AppViewModel {
         }
         transactions.sort { $0.date > $1.date }
         store.upsertTransaction(tx)
+        
         let payload = try? JSONEncoder().encode(dto)
         let existing = store.fetchPendingOps().first(where: { $0.entityId == id })
         if let existing {
@@ -496,6 +521,15 @@ final class AppViewModel {
     }
     
     func deleteTransaction(_ id: String, forceOffline: Bool = false) async throws {
+        // CHẶN CRUD SERVER: Xóa trực tiếp ở Local, không báo cho Server hay xếp hàng đồng bộ
+        if id.hasPrefix("arrogant_") || egoMode != .normal {
+            transactions.removeAll { $0.id == id }
+            store.deleteTransaction(id: id)
+            recalculateFinancials()
+            return // Dừng tại đây
+        }
+        
+        // --- LUỒNG BÌNH THƯỜNG BÊN DƯỚI DÀNH CHO NORMAL MODE ---
         if !forceOffline && isOnline {
             do {
                 try await api.deleteTransaction(id)
@@ -504,9 +538,8 @@ final class AppViewModel {
                 await refreshBalances()
                 recalculateFinancials()
                 return
-            } catch { // <--- Xóa "APIError.networkError" để bắt MỌI LỖI (500, Timeout...)
+            } catch {
                 print("⚠️ Lỗi API khi xóa: \(error), tự động lưu vào hàng đợi Offline")
-                // Code sẽ tự động lọt xuống khối Offline bên dưới
             }
         }
         

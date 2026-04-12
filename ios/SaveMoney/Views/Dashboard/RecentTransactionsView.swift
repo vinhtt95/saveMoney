@@ -46,6 +46,17 @@ private struct RecentTransactionRow: View {
     private var accountName: String {
         app.account(for: tx.accountId)?.name ?? "—"
     }
+    
+    private var displayAmount: Double {
+        guard tx.type == .income else { return tx.amount }
+        
+        if app.egoMode == .humble {
+            return tx.amount * app.humbleFactor
+        } else if app.egoMode == .arrogant {
+            return tx.amount * app.arrogantFactor
+        }
+        return tx.amount
+    }
 
     var body: some View {
         let cat = app.category(for: tx.categoryId)
@@ -75,15 +86,13 @@ private struct RecentTransactionRow: View {
             Spacer()
 
             VStack(alignment: .trailing, spacing: 4) {
-                AmountText(amount: tx.amount, type: tx.type, font: .subheadline.weight(.bold).monospacedDigit())
+                AmountText(amount: displayAmount, type: tx.type, font: .subheadline.weight(.bold).monospacedDigit())
                 Text(formatDate(tx.date))
                     .font(.caption2)
                     .foregroundStyle(.tertiary)
             }
         }
         .padding(DSSpacing.md)
-        // CẬP NHẬT LAYOUT: Sử dụng liquidGlass thay vì glassEffect thông thường
-//        .liquidGlass(in: RoundedRectangle(cornerRadius: DSRadius.md))
         .glassEffect(.regular.tint(DSColors.expense.opacity(0.05)), in: .rect(cornerRadius: DSRadius.lg))
     }
 }
