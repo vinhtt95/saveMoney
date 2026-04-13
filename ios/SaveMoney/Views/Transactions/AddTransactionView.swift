@@ -39,6 +39,75 @@ struct AddTransactionView: View {
         }
     }
     
+    // Hàm format số thành dạng viết tắt: 2K6, 26K68, 266K8...
+    private func formatShorthand(_ value: Double) -> String {
+        let intValue = Int(value)
+        
+        // Formatter để dự phòng nếu dùng số thường (vd: 266.880)
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.groupingSeparator = "."
+        
+        if intValue >= 1_000_000 {
+            return formatter.string(from: NSNumber(value: intValue)) ?? "\(intValue)"
+        } else if intValue >= 1_000 {
+            let thousands = intValue / 1_000
+            let remainder = intValue % 1_000
+            
+            if remainder == 0 {
+                return "\(thousands)K" // VD: 26000 -> 26K
+            } else {
+                // Xử lý phần dư (VD: 680 -> "68", 800 -> "8", 660 -> "66")
+                var remStr = String(format: "%03d", remainder)
+                while remStr.hasSuffix("0") {
+                    remStr.removeLast()
+                }
+                
+                // Quy tắc:
+                // - remStr.count <= 2: phần sau K chỉ tối đa 2 chữ số (vd: 26K68)
+                // - thousands < 100 || remStr.count == 1: Nếu số đã lên hàng trăm nghìn (vd: 266K), chỉ cho phép 1 chữ số dư (266K8).
+                // Ngược lại (vd: 266.880), trả về số thường.
+                if remStr.count <= 2 && (thousands < 100 || remStr.count == 1) {
+                    return "\(thousands)K\(remStr)"
+                } else {
+                    return formatter.string(from: NSNumber(value: intValue)) ?? "\(intValue)"
+                }
+            }
+        }
+        
+        return formatter.string(from: NSNumber(value: intValue)) ?? "\(intValue)"
+    }
+    
+    // Hàm tính toán danh sách các số gợi ý dựa vào số đang nhập
+    private func getSuggestionTargets(for inputAmount: Double) -> [Double] {
+        var targets: [Double] = []
+        guard inputAmount > 0 else { return targets }
+        
+        // 1. Tìm số lõi (baseValue)
+        var val = Int(inputAmount)
+        while val > 0 && val % 10 == 0 { val /= 10 }
+        let baseValue = val
+        
+        // 2. Tìm đúng 3 gợi ý thỏa mãn điều kiện
+        var multiplier = 10
+        while targets.count < 3 {
+            let candidate = Double(baseValue * multiplier)
+            
+            if candidate > inputAmount && candidate >= 1_000 {
+                if candidate < 1_000_000 {
+                    targets.append(candidate)
+                } else {
+                    break // Đã vượt 1 triệu, dừng thuật toán
+                }
+            }
+            
+            multiplier *= 10
+            if multiplier > 1_000_000_000 { break } // Cầu chì an toàn
+        }
+        
+        return targets
+    }
+    
     private var projectedBalance: Double? {
         guard let accId = accountId else { return nil }
         
@@ -274,6 +343,7 @@ struct AddTransactionView: View {
                     }
                     
                     // Toolbar hỗ trợ nhập nhanh trên bàn phím
+                    
                     ToolbarItemGroup(placement: .keyboard) {
                         if focusedField == .amount {
                             HStack(spacing: 16) {
@@ -284,32 +354,15 @@ struct AddTransactionView: View {
                                     Button("35K") { formatAmountInput("35000") }.padding(.vertical ,5)
                                     Button("300K") { formatAmountInput("300000") }.padding(.vertical ,5)
                                 } else {
-                                    // Gợi ý động dựa trên số gốc (significant digits)
-                                    let baseValue: Double = {
-                                        var val = Int(amount)
-                                        while val >= 10 && val % 10 == 0 { val /= 10 }
-                                        return Double(val)
-                                    }()
-                                    
-                                    let targets: [Double] = [
-                                        baseValue * 1_000,
-                                        baseValue * 10_000,
-                                        baseValue * 100_000
-                                    ]
-                                    
-                                    ForEach(targets, id: \.self) { target in
-                                        // Giới hạn gợi ý tối đa 900.000 như bạn yêu cầu
-                                        if target <= 900_000 {
-                                            Button(formatVNDShort(target).replacingOccurrences(of: "₫", with: "")) {
-                                                formatAmountInput(String(Int(target)))
-                                            }.padding(.vertical ,5)
-                                        }
+                                    // Gọi hàm tính toán đã tách riêng
+                                    ForEach(getSuggestionTargets(for: amount), id: \.self) { target in
+                                        Button(formatShorthand(target)) {
+                                            formatAmountInput(String(Int(target)))
+                                        }.padding(.vertical ,5)
                                     }
                                 }
                             }
-                            //                        .background(.bar.opacity(0.5), in: .capsule)
                             .glassEffect()
-                            //                        .shadow(color: .black.opacity(0.2), radius: 20, y: 10)
                             .padding(.bottom, 10)
                             .font(.system(.callout, design: .monospaced))
                             Spacer()
