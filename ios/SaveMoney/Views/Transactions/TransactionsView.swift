@@ -16,6 +16,7 @@ struct TransactionsView: View {
     }
     
     var body: some View {
+        let _ = app.transactions
         NavigationStack {
             ZStack {
                 // MARK: - Nền hiệu ứng giống trang Flow

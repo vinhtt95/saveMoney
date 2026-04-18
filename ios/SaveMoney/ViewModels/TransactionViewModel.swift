@@ -37,19 +37,24 @@ final class TransactionViewModel {
     var hasMore: Bool { filteredTransactions.count > page * Constants.pageSize }
     
     var groupedTransactions: [(String, [Transaction])] {
-        let grouped = Dictionary(grouping: paginatedTransactions) { dateLabel($0.date) }
-        let order = ["Hôm nay", "Hôm qua"]
-        let sortedKeys = grouped.keys.sorted { a, b in
-            let ai = order.firstIndex(of: a)
-            let bi = order.firstIndex(of: b)
-            if let ai, let bi { return ai < bi }
-            if ai != nil { return true }
-            if bi != nil { return false }
-            return a > b
+        // 1. Gom nhóm theo chuỗi ngày chuẩn "yyyy-MM-dd" để đảm bảo sort chính xác
+        let grouped = Dictionary(grouping: paginatedTransactions) { tx -> String in
+            guard let date = parseStorageDate(tx.date) else {
+                return String(tx.date.prefix(10))
+            }
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            formatter.timeZone = TimeZone.current
+            return formatter.string(from: date)
         }
+        
+        // 2. Sắp xếp key "yyyy-MM-dd" theo thứ tự giảm dần (mới nhất lên đầu)
+        let sortedKeys = grouped.keys.sorted(by: >)
+        
+        // 3. Map lại thành mảng tuple, lấy dateLabel từ giao dịch đầu tiên của nhóm
         return sortedKeys.compactMap { key in
-            guard let txs = grouped[key] else { return nil }
-            return (key, txs)
+            guard let txs = grouped[key], let firstTx = txs.first else { return nil }
+            return (dateLabel(firstTx.date), txs)
         }
     }
     
