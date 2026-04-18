@@ -6,47 +6,55 @@ struct DashboardView: View {
     @State private var selectedPeriod = toYYYYMM(Date())
     @State private var periods = availablePeriods()
     @State private var isRefreshing = false
-    // 1. Thêm State để lưu ID tài khoản đang hiển thị (nil nghĩa là "Tổng số dư")
-    @State private var displayedAccountID: String? = nil
+    
+    // 1. Dùng @AppStorage lưu vĩnh viễn trạng thái chọn Account ("" nghĩa là "Tổng số dư")
+    @AppStorage("dashboardDisplayedAccountID", store: UserDefaults(suiteName: Constants.appGroup))
+    private var displayedAccountID: String = ""
     
     private var income: Double { app.monthlyIncome(period: selectedPeriod) }
     private var expense: Double { app.monthlyExpense(period: selectedPeriod) }
     private var remaining: Double { income - expense }
     private var recentTxs: [Transaction] { Array(app.visibleTransactions.prefix(Constants.dashboardRecentCount)) }
     
-    // 2. Computed property để lấy tiêu đề hiển thị (Tên tài khoản hoặc "Tổng số dư")
+    // 2. Computed property lấy tên tài khoản (hoặc "Tổng số dư")
     private var balanceTitle: String {
-        if let id = displayedAccountID, let account = app.accounts.first(where: { $0.id == id }) {
+        if !displayedAccountID.isEmpty, let account = app.accounts.first(where: { $0.id == displayedAccountID }) {
             return account.name
         }
         return "Tổng số dư"
     }
     
-    // 3. Computed property để lấy số tiền hiển thị tương ứng
+    // 3. Computed property lấy số dư
     private var displayBalance: Double {
-        if let id = displayedAccountID {
-            return app.computedBalance(for: id)
+        if !displayedAccountID.isEmpty {
+            return app.computedBalance(for: displayedAccountID)
         }
         return app.totalBalance
     }
     
-    // 4. Hàm logic để xoay vòng: Tổng -> Tài khoản 1 -> Tài khoản 2 -> ... -> Tổng
+    // 4. Hàm đồng bộ Widget (Gọi khi thay đổi account hoặc có giao dịch mới làm tiền thay đổi)
+    private func syncWidgetData() {
+        WidgetDataManager.shared.updateSelectedAccount(title: balanceTitle, balance: displayBalance)
+    }
+    
+    // 5. Hàm logic xoay vòng: Tổng -> Tài khoản 1 -> Tài khoản 2 -> ... -> Tổng
     private func toggleAccountBalance() {
-        // Tạo danh sách ID bao gồm nil (tổng) và tất cả ID tài khoản hiện có
-        let allIDs: [String?] = [nil] + app.accounts.map { $0.id }
+        let allIDs: [String] = [""] + app.accounts.map { $0.id }
+        let currentIndex = allIDs.firstIndex(of: displayedAccountID) ?? 0
+        let nextIndex = (currentIndex + 1) % allIDs.count
         
-        if let currentIndex = allIDs.firstIndex(of: displayedAccountID) {
-            let nextIndex = (currentIndex + 1) % allIDs.count
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                displayedAccountID = allIDs[nextIndex]
-            }
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            displayedAccountID = allIDs[nextIndex]
         }
+        
+        // Đồng bộ lên widget ngay khi xoay vòng
+        syncWidgetData()
     }
     
     var body: some View {
         NavigationStack {
             ZStack {
-                // MARK: - iOS 18 Background Effect (Blurred Orbs)
+                // MARK: - iOS 18 Background Effect
 //                LiquidBackgroundView()
                 LiquiBackgroundViewNotAnimating()
                 
@@ -63,11 +71,9 @@ struct DashboardView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding(DSSpacing.xl)
-//                        .liquidGlass(in: .rect(cornerRadius: DSRadius.lg), tint: DSColors.accent.opacity(0.1), material: .ultraThinMaterial)
                         .glassEffect(.regular.tint(DSColors.expense.opacity(0.05)), in: .rect(cornerRadius: DSRadius.lg))
                         .padding(.horizontal, DSSpacing.lg)
-                        // 6. Thêm Double Tap Gesture vào card
-                        .contentShape(Rectangle()) // Đảm bảo nhận diện tap trên toàn vùng card
+                        .contentShape(Rectangle()) // Đảm bảo nhận diện tap
                         .onTapGesture(count: 2) {
                             toggleAccountBalance()
                         }
@@ -81,7 +87,7 @@ struct DashboardView: View {
                         }
                         .padding(.horizontal, DSSpacing.lg)
                         
-                        // Net Worth (shown when gold assets exist)
+                        // Net Worth
                         if !app.goldAssets.isEmpty {
                             HStack(alignment: .firstTextBaseline, spacing: DSSpacing.sm){
                                 VStack(alignment: .leading, spacing: DSSpacing.sm) {
@@ -109,8 +115,6 @@ struct DashboardView: View {
                                 }
                             }
                             .padding(DSSpacing.lg)
-                            // Áp dụng Liquid Glass
-//                            .liquidGlass(in: .rect(cornerRadius: DSRadius.lg), tint: DSColors.gold.opacity(0.1), material: .ultraThinMaterial)
                             .glassEffect(.regular.tint(DSColors.expense.opacity(0.05)), in: .rect(cornerRadius: DSRadius.lg))
                             .padding(.horizontal, DSSpacing.lg)
                         }
@@ -130,22 +134,19 @@ struct DashboardView: View {
                     }
                     .padding(.top, DSSpacing.md)
                 }
-                .background(.clear) // Cực kỳ quan trọng: Giúp nhìn xuyên qua nền phía sau
+                .background(.clear)
             }
-            .navigationTitle(Text("Hello Jackie")) // Hoặc để trống "" nếu bạn đã ẩn title
+            .navigationTitle(Text("Hello Jackie"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
-                        // Sử dụng trực tiếp danh sách periods mày đã có
                         Picker("Chọn thời gian", selection: $selectedPeriod) {
                             ForEach(periods, id: \.self) { period in
-                                // Dùng hàm periodLabel mày đã viết để hiển thị tên tháng
                                 Text(periodLabel(period)).tag(period)
                             }
                         }
                     } label: {
-                        // Hiển thị tháng đang chọn một cách gọn gàng trên thanh công cụ
                         Image(systemName: "calendar")
                             .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(DSColors.accent)
@@ -156,7 +157,6 @@ struct DashboardView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Button(action: {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            // Xoay vòng: Normal -> Humble -> Arrogant -> Normal
                             switch app.egoMode {
                             case .normal: app.egoMode = .humble
                             case .humble: app.egoMode = .arrogant
@@ -164,7 +164,6 @@ struct DashboardView: View {
                             }
                         }
                     }) {
-                        // Đổi icon và màu theo trạng thái
                         Image(systemName: app.egoMode == .humble ? "tortoise.fill" : (app.egoMode == .arrogant ? "hare.fill" : "peacesign"))
                             .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(app.egoMode == .arrogant ? DSColors.gold : DSColors.accent)
@@ -172,6 +171,10 @@ struct DashboardView: View {
                 }
             }
             .refreshable { await app.loadInitData() }
+            // Tự động update sang Widget khi có giao dịch mới (số dư thay đổi) hoặc sửa tài khoản
+            .onChange(of: app.transactions) { syncWidgetData() }
+            .onChange(of: app.accounts) { syncWidgetData() }
+            .onAppear { syncWidgetData() }
         }
     }
 }

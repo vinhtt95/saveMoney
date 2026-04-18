@@ -10,8 +10,8 @@ struct WidgetCategoryStat: Codable, Hashable {
 struct WidgetDataManager {
     static let shared = WidgetDataManager()
     
-    // Đã thay đổi thành App Group ID chuẩn của bạn
-    private let appGroupID = "group.com.vinhtt.savemoney"
+    // Sử dụng Constants.appGroup
+    private let appGroupID = Constants.appGroup
     
     func updateWidgetData(
         totalBalance: Double,
@@ -20,7 +20,7 @@ struct WidgetDataManager {
         budgetName: String,
         budgetLimit: Double,
         budgetSpent: Double,
-        categories: [WidgetCategoryStat] = [] // THÊM BIẾN NÀY
+        categories: [WidgetCategoryStat] = []
     ) {
         guard let defaults = UserDefaults(suiteName: appGroupID) else {
             print("Lỗi: Không tìm thấy App Group.")
@@ -42,6 +42,14 @@ struct WidgetDataManager {
             defaults.removeObject(forKey: "widget_categories")
         }
         
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+    
+    // Hàm mới: Chỉ cập nhật Account đã chọn mà không đụng tới lịch sử / ngân sách khác
+    func updateSelectedAccount(title: String, balance: Double) {
+        guard let defaults = UserDefaults(suiteName: appGroupID) else { return }
+        defaults.set(title, forKey: "widget_balanceTitle")
+        defaults.set(balance, forKey: "widget_displayBalance")
         WidgetCenter.shared.reloadAllTimelines()
     }
 }

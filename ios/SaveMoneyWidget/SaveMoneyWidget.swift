@@ -4,6 +4,8 @@ import Charts
 
 // MARK: - Model & Entry
 struct DashboardWidgetData {
+    var balanceTitle: String     // Thêm
+    var displayBalance: Double   // Thêm
     var totalBalance: Double
     var income: Double
     var expense: Double
@@ -21,15 +23,16 @@ struct SaveMoneyEntry: TimelineEntry {
 // MARK: - Provider
 struct SaveMoneyWidgetProvider: TimelineProvider {
     func placeholder(in context: Context) -> SaveMoneyEntry {
-        SaveMoneyEntry(date: Date(), data: .init(totalBalance: 25000000, income: 30000000, expense: 5000000, budgetName: "Ăn uống", budgetLimit: 5000000, budgetSpent: 3500000, categories: []))
+        SaveMoneyEntry(date: Date(), data: .init(balanceTitle: "Tổng số dư", displayBalance: 25000000, totalBalance: 25000000, income: 30000000, expense: 5000000, budgetName: "Ăn uống", budgetLimit: 5000000, budgetSpent: 3500000, categories: []))
     }
 
     func getSnapshot(in context: Context, completion: @escaping (SaveMoneyEntry) -> Void) {
-        let entry = SaveMoneyEntry(date: Date(), data: .init(totalBalance: 25000000, income: 30000000, expense: 5000000, budgetName: "Ăn uống", budgetLimit: 5000000, budgetSpent: 3500000, categories: []))
+        let entry = SaveMoneyEntry(date: Date(), data: .init(balanceTitle: "Tổng số dư", displayBalance: 25000000, totalBalance: 25000000, income: 30000000, expense: 5000000, budgetName: "Ăn uống", budgetLimit: 5000000, budgetSpent: 3500000, categories: []))
         completion(entry)
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<SaveMoneyEntry>) -> Void) {
+        // Cần đảm bảo chuỗi ID này khớp với file Constants.swift (group.com.vinhtt.savemoney)
         let defaults = UserDefaults(suiteName: "group.com.vinhtt.savemoney")
         
         let totalBalance = defaults?.double(forKey: "widget_totalBalance") ?? 0.0
@@ -40,6 +43,10 @@ struct SaveMoneyWidgetProvider: TimelineProvider {
         let budgetLimit = defaults?.double(forKey: "widget_budgetLimit") ?? 1.0
         let budgetSpent = defaults?.double(forKey: "widget_budgetSpent") ?? 0.0
         
+        // Đọc dữ liệu từ Account đã được Double Tap
+        let balanceTitle = defaults?.string(forKey: "widget_balanceTitle") ?? "Tổng số dư"
+        let displayBalance = defaults?.double(forKey: "widget_displayBalance") ?? totalBalance
+        
         // Đọc mảng categories
         var decodedCategories: [WidgetCategoryStat] = []
         if let data = defaults?.data(forKey: "widget_categories"),
@@ -48,6 +55,8 @@ struct SaveMoneyWidgetProvider: TimelineProvider {
         }
         
         let realData = DashboardWidgetData(
+            balanceTitle: balanceTitle,
+            displayBalance: displayBalance,
             totalBalance: totalBalance,
             income: income,
             expense: expense,
@@ -92,12 +101,12 @@ struct SmallBudgetWidgetView: View {
             data.append(ChartSegment(name: cat.name, amount: cat.amount, color: color, isRemaining: false))
         }
         
-        // Fallback: Nếu app chưa truyền danh mục sang nhưng đã có số liệu chi
+        // Fallback
         if data.isEmpty && spent > 0 {
             data.append(ChartSegment(name: "Đã chi", amount: spent, color: DSColors.expense, isRemaining: false))
         }
         
-        // 2. Thêm phần "Còn lại" nếu chưa vượt mức
+        // 2. Thêm phần "Còn lại"
         if !isOverspent && remaining > 0 {
             data.append(ChartSegment(name: "Còn lại", amount: remaining, color: DSColors.accent, isRemaining: true))
         }
@@ -105,7 +114,6 @@ struct SmallBudgetWidgetView: View {
         return data
     }
     
-    // Hàm format số tiền viết tắt (Ví dụ: 3tr, 500k)
     private func formatShortVND(_ amount: Double) -> String {
         let formatter = NumberFormatter()
         formatter.minimumFractionDigits = 0
@@ -129,7 +137,6 @@ struct SmallBudgetWidgetView: View {
     
     var body: some View {
         VStack(spacing: DSSpacing.xs) {
-        
             ZStack {
                 Chart(chartData) { item in
                     SectorMark(
@@ -137,7 +144,6 @@ struct SmallBudgetWidgetView: View {
                         innerRadius: .ratio(0.65),
                         angularInset: 1.5
                     )
-                    // Nếu vượt mức, ép tất cả các khối đã chi thành màu đỏ. "Còn lại" giữ nguyên (mặc dù lúc này Còn lại = 0 nên sẽ không vẽ)
                     .foregroundStyle(item.isRemaining ? item.color.gradient : (isOverspent ? DSColors.negative.opacity(0.8).gradient : item.color.gradient))
                     .cornerRadius(3)
                 }
@@ -166,10 +172,12 @@ struct MediumOverviewWidgetView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: DSSpacing.md) {
             VStack(alignment: .leading, spacing: DSSpacing.xs) {
-                Text("Tổng số dư")
+                // Hiển thị động Tên Tài Khoản đã chọn (hoặc Tổng số dư)
+                Text(entry.data.balanceTitle)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                AmountText(amount: entry.data.totalBalance, type: .account, font: .title3.bold())
+                // Hiển thị động Số tiền ứng với Account đó
+                AmountText(amount: entry.data.displayBalance, type: .account, font: .title3.bold())
             }
             .padding(.horizontal, DSSpacing.md)
             

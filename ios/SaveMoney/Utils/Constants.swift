@@ -8,6 +8,9 @@ enum Constants {
     static let apiBaseURLKey = "api_base_url"
     static let goldPriceCacheKey = "gold_price_cache"
     static let themePreferenceKey = "theme_preference"
+    // Thêm App Group ID chuẩn của bạn vào đây
+    static let appGroup = "group.com.vinhtt.savemoney"
+    
     // Gold conversion: 1 tael (lượng) = 37.5g = 1.2057 troy oz
     static let taelToGrams: Double = 37.5
     static let taelToTroyOz: Double = 1.2057
